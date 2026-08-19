@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Kindle Reader",
+    "slug": "matheus",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "android": {
+      "package": "com.kindle.reader",
+      "versionCode": 1
+    },
+    "userInterfaceStyle": "automatic",
+    "scheme": "kindlereader",
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-asset",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "fd89ca78-4621-4457-bace-07638decbb2e"
+      }
+    },
+    "owner": "matheusborba19s-team"
+  }
+}

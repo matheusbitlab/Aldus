@@ -1,0 +1,1 @@
+export function sanitizeUrl(value: string): string | null { try { const url = new URL(value.trim()); if (url.protocol !== "http:" && url.protocol !== "https:") return null; ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid"].forEach((key) => url.searchParams.delete(key)); return url.toString(); } catch { return null; } }

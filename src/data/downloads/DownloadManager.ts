@@ -1,0 +1,15 @@
+import * as FileSystem from "expo-file-system";
+import { DownloadError } from "@/src/core/errors/DownloadErrors";
+import { DownloadJob } from "@/src/domain/types/download";
+import { EpubFileImporter } from "@/src/data/epub/EpubFileImporter";
+import { assertStorageAvailable } from "@/src/data/downloads/StorageValidator";
+import { withExponentialBackoff } from "@/src/core/utils/retry";
+import { NetworkStatusService } from "@/src/data/downloads/NetworkStatusService";
+
+export class DownloadManager {
+  private readonly tasks = new Map<string, FileSystem.DownloadResumable>();
+  constructor(private readonly epubImporter: EpubFileImporter, private readonly network = new NetworkStatusService()) {}
+  async download(job: DownloadJob, onUpdate: (job: DownloadJob) => void): Promise<DownloadJob> { return withExponentialBackoff(() => this.downloadOnce(job, onUpdate), 3, 1000); }
+  private async downloadOnce(job: DownloadJob, onUpdate: (job: DownloadJob) => void): Promise<DownloadJob> { const root = FileSystem.documentDirectory; if (!root) throw new DownloadError("Diretório local indisponível."); await this.network.assertConnected(); await assertStorageAvailable(); const directory = `${root}books/`; const tempDirectory = `${directory}temp/`; const importedDirectory = `${directory}imported/`; await FileSystem.makeDirectoryAsync(tempDirectory, { intermediates: true }); await FileSystem.makeDirectoryAsync(importedDirectory, { intermediates: true }); const safeName = job.fileName.replace(/[^a-zA-Z0-9._-]/g, "_"); const tempUri = `${tempDirectory}${job.id}-${safeName}`; const importedUri = `${importedDirectory}${safeName}`; let current: DownloadJob = { ...job, status: "downloading", attempts: job.attempts + 1, localUri: tempUri, error: null }; onUpdate(current); try { const task = FileSystem.createDownloadResumable(job.url, tempUri, {}, (data) => { const progress = data.totalBytesExpectedToWrite > 0 ? data.totalBytesWritten / data.totalBytesExpectedToWrite : 0; onUpdate({ ...current, progress: Math.min(1, progress) }); }); this.tasks.set(job.id, task); const result = await task.downloadAsync(); if (!result) throw new DownloadError("Download cancelado."); const info = await FileSystem.getInfoAsync(result.uri); if (!info.exists || !info.size) throw new DownloadError("Arquivo baixado vazio."); await this.epubImporter.validateUri(result.uri); await FileSystem.moveAsync({ from: result.uri, to: importedUri }); const imported = await this.epubImporter.importFromUri(importedUri, safeName); current = { ...current, status: "completed", progress: 1, localUri: imported.filePath }; onUpdate(current); return current; } catch (error) { try { await FileSystem.deleteAsync(tempUri, { idempotent: true }); } catch { /* cleanup best effort */ } current = { ...current, status: "failed", error: error instanceof Error ? error.message : "Arquivo inválido ou corrompido." }; onUpdate(current); throw error; } finally { this.tasks.delete(job.id); } }
+  async cancel(jobId: string): Promise<void> { const task = this.tasks.get(jobId); if (task) await task.cancelAsync(); }
+}

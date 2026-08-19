@@ -1,0 +1,12 @@
+import { LibraryBook } from "@/src/domain/entities/LibraryBook";
+import { BookRepository } from "@/src/domain/repositories/BookRepository";
+import { getDatabase } from "@/src/data/database/connection/database";
+
+export class SqliteBookRepository implements BookRepository {
+  async listActive(): Promise<LibraryBook[]> { const database = await getDatabase(); const rows = await database.getAllAsync<BookRow>("SELECT b.*, COALESCE(p.percentage, 0) AS progress FROM books b LEFT JOIN reading_progress p ON p.book_id = b.id WHERE b.is_deleted = 0 ORDER BY COALESCE(b.last_opened_date, b.added_date) DESC"); return rows.map(mapBook); }
+  async findById(bookId: string): Promise<LibraryBook | null> { const database = await getDatabase(); const row = await database.getFirstAsync<BookRow>("SELECT b.*, COALESCE(p.percentage, 0) AS progress FROM books b LEFT JOIN reading_progress p ON p.book_id = b.id WHERE b.id = ? AND b.is_deleted = 0", bookId); return row ? mapBook(row) : null; }
+  async save(book: LibraryBook): Promise<void> { const database = await getDatabase(); await database.runAsync("INSERT OR REPLACE INTO books (id, title, author, file_name, file_path, file_hash, mime_type, file_size, cover_image_path, total_chapters, total_words, added_date, last_opened_date, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", book.id, book.title, book.author, book.fileName, book.filePath, book.fileHash, book.mimeType, book.fileSize, book.coverImagePath, book.totalChapters, book.totalWords, book.addedDate, book.lastOpenedDate, book.isDeleted ? 1 : 0); }
+  async softDelete(bookId: string): Promise<void> { const database = await getDatabase(); await database.runAsync("UPDATE books SET is_deleted = 1 WHERE id = ?", bookId); }
+}
+interface BookRow { id: string; title: string; author: string; file_name: string; file_path: string; file_hash: string | null; mime_type: string; file_size: number; cover_image_path: string | null; total_chapters: number; total_words: number; added_date: number; last_opened_date: number | null; is_deleted: number; progress: number; }
+function mapBook(row: BookRow): LibraryBook { return { id: row.id, title: row.title, author: row.author, fileName: row.file_name, filePath: row.file_path, fileHash: row.file_hash, mimeType: row.mime_type, fileSize: row.file_size, coverImagePath: row.cover_image_path, totalChapters: row.total_chapters, totalWords: row.total_words, addedDate: row.added_date, lastOpenedDate: row.last_opened_date, isDeleted: row.is_deleted === 1, progress: Math.min(1, Math.max(0, row.progress ?? 0)) }; }

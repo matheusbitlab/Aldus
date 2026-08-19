@@ -1,0 +1,2 @@
+import { ReadingProgressRepository } from "@/src/domain/repositories/ReadingProgressRepository";
+export class UpdateReadingProgressUseCase { constructor(private readonly progress: ReadingProgressRepository) {} execute(input: { bookId: string; currentChapterId: string | null; percentage: number; pageNumber: number; }): Promise<void> { return this.progress.save({ id: `progress-${input.bookId}`, bookId: input.bookId, currentChapterId: input.currentChapterId, cfiPosition: null, percentage: input.percentage, pageNumber: input.pageNumber, updatedAt: Date.now() }); } }
