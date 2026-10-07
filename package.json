@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:apk": "eas build --platform android --profile preview",
+    "build:apk:local": "node scripts/build-apk-local.mjs",
     "build": "expo export --platform web && node scripts/copy-books-to-dist.mjs",
     "typecheck": "tsc --noEmit",
     "covers:generate": "node scripts/generate-book-covers.mjs",

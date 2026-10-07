@@ -20,6 +20,25 @@ npm run build:apk
 
 O perfil `preview` em `eas.json` produz um APK Android para distribuicao interna.
 
+### Gerar APK localmente (Windows)
+
+Requisitos: JDK 17, Android SDK com as plataformas, build-tools e NDK exigidos
+pelo projeto, `JAVA_HOME` e `ANDROID_HOME` configurados, e dependencias instaladas
+com `npm ci`. O projeto nativo em `android/` esta versionado.
+
+```powershell
+npm run build:apk:local
+```
+
+Esse comando executa `gradlew.bat :app:assembleRelease` em `android/`. O APK fica
+em `android/app/build/outputs/apk/release/app-release.apk`, com JavaScript e assets
+embutidos, sem depender do Metro ou de login no EAS. A primeira compilacao pode
+baixar dependencias do Gradle e componentes do Android SDK.
+
+A configuracao nativa atual assina o release com a chave de debug padrao, adequada
+para testes locais. Para publicacao, configure uma chave de assinatura propria.
+`npm run build:apk` continua usando o EAS na nuvem.
+
 ## Fase 2
 
 - SQLite local com WAL e migrations versionadas.
