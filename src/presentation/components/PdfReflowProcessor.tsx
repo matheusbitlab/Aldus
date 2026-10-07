@@ -1,0 +1,1 @@
+export { PdfReflowProcessor } from "@/src/presentation/components/PdfReflowProcessor.native";

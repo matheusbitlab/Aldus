@@ -77,3 +77,16 @@ A persistencia SQLite, repositorios, importacao EPUB real, busca web e downloads
 ## Validacao
 
 Com Node.js 24.19.0 e npm 11.17.0, `npm run typecheck`, `npx expo-doctor` e `npx expo export --platform web` foram executados com sucesso.
+
+## Refatoracao de fontes e acervos
+
+- Gerenciador persistente de fontes web em AsyncStorage.
+- Importacao local de EPUB e PDF.
+- Gutendex e fontes JSON/OPDS/HTML na busca; Gutenberg direto e BNDigital aparecem como Em breve.
+- Filtros por acervo, capas e autores.
+- WebView para BibliON e MEC Livros.
+- Reader restaura o livro mockado e aceita EPUB/PDF persistidos.
+
+Catálogo JSON V1: adicione em Ajustes → Gerenciar minhas fontes uma URL com uma lista ou `{ "books": [{ "title": "Livro", "author": "Autor", "url": "https://exemplo.org/livro.epub" }] }`. O catálogo e os EPUBs precisam permitir CORS para download dentro do app Web. Gutenberg pode exigir salvar pelo navegador e importar na Biblioteca. Remover uma fonte preserva livros importados.
+
+Validação de catálogos: `node scripts/test-catalogs.cjs`; consulta real Gutendex: `node scripts/test-catalogs.cjs --live`. Auditoria e limites: [COPILOT_CONTINUATION_AUDIT.md](COPILOT_CONTINUATION_AUDIT.md).

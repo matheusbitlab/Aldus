@@ -6,4 +6,19 @@ expo-env.d.ts
 .expo/
 dist/
 node_modules/
+.env*.local
 # @end expo-cli
+
+# Local diagnostics, editor settings and generated packages
+.browser-*
+.idea/
+.vscode/
+/Livros/
+/debug-reflow-metrics-temp.mjs
+/debug-reflow-scan.js
+*.apk
+*.aab
+credentials.json
+*.jks
+*.keystore
+!android/app/debug.keystore

@@ -1,0 +1,1 @@
+export { PdfPageViewer } from "@/src/presentation/components/PdfPageViewer.native";

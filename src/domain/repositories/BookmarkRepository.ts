@@ -1,2 +1,2 @@
 export interface Bookmark { id: string; bookId: string; chapterId: string; cfiPosition: string | null; textPreview: string; note: string | null; createdAt: number; }
-export interface BookmarkRepository { listByBookId(bookId: string): Promise<Bookmark[]>; save(bookmark: Bookmark): Promise<void>; remove(bookmarkId: string): Promise<void>; }
+export interface BookmarkRepository { listByBookId(bookId: string): Promise<Bookmark[]>; findById(id: string): Promise<Bookmark | null>; save(bookmark: Bookmark): Promise<void>; remove(bookmarkId: string): Promise<void>; importPreservingExisting(bookId: string, bookmarks: Bookmark[]): Promise<{ imported: number; skipped: number }>; }

@@ -1,4 +1,4 @@
-export type ReaderTheme = "light" | "dark" | "sepia";
+export type ReaderTheme = "light" | "dark" | "sepia" | "paper" | "black";
 export type ReaderFont = "serif" | "sans" | "dyslexic";
 export type ReaderMargin = "small" | "medium" | "large";
 
