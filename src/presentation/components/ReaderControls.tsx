@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { BottomFooter } from "@/src/presentation/components/BottomFooter";
 import { TopHeader } from "@/src/presentation/components/TopHeader";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
+import { readerUiDiagnostic, ReaderUiContext } from "@/src/utils/readerUiDiagnostics";
 
 interface Props {
   layoutMode?: "overlay" | "flow";
@@ -26,6 +27,10 @@ interface Props {
   onSearch?: () => void;
   onContents?: () => void;
   onStudy?: () => void;
+  onHeaderHeight?: (height: number) => void;
+  diagnosticContext?: ReaderUiContext;
+  requestedPage?: number | null;
+  operationId?: number;
 }
 
 export function ReaderControls(readerProps: Props) {
@@ -34,12 +39,15 @@ export function ReaderControls(readerProps: Props) {
   const opacity = useRef(new Animated.Value(props.visible ? 1 : 0)).current;
   const isFlow = props.layoutMode === "flow";
   const hasDocument = props.children != null;
+  const ControlView = Platform.OS === "web" ? Animated.View : View;
+  const controlOpacity = isFlow ? 1 : Platform.OS === "web" ? opacity : props.visible ? 1 : 0;
 
   useEffect(() => {
+    if (Platform.OS !== "web") return;
     Animated.timing(opacity, {
       toValue: props.visible ? 1 : 0,
       duration: 180,
-      useNativeDriver: Platform.OS !== "web",
+      useNativeDriver: false,
     }).start();
   }, [opacity, props.visible]);
 
@@ -55,11 +63,14 @@ export function ReaderControls(readerProps: Props) {
         >
           {props.children}
         </View>
-        <Animated.View
+        <ControlView
+          onLayout={event => readerUiDiagnostic("LAYOUT", "reflowHeader", props.diagnosticContext, event.nativeEvent.layout, { pointerEvents: props.visible ? "box-none" : "none", zIndex: 20, overflow: "visible" })}
           pointerEvents={props.visible ? "box-none" : "none"}
-          style={[styles.reflowHeader, { opacity: isFlow ? 1 : opacity }]}
+          style={[!isFlow && styles.controls, styles.reflowHeader, { opacity: controlOpacity }]}
         >
           <TopHeader
+            diagnosticContext={props.diagnosticContext}
+            onHeight={props.onHeaderHeight}
             layoutMode={props.layoutMode}
             title={props.title}
             chapterTitle={props.chapterTitle}
@@ -72,12 +83,16 @@ export function ReaderControls(readerProps: Props) {
             onContents={props.onContents}
             onStudy={props.onStudy}
           />
-        </Animated.View>
-        <Animated.View
+        </ControlView>
+        <ControlView
+          onLayout={event => readerUiDiagnostic("LAYOUT", "reflowFooter", props.diagnosticContext, event.nativeEvent.layout, { pointerEvents: props.visible ? "box-none" : "none", zIndex: 20 })}
           pointerEvents={props.visible ? "box-none" : "none"}
-          style={[styles.reflowFooter, { opacity: isFlow ? 1 : opacity }]}
+          style={[!isFlow && styles.controls, styles.reflowFooter, { opacity: controlOpacity }]}
         >
           <BottomFooter
+            requestedPage={props.requestedPage}
+            operationId={props.operationId}
+            controlsVisible={props.visible}
             layoutMode={props.layoutMode}
             progress={props.progress}
             pageNumber={props.pageNumber}
@@ -89,17 +104,19 @@ export function ReaderControls(readerProps: Props) {
             onPrevious={props.onPagePrevious}
             onNext={props.onPageNext}
           />
-        </Animated.View>
+        </ControlView>
       </View>
     );
   }
 
   return (
-    <Animated.View
+    <ControlView
       pointerEvents={props.visible ? "box-none" : "none"}
-      style={[isFlow ? styles.flow : styles.controls, { opacity: isFlow ? 1 : opacity }]}
+      style={[isFlow ? styles.flow : styles.controls, { opacity: controlOpacity }]}
     >
       <TopHeader
+        diagnosticContext={props.diagnosticContext}
+        onHeight={props.onHeaderHeight}
         layoutMode={props.layoutMode}
         title={props.title}
         chapterTitle={props.chapterTitle}
@@ -113,6 +130,9 @@ export function ReaderControls(readerProps: Props) {
         onStudy={props.onStudy}
       />
       <BottomFooter
+        requestedPage={props.requestedPage}
+        operationId={props.operationId}
+        controlsVisible={props.visible}
         layoutMode={props.layoutMode}
         progress={props.progress}
         pageNumber={props.pageNumber}
@@ -124,7 +144,7 @@ export function ReaderControls(readerProps: Props) {
         onPrevious={props.onPagePrevious}
         onNext={props.onPageNext}
       />
-    </Animated.View>
+    </ControlView>
   );
 }
 

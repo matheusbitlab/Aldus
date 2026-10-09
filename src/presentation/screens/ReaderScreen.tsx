@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
+  BackHandler,
   Platform,
   Pressable,
   StatusBar,
@@ -28,11 +29,15 @@ import { useReaderStore } from "@/src/presentation/stores/readerStore";
 import { ReaderControls } from "@/src/presentation/components/ReaderControls";
 import { ReaderSettingsPanel } from "@/src/presentation/components/ReaderSettingsPanel";
 import { DocumentReaderAdapter } from "@/src/presentation/components/reader/DocumentReaderAdapter";
+import { documentSafeInsets, readerFeedbackTop } from "@/src/presentation/components/reader/ReaderGeometry";
+import { readerUiDiagnostic, ReaderUiContext } from "@/src/utils/readerUiDiagnostics";
+import { readerNavigationDiagnostic, ReaderNavigationOrigin } from "@/src/utils/readerNavigationDiagnostics";
 import { EpubNavigationRequest, EpubPageInfo } from "@/src/presentation/components/EpubPageViewerProps";
 import { getPdfPageMode, PdfPageMode } from "@/src/presentation/components/PdfPageViewerProps";
 import { PdfModeChooser } from "@/src/presentation/components/PdfModeChooser";
 import { PdfReflowProcessor } from "@/src/presentation/components/PdfReflowProcessor";
 import { toStoredReflowChapters } from "@/src/data/local/PdfReflowDocumentBuilder";
+import { isValidatedReflowDocument } from "@/src/data/local/pdfReflowQuality";
 import {
   defaultPdfReaderSettings,
   PDF_REFLOW_PROCESSOR_VERSION,
@@ -56,6 +61,8 @@ interface Props {
 
 export function ReaderScreen({ bookId }: Props) {
   const renderCount = useRef(0);
+  const reflowModeGeneration = useRef(0);
+  useEffect(() => { reflowModeGeneration.current++; return () => { reflowModeGeneration.current++; }; }, [bookId]);
   const nativeBrightnessApplied = useRef(false);
   const originalBrightnessRef = useRef<number | null>(null);
   const nativeBrightnessOperation = useRef(0);
@@ -66,6 +73,7 @@ export function ReaderScreen({ bookId }: Props) {
   const { width, height } = useWindowDimensions();
   const { progress, controlsVisible, setProgress, setControlsVisible, toggleControls } = useReaderStore();
   const [readerPanel, setReaderPanel] = useState<"appearance" | "contents" | "search" | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const [studyVisible, setStudyVisible] = useState(false);
   const [studyAnchor, setStudyAnchor] = useState<ReadingAnchor | null>(null);
   const [studyRequest, setStudyRequest] = useState<ReaderStudyRequest | null>(null);
@@ -90,7 +98,6 @@ export function ReaderScreen({ bookId }: Props) {
       try { setStudyAnchor(parseReadingAnchor(result.anchor)); setStudyFeedback(null); setStudySelecting(false); setStudyVisible(true); setStudyRequest({ id: result.id, type: "studySelection", enabled: false }); }
       catch { setStudyFeedback("A localização recebida não é válida. Capture novamente."); }
     } else if (result.status === "exact" || result.status === "relocated") {
-      pendingEpubNavigationTarget.current = result.pageNumber ?? null;
       setStudyVisible(false); setStudyFeedback(null);
     } else setStudyFeedback(result.status === "ambiguous" ? "Há mais de um trecho correspondente. A nota permanece disponível; o leitor não foi movido." : result.status === "missing" ? "O trecho não foi encontrado nesta edição. A nota permanece disponível." : result.message ?? "Não foi possível localizar o trecho.");
   }, []);
@@ -127,7 +134,9 @@ export function ReaderScreen({ bookId }: Props) {
   }, []);
   const [epubNavigationRequest, setEpubNavigationRequest] = useState<EpubNavigationRequest | null>(null);
   const epubNavigationRequestId = useRef(0);
-  const pendingEpubNavigationTarget = useRef<number | null>(null);
+  const requestedNavigationId = useRef(0);
+  const acceptedNavigationId = useRef(0);
+  const [requestedPage, setRequestedPage] = useState<number | null>(null);
   const [epubTotalPages, setEpubTotalPagesRaw] = useState(0);
   const setEpubTotalPages = useCallback((total: number | ((prev: number) => number)) => {
     const invocationStack = new Error().stack?.split("\n").slice(1, 6).join(" | ");
@@ -147,9 +156,7 @@ export function ReaderScreen({ bookId }: Props) {
   const initialEpubProgress = useRef<number | null>(null);
   const reflowRestoreTarget = useRef<{ page: number; totalPages: number } | null>(null);
   const [bookStatus, setBookStatus] = useState<"loading" | "ready" | "error">("loading");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousControlsVisible = useRef(controlsVisible);
-  const statusInsetTop = Math.max(insets.top, 12);
   console.log(`[FORENSIC:ReaderScreen] t=${performance.timeOrigin + performance.now()} render #${renderCount.current} bookId=${bookId} status=${bookStatus} controlsVisible=${controlsVisible} epubPage=${epubPage} epubTotalPages=${epubTotalPages} progress=${progress} initialEpubProgress=${initialEpubProgress.current}`);
 
   const handleToggleControls = useCallback(() => {
@@ -157,8 +164,9 @@ export function ReaderScreen({ bookId }: Props) {
     console.log(`[FORENSIC:toggleControls] t=${performance.timeOrigin + performance.now()} invoked before=${before} epubPage=${epubPage}`);
     toggleControls();
     const after = useReaderStore.getState().controlsVisible;
+    readerNavigationDiagnostic("CONTROLS_TOGGLE", { operationId: requestedNavigationId.current, confirmedPage: epubPage, currentPage: epubPage, totalPages: epubTotalPages, requestedPage, controlsVisible: after, sliderDragging: false });
     console.log(`[FORENSIC:toggleControls] t=${performance.timeOrigin + performance.now()} returned after=${after} epubPage=${epubPage}`);
-  }, [epubPage, toggleControls]);
+  }, [epubPage, epubTotalPages, requestedPage, toggleControls]);
 
   useEffect(() => {
     if (previousControlsVisible.current !== controlsVisible) {
@@ -181,7 +189,9 @@ export function ReaderScreen({ bookId }: Props) {
     setReflowFeedback(null);
     setEpubPage(1);
     setEpubNavigationRequest(null);
-    pendingEpubNavigationTarget.current = null;
+    requestedNavigationId.current = 0;
+    acceptedNavigationId.current = 0;
+    setRequestedPage(null);
     setEpubTotalPages(0);
     setEpubChapterIndex(0);
     setChapterLocations([]);
@@ -299,11 +309,13 @@ export function ReaderScreen({ bookId }: Props) {
               cached &&
               cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION &&
               cached.sourceSignature === sourceSignature &&
+              isValidatedReflowDocument(cached.document) &&
               cached.document.classification !== "image-based"
             ) {
               setPdfReflowDocument(cached.document);
-            } else if (cached?.document.classification === "image-based") {
+            } else if (cached && cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION && cached.sourceSignature === sourceSignature && isValidatedReflowDocument(cached.document) && cached.document.classification === "image-based") {
               const originalSettings = { ...nextSettings, mode: "original" as const };
+              restoredProgress = originalSettings.originalProgress ?? result.progress?.percentage ?? 0;
               setPdfReaderSettings(originalSettings);
               setReflowFeedback("O Reflow requer OCR para este PDF. O arquivo original continua disponível.");
               startsInReflow = false;
@@ -323,7 +335,7 @@ export function ReaderScreen({ bookId }: Props) {
 
         initialPdfProgress.current = restoredProgress;
         initialEpubProgress.current = isEpubBook || startsInReflow ? restoredProgress : null;
-        setReflowRestoreState(startsInReflow ? "pending" : "inactive");
+        setReflowRestoreState(isEpubBook || startsInReflow ? "pending" : "inactive");
         reflowRestoreTarget.current = null;
 
         setPdfPage(1);
@@ -393,7 +405,25 @@ export function ReaderScreen({ bookId }: Props) {
     setPdfPageMode(nextSettings.layout);
   }, []);
 
+  const returnToOriginal = useCallback((message?: string) => {
+    const originalProgress = pdfReaderSettings?.originalProgress ?? initialPdfProgress.current;
+    initialPdfProgress.current = originalProgress;
+    setProgress(originalProgress);
+    setReflowPreparing(false);
+    setReflowRestoreState("inactive");
+    reflowRestoreTarget.current = null;
+    initialEpubProgress.current = null;
+    setPdfReflowDocument(null);
+    setPdfReaderSettings(current => ({ ...(current ?? defaultPdfReaderSettings), mode: "original" }));
+    if (message) setReflowFeedback(message);
+  }, [pdfReaderSettings, setProgress]);
+
   const handlePdfModeChange = useCallback(async (mode: PdfReadingMode) => {
+    const generation = ++reflowModeGeneration.current;
+    setEpubNavigationRequest(null);
+    setRequestedPage(null);
+    requestedNavigationId.current = 0;
+    acceptedNavigationId.current = 0;
     setPdfModeChooserVisible(false);
     setReflowFeedback(null);
     const nextSettings = { ...(pdfReaderSettings ?? defaultPdfReaderSettings), mode };
@@ -421,14 +451,15 @@ export function ReaderScreen({ bookId }: Props) {
     const cached = await appDependencies.pdfReflowCache
       .findByBookId(currentBook.id)
       .catch(() => null);
+    if (generation !== reflowModeGeneration.current) return;
     if (
       cached &&
       cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION &&
-      cached.sourceSignature === getPdfSourceSignature(currentBook)
+      cached.sourceSignature === getPdfSourceSignature(currentBook) &&
+      isValidatedReflowDocument(cached.document)
     ) {
       if (cached.document.classification === "image-based") {
-        setPdfReaderSettings({ ...nextSettings, mode: "original" });
-        setReflowFeedback("O Reflow requer OCR para este PDF. O arquivo original continua disponível.");
+        returnToOriginal("O Reflow requer OCR para este PDF. O arquivo original continua disponível.");
       } else {
         setPdfReflowDocument(cached.document);
       }
@@ -439,24 +470,21 @@ export function ReaderScreen({ bookId }: Props) {
     setPdfReflowDocument(null);
     setReflowProgress({ currentPage: 0, totalPages: 0 });
     setReflowPreparing(true);
-  }, [currentBook, pdfReaderSettings, pdfTotalPages, progress]);
+  }, [currentBook, pdfReaderSettings, pdfTotalPages, progress, returnToOriginal]);
 
   const handleReflowProgress = useCallback((nextProgress: { currentPage: number; totalPages: number }) => {
     setReflowProgress(nextProgress);
   }, []);
 
-  const handleReflowComplete = useCallback(async (document: PdfReflowDocument) => {
+  const handleReflowComplete = useCallback((document: PdfReflowDocument) => {
     setReflowPreparing(false);
-    if (document.classification === "image-based" || document.characterCount < 1 || document.chapters.length === 0) {
-      const originalSettings = { ...(pdfReaderSettings ?? defaultPdfReaderSettings), mode: "original" as const };
-      setPdfReaderSettings(originalSettings);
-      setPdfReflowDocument(null);
-      setReflowFeedback("O Reflow requer OCR para este PDF. Você voltou ao PDF Original.");
+    if (!isValidatedReflowDocument(document) || document.classification === "image-based" || document.characterCount < 1 || document.chapters.length === 0) {
+      returnToOriginal(document.classification === "image-based" ? "O Reflow requer OCR para este PDF. Você voltou ao PDF Original." : "O texto extraído não pôde ser validado. Você voltou ao PDF Original.");
       return;
     }
 
     if (currentBook) {
-      await appDependencies.pdfReflowCache.save({
+      void appDependencies.pdfReflowCache.save({
         id: currentBook.id,
         sourceSignature: getPdfSourceSignature(currentBook),
         processorVersion: PDF_REFLOW_PROCESSOR_VERSION,
@@ -467,25 +495,23 @@ export function ReaderScreen({ bookId }: Props) {
     setPdfReflowDocument(document);
     setPdfReaderSettings({ ...(pdfReaderSettings ?? defaultPdfReaderSettings), mode: "reflow" });
     setReflowFeedback("Leitura livre pronta.");
-  }, [currentBook, pdfReaderSettings]);
+  }, [currentBook, pdfReaderSettings, returnToOriginal]);
 
   const handleReflowError = useCallback((message: string) => {
-    setReflowPreparing(false);
-    setReflowRestoreState("inactive");
-    reflowRestoreTarget.current = null;
-    initialEpubProgress.current = null;
-    setPdfReflowDocument(null);
-    setPdfReaderSettings((current) => ({ ...(current ?? defaultPdfReaderSettings), mode: "original" }));
-    setReflowFeedback(`Não foi possível preparar este PDF para leitura livre. Você voltou ao PDF Original. ${message}`);
-  }, []);
+    reflowModeGeneration.current++;
+    returnToOriginal(`Não foi possível preparar este PDF para leitura livre. Você voltou ao PDF Original. ${message}`);
+  }, [returnToOriginal]);
 
   const handleCancelReflow = useCallback(() => {
-    setReflowPreparing(false);
-    setReflowRestoreState("inactive");
-    reflowRestoreTarget.current = null;
-    initialEpubProgress.current = null;
-    setPdfReaderSettings((current) => ({ ...(current ?? defaultPdfReaderSettings), mode: "original" }));
-  }, []);
+    reflowModeGeneration.current++;
+    returnToOriginal();
+  }, [returnToOriginal]);
+
+  useEffect(() => {
+    if (Platform.OS === "web" || !reflowPreparing) return;
+    const listener = BackHandler.addEventListener("hardwareBackPress", () => { handleCancelReflow(); return true; });
+    return () => listener.remove();
+  }, [reflowPreparing, handleCancelReflow]);
 
   const handleToggleFullscreen = useCallback(() => {
     if (Platform.OS !== "web") return;
@@ -562,10 +588,6 @@ export function ReaderScreen({ bookId }: Props) {
     [setProgress]
   );
 
-  useEffect(() => () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-  }, []);
-
   useEffect(() => {
     if (Platform.OS === "web" || bookStatus !== "ready") return;
 
@@ -632,10 +654,21 @@ export function ReaderScreen({ bookId }: Props) {
     };
   }, [bookId, bookStatus, settings.brightness, settings.useSystemBrightness]);
 
-  const handleProgress = (nextProgress: number) => {
+  const handleProgress = (nextProgress: number, origin: ReaderNavigationOrigin = "SLIDER_COMMIT") => {
     if (studySelecting) return;
+    if (isEpub || isReflowPdf) {
+      if (epubTotalPages < 1) return;
+      const target = Math.max(1, Math.min(epubTotalPages, Math.round(nextProgress * (epubTotalPages - 1)) + 1));
+      const id = ++epubNavigationRequestId.current;
+      requestedNavigationId.current = id;
+      setRequestedPage(target);
+      setEpubNavigationRequest({ id, pageNumber: target, origin });
+      readerNavigationDiagnostic(origin, { operationId: id, requestedPage: target,
+        confirmedPage: epubPage, currentPage: epubPage, targetPage: target, totalPages: epubTotalPages,
+        sliderDragging: false, controlsVisible });
+      return;
+    }
     setProgress(nextProgress);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
 
     const pdfPageNumber =
       isPdf && !isReflowPdf && pdfTotalPages > 0
@@ -650,39 +683,21 @@ export function ReaderScreen({ bookId }: Props) {
 
     if (pdfPageNumber !== null) setPdfPage(pdfPageNumber);
 
-    const epubPageNumber =
-      (isEpub || isReflowPdf) && epubTotalPages > 0
-        ? Math.max(
-            1,
-            Math.min(
-              epubTotalPages,
-              Math.round(nextProgress * Math.max(0, epubTotalPages - 1)) + 1
-            )
-          )
-        : null;
-
-    if (epubPageNumber !== null) {
-      pendingEpubNavigationTarget.current = epubPageNumber;
-      setEpubPage(epubPageNumber);
-    }
-
     const currentChapterId =
       (isReflowPdf ? pdfReflowChapters : chapters)[epubChapterIndex]?.id ??
       (isReflowPdf ? pdfReflowChapters : chapters)[0]?.id ??
       null;
 
-    saveTimer.current = setTimeout(() => {
-      if (isPdf && pdfReaderSettings) {
-        const progressKey = pdfReaderSettings.mode === "reflow" ? "reflowProgress" : "originalProgress";
-        setPdfReaderSettings({ ...pdfReaderSettings, [progressKey]: nextProgress });
-      }
-      void appDependencies.updateReadingProgress.execute({
+    if (isPdf) {
+      const progressKey = isReflowPdf ? "reflowProgress" : "originalProgress";
+      setPdfReaderSettings(current => current ? { ...current, [progressKey]: nextProgress } : current);
+    }
+    void appDependencies.updateReadingProgress.execute({
         bookId,
         currentChapterId,
         percentage: nextProgress,
         pageNumber:
           pdfPageNumber ??
-          epubPageNumber ??
           (isEpub || isReflowPdf
             ? 1
             : estimatePageNumber(
@@ -690,14 +705,19 @@ export function ReaderScreen({ bookId }: Props) {
                 totalCharacters,
                 totalPages
               )),
-      });
-    }, 500);
+      }).catch(() => console.log("[ReaderProgress] Failed to persist acknowledged position"));
   };
 
   const handleEpubPageInfo = useCallback((info: EpubPageInfo) => {
+    readerNavigationDiagnostic("VIEWER_CONFIRMATION", { ...info, confirmedPage: info.pageNumber, controlsVisible: useReaderStore.getState().controlsVisible });
+    if (info.operationId !== undefined && info.operationId < acceptedNavigationId.current) return;
+    if (info.operationId !== undefined) acceptedNavigationId.current = info.operationId;
+    if (info.operationId !== undefined && info.operationId >= requestedNavigationId.current) {
+      setRequestedPage(null);
+    }
     console.log(`[FORENSIC:handleEpubPageInfo] received page=${info.pageNumber} total=${info.totalPages} layoutReady=${Boolean(info.layoutReady)} chapter=${info.chapterIndex} | closure:epubTotalPages=${epubTotalPages} initialEpubProgress=${initialEpubProgress.current} reflowRestoreState=${reflowRestoreState}`);
 
-    if (isReflowPdf && reflowRestoreState !== "inactive") {
+    if ((isEpub || isReflowPdf) && reflowRestoreState !== "inactive") {
       if (!info.layoutReady) {
         console.log(`[FORENSIC:reflowRestore] ignored provisional page info page=${info.pageNumber} total=${info.totalPages} state=${reflowRestoreState}`);
         return;
@@ -735,36 +755,8 @@ export function ReaderScreen({ bookId }: Props) {
       console.log(`[FORENSIC:reflowRestore] completed page=${info.pageNumber} total=${info.totalPages}`);
     }
 
-    if (
-      !isReflowPdf &&
-      info.pageNumber === 1 &&
-      epubPage > 1 &&
-      pendingEpubNavigationTarget.current !== 1
-    ) {
-      setEpubTotalPages(info.totalPages);
-      return;
-    }
-    if (pendingEpubNavigationTarget.current === info.pageNumber) {
-      pendingEpubNavigationTarget.current = null;
-    }
-
     setEpubTotalPages(info.totalPages);
-    const isInitialLayout =
-      !isReflowPdf && epubTotalPages === 0 && initialEpubProgress.current !== null;
-    const page = isInitialLayout
-      ? Math.max(
-          1,
-          Math.min(
-            info.totalPages,
-            Math.round(
-              (initialEpubProgress.current ?? 0) * Math.max(0, info.totalPages - 1)
-            ) + 1
-          )
-        )
-      : info.pageNumber;
-
-    console.log(`[FORENSIC:handleEpubPageInfo] isInitialLayout=${isInitialLayout} → page=${page}`);
-    if (isInitialLayout) initialEpubProgress.current = null;
+    const page = info.pageNumber;
 
     setEpubPage(page);
     setEpubChapterIndex(info.chapterIndex);
@@ -775,24 +767,20 @@ export function ReaderScreen({ bookId }: Props) {
       info.totalPages > 1 ? (page - 1) / (info.totalPages - 1) : 0;
     setProgress(nextProgress);
 
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-
     const progressChapters = isReflowPdf ? pdfReflowChapters : chapters;
     const currentChapterId =
       progressChapters[info.chapterIndex]?.id ?? progressChapters[0]?.id ?? null;
 
-    saveTimer.current = setTimeout(() => {
-      if (isPdf && pdfReaderSettings) {
-        const progressKey = pdfReaderSettings.mode === "reflow" ? "reflowProgress" : "originalProgress";
-        setPdfReaderSettings({ ...pdfReaderSettings, [progressKey]: nextProgress });
-      }
-      void appDependencies.updateReadingProgress.execute({
+    if (isPdf) {
+      const progressKey = isReflowPdf ? "reflowProgress" : "originalProgress";
+      setPdfReaderSettings(current => current ? { ...current, [progressKey]: nextProgress } : current);
+    }
+    void appDependencies.updateReadingProgress.execute({
         bookId,
         currentChapterId,
         percentage: nextProgress,
         pageNumber: page,
-      });
-    }, 500);
+      }).catch(() => console.log("[ReaderProgress] Failed to persist acknowledged position"));
   }, [
     bookId,
     chapters,
@@ -800,13 +788,12 @@ export function ReaderScreen({ bookId }: Props) {
     isPdf,
     isReflowPdf,
     reflowRestoreState,
-    pdfReaderSettings,
     pdfReflowChapters,
     epubPage,
     setProgress,
   ]);
 
-  const changePage = (nextPage: number) => {
+  const changePage = (nextPage: number, origin?: ReaderNavigationOrigin) => {
     if (studySelecting) return;
     const pageCount = isPdf && !isReflowPdf
       ? pdfTotalPages
@@ -815,11 +802,14 @@ export function ReaderScreen({ bookId }: Props) {
       : totalPages;
     if (pageCount < 1) return;
     const page = Math.max(1, Math.min(pageCount, nextPage));
-    if (isEpub && page !== epubPage) {
-      pendingEpubNavigationTarget.current = page;
+    if ((isEpub || isReflowPdf) && page !== epubPage) {
+      const id = ++epubNavigationRequestId.current;
+      requestedNavigationId.current = id;
+      setRequestedPage(page);
       setEpubNavigationRequest({
-        id: ++epubNavigationRequestId.current,
+        id,
         direction: page > epubPage ? 1 : -1,
+        origin: origin ?? (page > epubPage ? "NEXT_PAGE" : "PREVIOUS_PAGE"),
       });
       return;
     }
@@ -841,7 +831,7 @@ export function ReaderScreen({ bookId }: Props) {
     const location = chapterLocations.find((item) => item.chapterIndex === chapterIndex);
     if (!location || epubTotalPages < 1) return;
     const targetPage = Math.min(epubTotalPages, location.pageNumber);
-    handleProgress(epubTotalPages > 1 ? (targetPage - 1) / (epubTotalPages - 1) : 0);
+    handleProgress(epubTotalPages > 1 ? (targetPage - 1) / (epubTotalPages - 1) : 0, "CONTENTS");
     setReaderPanel(null);
   };
 
@@ -894,8 +884,8 @@ export function ReaderScreen({ bookId }: Props) {
   }
 
   const readerDocument = (
-    <View style={[styles.documentSurface, { opacity: Platform.OS === "web" ? documentBrightnessFactor : 1 }]}>
-      <DocumentReaderAdapter
+    <View style={[styles.documentSurface, documentSafeInsets(Platform.OS, insets), { opacity: Platform.OS === "web" ? documentBrightnessFactor : 1 }]}>
+      {!(isReflowPdf && !pdfReflowDocument) ? <DocumentReaderAdapter
         mimeType={bookMimeType}
         filePath={bookFilePath}
         chapters={chapters}
@@ -909,24 +899,28 @@ export function ReaderScreen({ bookId }: Props) {
         searchTerm={isEpub || isReflowPdf ? bookSearchTerm : ""}
         onSearchResult={handleBookSearchResult}
         epubPage={epubPage}
-        initialRestorePending={isReflowPdf && reflowRestoreState !== "inactive"}
-        restoreTargetReady={isReflowPdf && reflowRestoreState === "applying"}
+        initialRestorePending={(isEpub || isReflowPdf) && reflowRestoreState !== "inactive"}
+        restoreTargetReady={(isEpub || isReflowPdf) && reflowRestoreState === "applying"}
         epubNavigationRequest={epubNavigationRequest}
         settings={activeReaderSettings}
         onPdfTotalPages={handlePdfTotalPages}
         onEpubPageInfo={handleEpubPageInfo}
         onProgressChange={handleProgress}
-        onPreviousPage={() => changePage(pageNumber - 1)}
-        onNextPage={() => changePage(pageNumber + 1)}
+        onPreviousPage={() => changePage(pageNumber - 1, "TOUCH_ZONE")}
+        onNextPage={() => changePage(pageNumber + 1, "TOUCH_ZONE")}
         onToggleControls={handleToggleControls}
         studyRequest={studyRequest}
         onStudyResult={handleStudyResult}
         studySelecting={studySelecting}
+        panelOpen={readerPanel !== null || studyVisible}
         studyHighlights={isEpub ? studyHighlights : undefined}
-      />
+      /> : null}
     </View>
   );
   const readerControlProps = {
+    requestedPage,
+    operationId: requestedNavigationId.current,
+    diagnosticContext: { mode: isPdf ? (isReflowPdf ? "reflow" : "original") : "epub", controlsVisible, reflowPreparing, feedback: Boolean(reflowFeedback) } as ReaderUiContext,
     visible: controlsVisible && !studySelecting,
     title: bookTitle,
     chapterTitle,
@@ -939,6 +933,7 @@ export function ReaderScreen({ bookId }: Props) {
     background: activePalette.background,
     onBack: () => router.push("/(tabs)/library"),
     onSettings: () => setReaderPanel("appearance"),
+    onHeaderHeight: setHeaderHeight,
     onSearch: isEpub || isReflowPdf ? () => setReaderPanel("search") : undefined,
     onContents: readerChapterItems.length > 0 ? () => setReaderPanel("contents") : undefined,
     onStudy: !isReflowPdf && (isEpub || isPdf) ? () => { setStudyVisible(true); setStudyAnchor(null); setStudyFeedback(null); } : undefined,
@@ -1004,12 +999,13 @@ export function ReaderScreen({ bookId }: Props) {
         {reflowFeedback ? (
           <View
             accessibilityRole="alert"
+            onLayout={event => readerUiDiagnostic("LAYOUT", "feedback", readerControlProps.diagnosticContext, event.nativeEvent.layout, { pointerEvents: "box-none", zIndex: 40 })}
             pointerEvents="box-none"
             style={[
               styles.reflowFeedback,
               {
                 backgroundColor: activePalette.panel,
-                top: statusInsetTop + 12,
+                top: readerFeedbackTop(insets.top, controlsVisible && !studySelecting, headerHeight),
               },
             ]}
           >
@@ -1074,9 +1070,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   documentSurface: {
-    flex: 1,
-    width: "100%",
-    height: "100%",
+    ...StyleSheet.absoluteFill,
     backgroundColor: "transparent",
   },
   backButton: {

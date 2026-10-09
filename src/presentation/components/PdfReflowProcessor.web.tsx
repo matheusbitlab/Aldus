@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { getDocument, GlobalWorkerOptions, ImageKind, OPS, type PDFPageProxy } from "pdfjs-dist";
-import { PdfReflowImage, PdfReflowPageData, PdfReflowTextItem } from "@/src/domain/types/pdfReader";
-import { buildPdfReflowDocument } from "@/src/data/local/PdfReflowDocumentBuilder";
-import { PdfReflowProgress, PdfReflowProcessorProps } from "@/src/presentation/components/PdfReflowProcessorProps";
+import { PdfReflowImage, PdfReflowPageData } from "@/src/domain/types/pdfReader";
+import { buildPdfReflowDocumentAsync } from "@/src/data/local/PdfReflowDocumentBuilder";
+import { assessTextExtractionQuality, isClearlyCorruptedTextExtraction, CORRUPT_PDF_TEXT, isValidatedReflowDocument } from "@/src/data/local/pdfReflowQuality";
+import { PdfReflowProgress, PdfReflowProcessorProps, reflowProgressLabel } from "@/src/presentation/components/PdfReflowProcessorProps";
+import { createReflowOperation } from "./reflowOperation";
 
 interface PdfTextItem {
   str: string;
@@ -17,30 +19,45 @@ interface PdfTextItem {
 
 export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCancel }: PdfReflowProcessorProps) {
   const [progress, setProgress] = useState<PdfReflowProgress>({ currentPage: 0, totalPages: 0 });
+  const cancel = useRef<() => void>(() => {});
+  const callbacks = useRef({ onComplete, onError, onProgress, onCancel });
+  callbacks.current = { onComplete, onError, onProgress, onCancel };
 
   useEffect(() => {
-    let active = true;
+    const operation = createReflowOperation();
+    let worker: Worker | undefined;
     try {
-      GlobalWorkerOptions.workerPort = new Worker(new URL("./pdfjs.worker.ts", import.meta.url));
+      worker = new Worker(new URL("./pdfjs.worker.ts", import.meta.url));
+      GlobalWorkerOptions.workerPort = worker;
     } catch {
       /* Fall back to PDF.js worker configuration. */
     }
     const task = getDocument({
       url: uri,
-      cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
+      cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/cmaps/",
       cMapPacked: true,
     });
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      void task.destroy().catch(() => undefined);
+      if (GlobalWorkerOptions.workerPort === worker) GlobalWorkerOptions.workerPort = null;
+      worker?.terminate();
+    };
+    const fail = (message: string) => { if (operation.finish()) { release(); callbacks.current.onError(message); } };
+    const update = (next: PdfReflowProgress) => { if (operation.active) { setProgress(next); callbacks.current.onProgress(next); } };
+    cancel.current = () => { if (operation.finish()) { release(); callbacks.current.onCancel(); } };
+    if (worker) worker.onerror = () => fail("O motor PDF falhou. O PDF Original continua disponível.");
 
     void task.promise
       .then(async (pdf) => {
         const pages: PdfReflowPageData[] = [];
-        let extractedCharacters = 0;
-        let controlCharacters = 0;
-        let letterCharacters = 0;
-        let corruptPages = 0;
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-          if (!active) return;
+          if (!operation.active) return;
           const page = await pdf.getPage(pageNumber);
+          try {
+          if (!operation.active) return;
           const textContent = await page.getTextContent();
           const viewport = page.getViewport({ scale: 1 });
           const operatorList = await page.getOperatorList();
@@ -55,11 +72,7 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
             hasEOL: item.hasEOL,
           }));
           const quality = assessTextExtractionQuality(textItems);
-          extractedCharacters += quality.totalChars;
-          controlCharacters += quality.controlChars;
-          letterCharacters += quality.letterChars;
           if (quality.totalChars > 0 && isClearlyCorruptedTextExtraction(quality)) {
-            corruptPages += 1;
             if (isPdfReflowDiagnosticsEnabled()) {
               console.warn("[PDF Reflow] página com texto extraído corrompido", { pageNumber, totalPages: pdf.numPages, quality });
             }
@@ -69,38 +82,27 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
           }
           const images = await extractPageImages(page, operatorList.fnArray, operatorList.argsArray, viewport.width, viewport.height);
           pages.push({ pageNumber, pageWidth: viewport.width, pageHeight: viewport.height, textItems, images });
-          page.cleanup();
-          const nextProgress = { currentPage: pageNumber, totalPages: pdf.numPages, imageCount: images.length };
-          setProgress(nextProgress);
-          onProgress(nextProgress);
+          update({ stage: "extracting", currentPage: pageNumber, totalPages: pdf.numPages, imageCount: images.length });
+          } finally { page.cleanup(); }
         }
-        if (active) {
-          const overallQuality = {
-            totalChars: extractedCharacters,
-            letterChars: letterCharacters,
-            controlChars: controlCharacters,
-          };
-          if (isClearlyCorruptedTextExtraction(overallQuality) || (corruptPages > 0 && extractedCharacters > 0 && controlCharacters >= 100 && controlCharacters / extractedCharacters >= 0.2 && letterCharacters / extractedCharacters < 0.35)) {
-            onError("A extração de texto deste PDF está corrompida. O PDF Original continua disponível.");
-            return;
-          }
-          const document = buildPdfReflowDocument(pages, pdf.numPages);
-          onComplete(document);
+        if (operation.active) {
+          update({ stage: "building", currentPage: pdf.numPages, totalPages: pdf.numPages });
+          const document = await buildPdfReflowDocumentAsync(pages, pdf.numPages, operation.signal);
+          update({ stage: "validating", currentPage: pdf.numPages, totalPages: pdf.numPages });
+          if (!isValidatedReflowDocument(document)) throw new Error(CORRUPT_PDF_TEXT);
+          update({ stage: "finalizing", currentPage: pdf.numPages, totalPages: pdf.numPages });
+          if (operation.finish()) { release(); callbacks.current.onComplete(document); }
         }
       })
       .catch((failure: unknown) => {
-        if (active) onError(failure instanceof Error ? failure.message : "Não foi possível extrair o conteúdo deste PDF.");
+        fail(failure instanceof Error ? failure.message : "Não foi possível extrair o conteúdo deste PDF.");
       });
 
     return () => {
-      active = false;
-      void task.destroy();
+      operation.finish();
+      release();
     };
-  }, [uri, onComplete, onError, onProgress]);
-
-  const percentage = progress.totalPages > 0
-    ? Math.round((progress.currentPage / progress.totalPages) * 100)
-    : 0;
+  }, [uri]);
 
   return (
     <View style={styles.overlay}>
@@ -108,66 +110,14 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
         <ActivityIndicator size="large" color="#B65F42" />
         <Text style={styles.title}>Preparando leitura livre</Text>
         <Text style={styles.description}>
-          {progress.totalPages > 0
-            ? `Analisando página ${progress.currentPage} de ${progress.totalPages} (${percentage}%) · ${progress.imageCount ?? 0} ilustrações`
-            : "Abrindo PDF para análise..."}
+          {reflowProgressLabel(progress)}
         </Text>
-        <Pressable accessibilityRole="button" onPress={onCancel} style={styles.cancel}>
+        <Pressable accessibilityRole="button" onPress={() => cancel.current()} style={styles.cancel}>
           <Text style={styles.cancelText}>Cancelar</Text>
         </Pressable>
       </View>
     </View>
   );
-}
-
-function assessTextExtractionQuality(items: Array<{ text: string }>) {
-  let totalChars = 0;
-  let replacementChars = 0;
-  let controlChars = 0;
-  let letterChars = 0;
-
-  for (const item of items) {
-    const text = item.text ?? "";
-    totalChars += text.length;
-    for (const char of Array.from(text)) {
-      const code = char.codePointAt(0) ?? 0;
-      if (char === "�" || char === "\uFFFD") {
-        replacementChars += 1;
-      }
-      if (/^[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]$/u.test(char)) {
-        controlChars += 1;
-      }
-      if (/\p{L}/u.test(char)) {
-        letterChars += 1;
-      }
-      if (code >= 0xE000 && code <= 0xF8FF) {
-        // Private Use Area may appear in legitimate PDFs with custom glyph maps.
-        // Do not reject the document solely because of it.
-      }
-    }
-  }
-
-  const replacementRatio = totalChars > 0 ? replacementChars / totalChars : 0;
-  return {
-    totalChars,
-    replacementChars,
-    controlChars,
-    letterChars,
-    replacementRatio,
-  };
-}
-
-function isClearlyCorruptedTextExtraction(quality: { totalChars: number; controlChars: number; letterChars: number }): boolean {
-  const totalCharacters = quality.totalChars;
-  if (totalCharacters <= 0) return false;
-
-  const controlRatio = quality.controlChars / totalCharacters;
-  const letterRatio = quality.letterChars / totalCharacters;
-
-  if (quality.controlChars < 100) return false;
-  if (controlRatio < 0.2) return false;
-
-  return letterRatio < 0.35 || (controlRatio > 0.6 && letterRatio < 0.5);
 }
 
 function isPdfReflowDiagnosticsEnabled(): boolean {

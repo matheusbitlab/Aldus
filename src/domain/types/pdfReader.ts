@@ -56,6 +56,7 @@ export interface PdfReflowPageData {
 }
 
 export interface PdfReflowDocument {
+  extractionQuality?: PdfReflowQuality;
   classification: PdfClassification;
   pageCount: number;
   textPageCount: number;
@@ -63,6 +64,14 @@ export interface PdfReflowDocument {
   characterCount: number;
   chapters: PdfReflowChapter[];
   toc: PdfReflowTocEntry[];
+}
+
+export interface PdfReflowQuality {
+  version: number;
+  totalChars: number;
+  controlChars: number;
+  letterChars: number;
+  replacementChars: number;
 }
 
 export interface PdfReflowCacheRecord {
@@ -91,7 +100,7 @@ export interface PdfReaderSettings {
   reflowProgress: number | null;
 }
 
-export const PDF_REFLOW_PROCESSOR_VERSION = 10;
+export const PDF_REFLOW_PROCESSOR_VERSION = 11;
 
 export const defaultPdfReaderSettings: PdfReaderSettings = {
   mode: "original",

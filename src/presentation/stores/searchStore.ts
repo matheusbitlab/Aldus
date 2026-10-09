@@ -2,22 +2,32 @@ import { create } from "zustand";
 import { ScrapedLink, SearchSourceStatus } from "@/src/domain/types/search";
 import { appDependencies } from "@/src/presentation/services/dependencies";
 import { UserSourceRepository } from "@/src/data/sources/UserSourceRepository";
-import { UserSourceSearchPlugin } from "@/src/data/scraping/UserSourceSearchPlugin";
 import { GutendexSearchPlugin } from "@/src/data/scraping/GutendexSearchPlugin";
+import { GutenbergSearchPlugin } from "@/src/data/scraping/GutenbergSearchPlugin";
+import { builtinCatalogs, BUILTIN_CATALOG_NAMES, configuredCatalog } from "@/src/data/scraping/catalogPlugins";
 const sourceRepository = new UserSourceRepository();
+import { withAbort } from "@/src/core/utils/cancellation";
+import { searchDiagnostic } from "@/src/utils/searchDiagnostics";
+import { rankCatalogBooks } from "@/src/domain/search/catalogRanking";
 let requestVersion = 0;
 let activeRequest: AbortController | null = null;
-type SearchStatus = "idle" | "loading" | "success" | "empty" | "partial" | "error";
+type SearchStatus = "idle" | "loading" | "success" | "empty" | "partial" | "error" | "cancelled";
 
 interface SearchState {
 	query: string;
 	results: ScrapedLink[];
 	sourceStatuses: SearchSourceStatus[];
 	nextPageUrl: string | null;
+	nextPageSource: string | null;
 	status: SearchStatus;
 	error: string | null;
+	isSearching: boolean;
+	selectedSource: string;
+	pendingSources: string[];
 	setQuery: (query: string) => void;
-	search: () => Promise<void>;
+	selectSource: (source: string) => void;
+	cancel: () => void;
+	search: (source?: string) => Promise<void>;
 	loadMore: () => Promise<void>;
 }
 
@@ -34,77 +44,110 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 	results: [],
 	sourceStatuses: [],
 	nextPageUrl: null,
+	nextPageSource: null,
 	status: "idle",
 	error: null,
+	isSearching: false,
+	selectedSource: "Todos",
+	pendingSources: [],
+	selectSource: (selectedSource) => {
+		requestVersion++; activeRequest?.abort();
+		set({ selectedSource, results: [], sourceStatuses: [], pendingSources: [], nextPageUrl: null, status: "idle", isSearching: false, error: null });
+	},
+	cancel: () => {
+		searchDiagnostic(requestVersion, "cancel");
+		requestVersion++; activeRequest?.abort(); activeRequest = null;
+		set({ isSearching: false, pendingSources: [], status: "cancelled", sourceStatuses: get().sourceStatuses.map(source => source.status === "loading" ? { ...source, status: "cancelled" } : source) });
+	},
 	setQuery: (query) => {
 		requestVersion++;
 		activeRequest?.abort();
-		set({ query, results: [], sourceStatuses: [], nextPageUrl: null, status: "idle", error: null });
+		set({ query, results: [], sourceStatuses: [], pendingSources: [], nextPageUrl: null, status: "idle", isSearching: false, error: null });
 	},
-	search: async () => {
+	search: async (selectedSource = get().selectedSource) => {
 		const version = ++requestVersion;
 		activeRequest?.abort();
 		const controller = activeRequest = new AbortController();
 		const query = get().query.trim();
 		if (!query) {
-			set({ results: [], sourceStatuses: [], nextPageUrl: null, status: "idle", error: null });
+			set({ results: [], sourceStatuses: [], nextPageUrl: null, status: "idle", isSearching: false, pendingSources: [], error: null });
 			return;
 		}
-		set({ status: "loading", results: [], error: null, sourceStatuses: [], nextPageUrl: null });
+		set({ status: "loading", isSearching: true, selectedSource, results: [], error: null, sourceStatuses: [], pendingSources: [], nextPageUrl: null });
+		searchDiagnostic(version, "start");
 		try {
-			const sources = (await sourceRepository.list()).filter((source) => source.enabled && source.status === "active");
+			searchDiagnostic(version, "source-list");
+			const sources = BUILTIN_CATALOG_NAMES.includes(selectedSource) ? [] : (await withAbort(sourceRepository.list(), controller.signal)).filter((source) => source.enabled && source.status === "active");
 			const plugins = [
-				new GutendexSearchPlugin(),
-				...sources.map((source) => new UserSourceSearchPlugin(source)),
+				...(selectedSource === "Todos" ? builtinCatalogs() : selectedSource === "Gutendex" ? [new GutendexSearchPlugin()] : selectedSource === "Gutenberg" ? [new GutenbergSearchPlugin()] : []),
+				...sources.filter(source => selectedSource === "Todos" || selectedSource === "Minhas Fontes" || source.name === selectedSource).map(configuredCatalog),
 			];
 			if (version !== requestVersion) return;
-			const response = await appDependencies.searchBooks.executeDetailed(query, plugins, {}, controller.signal);
+			searchDiagnostic(version, "plugins", { sourceCount: plugins.length });
+			set({ pendingSources: plugins.map(plugin => plugin.name), sourceStatuses: plugins.map(plugin => ({ sourceName: plugin.name, status: "loading" })) });
+			const response = await withAbort(appDependencies.searchBooks.executeDetailed(query, plugins, {}, controller.signal, {
+				operationId: version,
+				onPartial: partial => {
+					if (version !== requestVersion) return;
+					set({ results: partial.results, sourceStatuses: partial.sources, pendingSources: partial.pendingSources ?? [], status: partial.results.length ? "partial" : "loading" });
+				},
+			}), controller.signal);
 			if (version !== requestVersion) return;
-			const nextPageUrl = response.sources.find((source) => source.sourceName === "Gutendex")?.nextPageUrl ?? null;
+			const nextSource = response.sources.find(source => source.nextPageUrl);
+			const nextPageUrl = nextSource?.nextPageUrl ?? null;
 			set({
+				isSearching: false, pendingSources: [],
 				results: response.results,
 				sourceStatuses: response.sources,
 				nextPageUrl,
+				nextPageSource: nextSource?.sourceName ?? null,
 				status: chooseStatus(response.results, response.sources),
 				error: response.sources.find((source) => source.status === "error")?.error ?? null,
 			});
+			searchDiagnostic(version, "set-status", { status: get().status, resultsCount: response.results.length });
 		} catch (failure) {
 			if (version !== requestVersion) return;
-			set({ status: "error", error: failure instanceof Error ? failure.message : "Não foi possível buscar livros." });
+			set({ status: "error", isSearching: false, pendingSources: [], sourceStatuses: get().sourceStatuses.map(source => source.status === "loading" ? { ...source, status: "error", error: "Não foi possível concluir a consulta." } : source), error: failure instanceof Error ? failure.message : "Não foi possível buscar livros." });
+			searchDiagnostic(version, "set-status", { status: "error" });
 		}
 	},
 	loadMore: async () => {
-		const { query, nextPageUrl, results, sourceStatuses } = get();
-		if (!nextPageUrl || !query.trim() || get().status === "loading") return;
+		const { query, nextPageUrl, nextPageSource, results, sourceStatuses } = get();
+		if (!nextPageUrl || !query.trim() || get().isSearching) return;
 		const version = ++requestVersion;
 		activeRequest?.abort();
 		const controller = activeRequest = new AbortController();
-		set({ status: "loading", error: null });
+		set({ status: "loading", isSearching: true, error: null, pendingSources: nextPageSource ? [nextPageSource] : [], sourceStatuses: sourceStatuses.map(source => source.sourceName === nextPageSource ? { ...source, status: "loading" } : source) });
 		try {
-			const plugin = new GutendexSearchPlugin();
-			const response = await appDependencies.searchBooks.executeDetailed(
+			const plugin = builtinCatalogs().find(source => source.name === nextPageSource) ?? (await withAbort(sourceRepository.list(), controller.signal)).filter(source => source.enabled && source.status === "active" && source.name === nextPageSource).map(configuredCatalog)[0];
+			if (!plugin) throw new Error("A fonte de paginação não está ativa.");
+			const response = await withAbort(appDependencies.searchBooks.executeDetailed(
 				query,
 				[plugin],
 				{ [plugin.name]: nextPageUrl },
-				controller.signal
-			);
+				controller.signal,
+				{ operationId: version }
+			), controller.signal);
 			if (version !== requestVersion) return;
-			const mergedResults = [...new Map([...results, ...response.results].map((item) => [item.url, item])).values()];
+			const mergedResults = rankCatalogBooks([...new Map([...results, ...response.results].map((item) => [item.url, item])).values()], query);
 			const updatedSources = [
 				...sourceStatuses.filter((source) => source.sourceName !== plugin.name),
 				...response.sources,
 			];
-			const updatedNextPage = response.sources[0]?.status === "error" ? nextPageUrl : response.sources[0]?.nextPageUrl ?? null;
+			const pagination = updatedSources.find(source => source.nextPageUrl && source.status !== "error");
+			const updatedNextPage = response.sources[0]?.status === "error" ? nextPageUrl : pagination?.nextPageUrl ?? null;
 			set({
 				results: mergedResults,
+				isSearching: false, pendingSources: [],
 				sourceStatuses: updatedSources,
 				nextPageUrl: updatedNextPage,
+				nextPageSource: response.sources[0]?.status === "error" ? nextPageSource : pagination?.sourceName ?? null,
 				status: chooseStatus(mergedResults, updatedSources),
 				error: response.sources.find((source) => source.status === "error")?.error ?? null,
 			});
 		} catch (failure) {
 			if (version !== requestVersion) return;
-			set({ status: "partial", error: failure instanceof Error ? failure.message : "Não foi possível carregar mais resultados." });
+			set({ status: "partial", isSearching: false, pendingSources: [], sourceStatuses: sourceStatuses.map(source => source.sourceName === nextPageSource ? { ...source, status: "error", error: "Não foi possível carregar mais resultados." } : source), error: failure instanceof Error ? failure.message : "Não foi possível carregar mais resultados." });
 		}
 	},
 }));

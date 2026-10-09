@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { useEffect } from "react";
 import { ActivityIndicator, DimensionValue, Platform, StatusBar, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
@@ -6,6 +7,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { ReaderSettingsProvider } from "@/src/presentation/contexts/ReaderSettingsContext";
 import { AppThemeProvider, useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { AuthProvider, useAuth } from "@/src/presentation/contexts/AuthContext";
+import { authDiagnostic, correlatedAuthDiagnostic } from "@/src/utils/authDiagnostics";
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(Ionicons.font);
@@ -34,6 +36,10 @@ function AppShell() {
   const { loading, session, profile } = useAuth();
   const usePhoneFrame = Platform.OS === "web" && width > 480;
   const appReady = !loading && !!session && !!profile?.username && profile.account_status === "active";
+  useEffect(() => {
+    authDiagnostic("AUTH_GUARD_DECISION", { operationId: correlatedAuthDiagnostic(session?.user.id), correlation: "candidate", guard: "shell", decision: appReady ? "allowed" : "blocked",
+      uuid: session?.user.id, session: !!session, profile: !!profile, username: !!profile?.username, accountStatus: profile?.account_status, loading, appReady });
+  }, [loading, session, profile, appReady]);
 
   return (
     <>
@@ -58,6 +64,8 @@ function AppShell() {
                 <Stack.Screen name="reader/[bookId]" />
                 <Stack.Screen name="reader/web" />
                 <Stack.Screen name="study/[deckId]" />
+                <Stack.Screen name="decks/[deckId]" />
+                <Stack.Screen name="battle" />
                 <Stack.Screen name="services/[provider]" />
                 <Stack.Screen name="account/index" />
                 <Stack.Screen name="account/edit-profile" />

@@ -1,4 +1,54 @@
-# Roadmap funcional — atualizado em 2026-10-06
+# Roadmap funcional — atualizado em 2026-10-09
+
+## Prioridades vigentes — campanha Reader de 09/10/2026
+
+Flashcards fora desta fase, trabalho anterior NÃO ALTERADO. Barra: disputa comprovada51→61→51; preview/commit único/comando explícito com ID/ACK sem reenvio/persistência confirmada IMPLEMENTADOS, gates EPUB/Reflow/Native/Screen/bytecode/Chromium com livros reais PASS. Primeiro retorno físico EPUB1015→429/1443, toggles/reabre429 PASS; step por página e matriz completa ainda PENDENTES. Preferências: gesto no slider nativo REPRODUZIDO; sliders direcionais/testes PASS, conjunto físico ainda NÃO PASSOU; separação backdrop/painel em contraprova, NÃO TESTADA. Gutenberg deixou placeholder: OPDS/contato autorizado/aquisição explícita IMPLEMENTADOS, consulta+registro real VALIDADOS na rede, APK PENDENTE. JSON/OPDS/HTML controlados PASS, filtros reais/cinco estados/parciais/cancel/stale preservados. BNDigital BLOQUEADA HTTP403/aquisição não validada, inventário objetivo em FONTES_INDEXACOES_VALIDACAO.md. Search normalizada/ranking título+autor/typo/transposição/fallback limitado IMPLEMENTADA e matriz local PASS; consultas Gutenberg misto/reordenado/typo também PASS na rede, retorno físico final PENDENTE. APK diagnóstico E67AACBE instalado preservando35 livros/sessão; segundo diagnóstico67CB09C8 compilado/verificado23 módulos, NÃO INSTALADO. Demonstração manual solicitada pelo usuário em14:15: observação sem toques automáticos nem instalação durante a reprodução. Demais bugs1–10 continuam conforme checkpoint, Auth externo e cancelamento final/movimento anti-enjoo ainda pendentes/inconclusivos.
+
+## Decks/flashcards — estado de 09/10/2026
+
+IMPLEMENTADO e VALIDADO em testes locais: editor completo/edição/gabarito explícito/imagem/desenho/prévia/proteção de saída, decks, regra comum ±10/±5, estudo idempotente persistido com resumo e snapshots estáveis. Persistência por conta: SQLite Native/IndexedDB Web, copiando legado AsyncStorage sem exclusão. Geração local salva rascunhos para selecionar gabarito; não é IA.
+
+Batalha real preparada no Supabase: RPC autorizado por auth.uid/feature, fila/cancelamento/confirmação, 3/5/10/15 por participante, sorteio sem repetição/congelamento/troca sem ownership, respostas/pontos autoritativos, segredo antes da resposta, retomada/espera/resultado/empate. Migration e SQL manual passaram em PostgreSQL WASM isolado; aplicação remota e dois usuários reais PENDENTES. Sem regras de abandono/expiração, sem derrota por rede e sem simulação local apresentada como multiplayer concluído.
+
+Guia de habilitação/verificações/manifesto: `FLASHCARDS_IMPLEMENTACAO.md`. Novo módulo Android e ponte SQLite NÃO TESTADOS. Nenhum APK/dependência nativa gerado/adicionado; Metro funciona em development build compatível, APK release instalado exige recompilação/reinstalação futura. Histórico Reader/APK abaixo é anterior a este módulo e permanece preservado.
+
+## Fechamento da rodada física — 09/10/2026
+
+Estado vigente, prevalecendo sobre os registros históricos abaixo: todos os grupos 1–10 e posição processados; conclusão por incidente na tabela final de `CORRECOES_BUGS_APK_PROGRESSO.md`. APK normal final 08/10 16:11:48, 207579358 bytes, SHA256 `BF49499ADB7079BA0ED8696935EC84E418FE4D74C30BA8E8094A430BF6D38F33`; compilação/export PASS, bundle e seis fontes conferidos. Instalado sem limpar dados; base.apk no Redmi novamente idêntico em 09/10.
+
+Controles Native com visibilidade declarativa direta mantidos após retorno físico positivo; animação Web preservada. Composição experimental descartada. Contagem EPUB final usa fragmentos/índices de coluna, eliminando oscilação de total por geometria transformada; largura fracionária corrige deriva distante. Chromium com Freud/Ócio em duas fontes/sete posições e última página com texto PASS; typecheck/Reader Native/Screen/bytecode e demais gates relevantes PASS.
+
+No APK normal final, controles/painéis disponíveis, setas, Back do header e fechamento/reabertura PASS: EPUB 220/631→221/631→220/631/reabre 220/631; Ócio Reflow 5/32→6/32→5/32/reabre 5/32; Sociedade Original 78/169→79/169→78/169/reabre 78/169. Estudo aberto somente para leitura, sem criar/editar anotações. Biblioteca 35 livros preservada em 09/10, anti-enjoo original off conferido, diagnósticos opt-in desligados, aparelho deixado na biblioteca sem filtro.
+
+Ainda PARCIAL/PENDENTE: validação completa Auth/Google/signup/recovery e configuração administrativa externa; cutout/rotação/matriz tipográfica/encerramento forçado; cancelamento real de busca e montagem final; arquivo de 969 páginas sem identificação. Await Weber 582/584 INCONCLUSIVO. Dados reais/overlay/lifecycle anti-enjoo PASS, movimento/eficácia ainda pendentes. Nenhuma migration/dependência/configuração remota/Flashcard alterada; worktree anterior preservado.
+
+## Retomada física final — 08/10/2026, 15:30
+
+APK normal 15:03:38 compilado/verificado/instalado, sessão/34 livros preservados, diagnósticos 0. Inclui medidas DOM fracionárias e correção de última coluna vazia; retorno físico EPUB distante alinhado, Back/reabertura manual 220/631 com mesmo trecho. Build/typecheck/Reader Native/Screen/browser/export Web 2335 PASS; hash e limites no checkpoint. Anti-enjoo original off restaurado.
+
+Controles EPUB e Reflow normal visíveis não responderam aos toques atuais; áreas central/laterais e Back físico respondem. Composição unificada ReaderScreen não melhorou e foi DESCARTADA; APK normal anterior reinstalado às 15:38:35, hash igual. Resultados positivos anteriores de PRESS/painéis eram da variante diagnóstica. Segundo experimento em execução: ReaderControls Native com View/opacidade literal por visible, Web mantém animação; gates locais PASS, build/export e retorno físico pendentes. Nenhuma migration/dependência/configuração remota/Flashcard alterada. Esta seção e o checkpoint canônico prevalecem sobre os registros históricos abaixo.
+
+## Campanha APK — 08/10/2026 (prevalece sobre histórico)
+
+Validação física: biblioteca 34/sessão preservadas; Sociedade Native fallback por corrupção PASS; Ócio bytecode REPRODUZIDO, causa .toString Hermes corrigida com literal WebView/paridade e retorno físico sem erro PASS. Gutendex sucesso real/detalhes; Minhas Fontes vazio terminal. Header busca/sumário/Aa/Back responderam. Rodapé Reflow fora da tela por wrapper zero-height CONFIRMADO/CORRIGIDO; limites overlay completos, retorno físico footer/slider/setas PASS e browser seis hits com iframe PASS.
+
+Anti-enjoo: Expo/permissão/samples reais e três ciclos Home/retorno VALIDADO. Layer atrás de Reflow z20 CONFIRMADA/CORRIGIDA com root z30/pointerEvents none; oito pontos no Reflow pronto PASS. Aparelho parado, deslocamento/eficácia pendentes; restaurar off original ao fechar. Weber eventualmente concluiu/cache legível após pausa 582/584; await exato inconclusivo. Scheduler microtask→idle real+Abort corrigido. República 525 páginas CANCEL durante extração→Original e reentrada complete/SUCCESS→Reflow PASS; não prova Cancelar na montagem/969 páginas.
+
+Deriva horizontal EPUB distante REPRODUZIDA física/browser: clientWidth inteiro difere da coluna fracionária. Medida getBoundingClientRect corrigida, baseline erro 33,47px na página 120→atual <0,05px, Freud/Ócio browser PASS. Última revisão APK/retorno físico em conclusão. Auth externo, rotação/cutout, cancel busca real e resposta ao movimento continuam pendentes. Estados abaixo são checkpoints históricos; detalhe/tabela canônica em CORRECOES_BUGS_APK_PROGRESSO.md.
+
+Revisão integrada: posição agora VALIDADA em documentos de livros reais Chromium (Freud EPUB/Ócio Reflow) e orquestração ReaderScreen controlada. Corrigidos viewer vazio no preparo apagando progresso, retorno Original com progresso Reflow e timer de 500ms que revertia modo ou descartava última posição no fechamento. Sem novo delay/debounce: gravação direta e settings funcionais. Back/cancel/erro/invalid, ack/layout provisório, controles/settings/instância, page=1 real, troca de modo e fechamento imediato PASS (storage controlado). APK físico ainda PENDENTE. Build JBR25 falhou; JDK17 existente e recompilação final PASS, sem upgrade/prebuild.
+
+Fechamento local: typecheck/export Web 2335 e suites relevantes PASS; diff da campanha limpo, EOF Flashcards preexistente preservado. APK final conferido em `C:\KIndle\android\app\build\outputs\apk\release\app-release.apk`, 207573078 bytes, 08/10/2026 09:47:07 -03:00, package com.kindle.reader, assinatura v2 Android Debug existente; hash/bundle no checkpoint. Aparelho Xiaomi 23117RA68G/Android 16 apareceu na conferência final: instalação `adb install -r` PASS preservando dados; processo iniciado, UI aguardando desbloqueio. Inventário anuncia os cinco tipos DeviceMotion, permissão já concedida; eventos/overlay ainda NÃO TESTADOS. Todos os grupos processados; tabela final e passos restantes no checkpoint. Nenhuma migration/dependência/config remota alterada.
+
+Anti-enjoo BUG 10 INCONCLUSIVO no Redmi: watchdog/toggle CORRIGIDOS, hook/lifecycle/overlay VALIDADO controlado; inventário físico anuncia cinco tipos necessários e permissão concedida, mas disponibilidade Expo/eventos/overlay no app PENDENTES até desbloqueio/teste. Diagnóstico opt-in pronto. Sem animação falsa/fallback por hipótese; nenhuma dependência nova. Gates grupo E e fechamento local PASS. Físico pendente.
+
+Sources BUG 9 PARCIAL: pipeline/seleção/terminais/cancelamento/resultados parciais IMPLEMENTADOS e VALIDADO controlado/HTTP local. Gutendex live terminou em erro de acesso; online Native PENDENTE e incidente físico INCONCLUSIVO. Histórico não bloqueia rede; nenhuma mudança de proxy/CORS/retry/timeout da busca. Gates grupo D PASS.
+
+Reader UI: BUG 2 PARCIAL (insets documentais Native IMPLEMENTADOS, contrato geométrico PASS; físico pendente). BUG 3 PARCIAL (feedback interceptador reproduzido/corrigido; 5 botões Chromium PASS; wrapper Native INCONCLUSIVO instrumentado). Posição PARCIAL: âncora tipográfica/transition/display/handshake Native CORRIGIDOS, baseline/atual browser/React VALIDADO, sem filtro page=1; origem completa do incidente físico e reabertura Android PENDENTES. Gates grupo C PASS. Flashcards NÃO ALTERADOS.
+
+Reflow: BUG 1 PARCIAL — contrato compartilhado/validação/cache v11 IMPLEMENTADOS e 5 PDFs reais Web VALIDADO; Native físico PENDENTE. BUG 8 PARCIAL — etapas, cancelamento/gerações/cleanup/renderer e builder cooperativo IMPLEMENTADOS, cancelamento controlado PASS; 969 páginas/memória/toque físico NÃO TESTADOS. `bytecode` INCONCLUSIVO, captura opt-in testada sem origem atribuída. Nenhum timeout novo nem perda de arquivo/progresso. Detalhes no checkpoint.
+
+Auth: BUG 5 PARCIAL (A–E controlado PASS; físico inconclusivo). BUG 6 BLOQUEADO POR CONFIGURAÇÃO EXTERNA (policy/logs/schema real). BUG 4: defeitos locais de callback CORRIGIDOS e teste controlado PASS; Google↔Supabase ainda BLOQUEADO por logs/configuração. BUG 7: erros operacionais e callback recovery CORRIGIDOS; allowlist/template/email real BLOQUEADOS. Nenhum bug Auth integralmente VALIDADO no APK. Migrations NÃO ALTERADAS/não aplicadas nesta campanha. Detalhes e sequência persistente: CORRECOES_BUGS_APK_PROGRESSO.md. Flashcards fora do escopo.
 
 Estados: **implementado** = caminho conectado no código; **aprovado** = teste indicado passou; **pendente** = validação ou implementação ainda necessária; **bloqueado** = dependência externa identificada. Export Web não valida Android.
 
@@ -96,10 +146,12 @@ Este fechamento prevalece sobre os checkpoints intermediários acima, preservado
 
 | Recurso | Estado | Evidência / falta |
 |---|---|---|
-| Login email, cadastro, recuperação e redefinição | 🧪 IMPLEMENTADO — AGUARDANDO CONFIG | Telas e APIs Supabase conectadas; migrations e email real pendentes |
+| Login email — BUG 5 | 🟡 PARCIAL / incidente APK INCONCLUSIVO | Correção do tratamento de erro de navegação VALIDADA em componentes/SDK controlados; credenciais inválidas recusadas no servidor. Conta válida/aparelho pendentes |
+| Cadastro email — BUG 6 | 🟡 PARCIAL / rejeição real INCONCLUSIVA | Code/status/categoria preservados e regressões controladas aprovadas; policy/trigger/constraint efetivos e signup real pendentes |
+| Recuperação e redefinição | 🧪 IMPLEMENTADO — AGUARDANDO CONFIG | Estado anterior preservado; NÃO ALTERADO na fase 1 de Auth |
 | Login username | 🧪 IMPLEMENTADO — AGUARDANDO CONFIG | Edge Function preparada; implantação e teste real pendentes |
 | Login Google Web/Android | 🧪 IMPLEMENTADO — AGUARDANDO CONFIG/DEVICE | OAuth PKCE/callback, scheme já existente; provider, secret rotacionado e device pendentes |
-| Sessão, logout, AuthGuard e perfil | 🧪 IMPLEMENTADO — AGUARDANDO CONFIG | Provider/rotas/conta no código; perfil remoto ainda ausente |
+| Sessão, logout, AuthGuard e perfil | 🧪 IMPLEMENTADO / VALIDADO CONTROLADO | Matriz A–E, logout e bloqueios por estado/cache aprovados; diagnóstico opt-in. Conta real e autorização remota continuam PENDENTES |
 | Roles, MASTER e TEST | 🧪 IMPLEMENTADO — AGUARDANDO CONFIG | Regra central e script admin; contas/UUIDs reais não provisionados |
 | Controle de Flashcards | 🧪 IMPLEMENTADO — AGUARDANDO CONFIG | UI/rota/ações bloqueadas por override; teste local passou, MASTER/TEST reais pendentes |
 | Profiles e override com RLS | 🟡 PARCIAL | Migrations preparadas, não aplicadas no remoto |
@@ -108,3 +160,12 @@ Este fechamento prevalece sobre os checkpoints intermediários acima, preservado
 | Android deep link e Play Store | 🧪 IMPLEMENTADO — AGUARDANDO DEVICE | `kindlereader`, `com.kindle.reader` já no app/Manifest; SHA-1 da keystore real e Play Signing pendentes |
 
 Auditoria, matriz, migrations, limites e passos externos: `AUTH_IMPLEMENTATION.md`. Nenhum valor de secret foi registrado. O reset EPUB permanece ABERTO. Sem alteração Native nova; não houve APK/reinstalação nesta etapa.
+
+### Fase 1 de correções Auth — 2026-10-07
+
+- **IMPLEMENTADO / VALIDADO controlado:** BUG 5, separação de falha de navegação após sucesso Auth; BUG 6, preservação sanitizada de erro e mensagens por categoria. Diagnósticos por operationId desligados por padrão. Nenhuma condição de acesso foi relaxada.
+- **INCONCLUSIVO:** causa do erro seguido de entrada no APK e etapa que rejeita seu cadastro. Os dois incidentes não estão concluídos. **PENDENTE:** timeline física, Auth/Postgres Logs e política de senha efetiva.
+- **VALIDADO:** testes React do fluxo, SDK instalado com HTTP controlado, regras Auth existentes, typecheck/export Web; tentativa remota sem sessão com credenciais inválidas permaneceu sem sessão. Build não valida autenticação funcional completa.
+- **NÃO TESTADO:** login/cadastro com conta real, email entregue, Android e autopromoção/RLS real. Browser visual bloqueado pela revisão automática ao iniciar Chrome. Contrato de privilégios foi conferido somente na migration local.
+- **NÃO ALTERADO:** migrations/schema/configuração remota, policy, Google/recovery e demais áreas fora de Auth. Nenhum novo APK; o standalone exige rebuild para receber o código embutido desta fase.
+- Evidências, matriz dos dez testes, limites e instruções de captura em `PROJECT_CONTEXT.md`, seção “Resultado da fase 1 — BUGS 5 e 6”.

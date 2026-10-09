@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+const React=require('../.expo/auth-test-tools/node_modules/react'),{act,create}=require('../.expo/auth-test-tools/node_modules/react-test-renderer');
+global.IS_REACT_ACT_ENVIRONMENT=true;
+const exportsForSlider={},commits=[];let handlers;
+const code=ts.transpileModule(fs.readFileSync('src/presentation/components/ReaderSettingsSlider.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
+new Function('require','exports',code)(name=>name==='react'?React:name==='react/jsx-runtime'?require('../.expo/auth-test-tools/node_modules/react/jsx-runtime'):name==='react-native'?{View:'View',Pressable:'Pressable',StyleSheet:{create:x=>x},PanResponder:{create:x=>(handlers=x,{panHandlers:{}})}}:require(name),exportsForSlider);
+(async()=>{
+ let r;const props={value:20,minimumValue:14,maximumValue:26,step:1,onValueChange:v=>commits.push(v),accessibilityLabel:'Tamanho da fonte',minimumTrackTintColor:'#a54',maximumTrackTintColor:'#ddd',thumbTintColor:'#a54'};
+ await act(async()=>{r=create(React.createElement(exportsForSlider.ReaderSettingsSlider,props));});
+ const area=()=>r.root.findByType('Pressable');
+ await act(async()=>r.root.findAllByType('View')[0].props.onLayout({nativeEvent:{layout:{width:224}}}));
+ for(const [dx,dy] of [[0,80],[30,80],[-20,-50],[2,1]])assert.equal(handlers.onMoveShouldSetPanResponder(null,{dx,dy}),false,'Vertical movement must stay with preferences scroll');
+ assert.equal(handlers.onMoveShouldSetPanResponder(null,{dx:50,dy:4}),true);
+ await act(async()=>handlers.onPanResponderGrant());await act(async()=>handlers.onPanResponderMove(null,{dx:50,dy:4}));
+ assert.deepEqual(commits,[]);assert.equal(area().props.accessibilityValue.now,23);
+ await act(async()=>handlers.onPanResponderRelease());assert.deepEqual(commits,[23]);
+ await act(async()=>r.update(React.createElement(exportsForSlider.ReaderSettingsSlider,{...props,value:23})));
+ await act(async()=>handlers.onPanResponderGrant());await act(async()=>handlers.onPanResponderMove(null,{dx:-500,dy:0}));await act(async()=>handlers.onPanResponderTerminate());assert.deepEqual(commits,[23],'Cancelled gesture does not apply a setting');
+ await act(async()=>area().props.onAccessibilityAction({nativeEvent:{actionName:'increment'}}));assert.equal(commits.at(-1),24);
+ await act(async()=>area().props.onPress({nativeEvent:{locationX:12}}));assert.equal(commits.at(-1),14);
+ await act(async()=>r.unmount());console.log('PASS preferences vertical gesture ownership, horizontal preview/single commit, cancellation, bounds, tap and accessibility adjustment');
+})().catch(e=>{console.error(e);process.exitCode=1;});

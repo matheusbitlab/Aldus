@@ -1,4 +1,12 @@
-import { Flashcard, FlashcardDeck, FlashcardReviewEvent, FlashcardReviewResult, FlashcardSnapshot } from "@/src/domain/types/flashcards";
+import {
+  Flashcard,
+  FlashcardChoice,
+  FlashcardDeck,
+  FlashcardReviewEvent,
+  FlashcardReviewResult,
+  FlashcardSnapshot,
+  FlashcardStudySession,
+} from "@/src/domain/types/flashcards";
 
 export interface FlashcardRepository {
   load(): Promise<FlashcardSnapshot>;
@@ -9,5 +17,21 @@ export interface FlashcardRepository {
   createCards(cards: Flashcard[]): Promise<void>;
   updateCard(card: Flashcard): Promise<void>;
   removeCard(cardId: string): Promise<void>;
-  recordReview(card: Flashcard, event: FlashcardReviewEvent): Promise<FlashcardReviewResult>;
+  recordReview(
+    card: Flashcard,
+    event: FlashcardReviewEvent,
+  ): Promise<FlashcardReviewResult>;
+  studySession(
+    deckId: string,
+    restart?: boolean,
+  ): Promise<FlashcardStudySession>;
+  answerStudy(
+    sessionId: string,
+    cardId: string,
+    choice: FlashcardChoice,
+  ): Promise<FlashcardStudySession>;
+  advanceStudy(
+    sessionId: string,
+    cardId: string,
+  ): Promise<FlashcardStudySession>;
 }

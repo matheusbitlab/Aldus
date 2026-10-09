@@ -10,7 +10,7 @@ export default function ForgotPassword() {
     try { await sendRecoveryEmail(email); setSent(true); }
     catch (failure) {
       if (failure instanceof Error && failure.message === "Informe um email válido.") setError(failure.message);
-      else setSent(true);
+      else setError("Não foi possível solicitar a recuperação agora. Verifique a conexão e tente novamente mais tarde.");
     } finally { setBusy(false); }
   };
   return <AuthForm title="Recuperar senha" subtitle={sent ? "Se existir uma conta correspondente, você receberá instruções." : "Informe seu email para receber um link de recuperação."}>

@@ -10,6 +10,8 @@ export interface ScrapedLink {
 	estimatedSize: number | null;
 	sourceSite: string;
 	format: "epub" | "mobi" | "pdf" | "unknown";
+	/** Partial OPDS entry; resolve the acquisition on explicit user action. */
+	catalogEntryUrl?: string;
 }
 
 export interface SearchPlugin {
@@ -17,6 +19,9 @@ export interface SearchPlugin {
 	/** Only legacy HTML crawlers consult robots; catalog APIs do not. */
 	requiresRobotsPolicy?: boolean;
 	skipLinkValidation?: boolean;
+	requestHeaders?: Record<string, string>;
+	/** At most one reduced remote query when the ranked primary response is empty. */
+	supportsQueryFallback?: boolean;
 	getSearchEndpoint(query: string): string;
 	parseResults(payload: string): ScrapedLink[];
 	filterResults?(links: ScrapedLink[], query: string): ScrapedLink[];
@@ -25,7 +30,7 @@ export interface SearchPlugin {
 
 export interface SearchSourceStatus {
 	sourceName: string;
-	status: "success" | "empty" | "error";
+	status: "loading" | "success" | "empty" | "error" | "cancelled";
 	error?: string;
 	nextPageUrl?: string | null;
 }
@@ -33,5 +38,7 @@ export interface SearchSourceStatus {
 export interface SearchExecutionResult {
 	results: ScrapedLink[];
 	sources: SearchSourceStatus[];
+	pendingSources?: string[];
 }
+export interface SearchExecutionOptions { operationId?: number; onPartial?: (result: SearchExecutionResult) => void; }
 export interface SearchHistory { id: string; query: string; resultsCount: number; searchedAt: number; }

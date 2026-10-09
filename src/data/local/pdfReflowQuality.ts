@@ -1,0 +1,60 @@
+import type { PdfReflowDocument, PdfReflowPageData, PdfReflowQuality } from "@/src/domain/types/pdfReader";
+
+export const PDF_REFLOW_QUALITY_VERSION = 1;
+export const CORRUPT_PDF_TEXT = "A extração de texto deste PDF está corrompida. O PDF Original continua disponível.";
+
+export function assessTextExtractionQuality(items: Iterable<{ text: string }>): PdfReflowQuality {
+  let totalChars = 0, controlChars = 0, letterChars = 0, replacementChars = 0;
+  for (const { text } of items) {
+    totalChars += text.length;
+    for (const char of text) {
+      if (char === "\uFFFD") replacementChars++;
+      if (/^[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]$/u.test(char)) controlChars++;
+      if (/\p{L}/u.test(char)) letterChars++;
+    }
+  }
+  return { version: PDF_REFLOW_QUALITY_VERSION, totalChars, controlChars, letterChars, replacementChars };
+}
+
+// Same conservative rule previously used on Web. Numeric/PUA glyphs alone
+// are not evidence of corrupt prose; never attempt to reconstruct encoding.
+export function isClearlyCorruptedTextExtraction(q: PdfReflowQuality): boolean {
+  if (q.totalChars <= 0 || q.controlChars < 100) return false;
+  const controls = q.controlChars / q.totalChars, letters = q.letterChars / q.totalChars;
+  return controls >= 0.2 && (letters < 0.35 || (controls > 0.6 && letters < 0.5));
+}
+
+export function validateReflowPages(pages: PdfReflowPageData[], count: number): PdfReflowQuality {
+  const steps = validateReflowPagesSteps(pages, count);
+  let result = steps.next();
+  while (!result.done) result = steps.next();
+  return result.value;
+}
+
+export function* validateReflowPagesSteps(pages: PdfReflowPageData[], count: number): Generator<void, PdfReflowQuality> {
+  if (!Number.isInteger(count) || count < 1 || pages.length !== count || pages.some((p, i) => p.pageNumber !== i + 1)) {
+    throw new Error("A extração do PDF não foi concluída. O arquivo original continua disponível.");
+  }
+  const quality = assessTextExtractionQuality([]);
+  for (const page of pages) {
+    const part = assessTextExtractionQuality(page.textItems);
+    quality.totalChars += part.totalChars;
+    quality.controlChars += part.controlChars;
+    quality.letterChars += part.letterChars;
+    quality.replacementChars += part.replacementChars;
+    yield;
+  }
+  if (isClearlyCorruptedTextExtraction(quality)) throw new Error(CORRUPT_PDF_TEXT);
+  return quality;
+}
+
+export function isValidatedReflowDocument(document: PdfReflowDocument | null | undefined): document is PdfReflowDocument {
+  try {
+    const q = document?.extractionQuality;
+    if (!q || q.version !== PDF_REFLOW_QUALITY_VERSION || !Number.isInteger(document?.pageCount) || document.pageCount < 1) return false;
+    if (![q.totalChars, q.controlChars, q.letterChars, q.replacementChars].every(n => Number.isFinite(n) && n >= 0) || isClearlyCorruptedTextExtraction(q)) return false;
+    // Recheck the actual derivative too: matching version/metadata cannot bless bad text.
+    const derived = assessTextExtractionQuality((function* () { for (const chapter of document.chapters) for (const block of chapter.blocks) if (block.text) yield { text: block.text }; })());
+    return !isClearlyCorruptedTextExtraction(derived) && ['image-based','text-based','mixed'].includes(document.classification);
+  } catch { return false; }
+}

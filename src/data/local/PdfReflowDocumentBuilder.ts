@@ -8,6 +8,7 @@ import {
   PdfReflowTocEntry,
 } from "@/src/domain/types/pdfReader";
 import { StoredChapter } from "@/src/domain/entities/LibraryBook";
+import { validateReflowPagesSteps } from "./pdfReflowQuality";
 
 interface VisualLine {
   pageNumber: number;
@@ -33,8 +34,52 @@ export function buildPdfReflowDocument(
   pages: PdfReflowPageData[],
   pageCount: number
 ): PdfReflowDocument {
+  const steps = buildReflowSteps(pages, pageCount);
+  let result = steps.next();
+  while (!result.done) result = steps.next();
+  return result.value;
+}
+
+export async function buildPdfReflowDocumentAsync(pages: PdfReflowPageData[], pageCount: number, signal: AbortSignal): Promise<PdfReflowDocument> {
+  const steps = buildReflowSteps(pages, pageCount);
+  for (;;) {
+    if (signal.aborted) { steps.return(undefined as never); throw new Error("Processamento cancelado."); }
+    const result = steps.next();
+    if (result.done) return result.value;
+    // Cooperative page-sized work, not a delay/retry or navigation workaround.
+    await yieldReflowWork(signal);
+  }
+}
+
+function yieldReflowWork(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let release = () => {};
+    const finish = () => { release(); signal.removeEventListener("abort", abort); resolve(); };
+    const abort = () => { release(); signal.removeEventListener("abort", abort); reject(new Error("Processamento cancelado.")); };
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) { abort(); return; }
+    // RN 0.86 implements setImmediate with queueMicrotask: it cannot yield to
+    // Native input/render tasks. The idle scheduler crosses that boundary.
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(finish);
+      release = () => { if (typeof cancelIdleCallback === "function") cancelIdleCallback(id); };
+    } else if (typeof setImmediate === "function") {
+      const id = setImmediate(finish);
+      release = () => clearImmediate(id);
+    } else {
+      const channel = new MessageChannel();
+      release = () => { channel.port1.close(); channel.port2.close(); };
+      channel.port1.onmessage = finish;
+      channel.port2.postMessage(null);
+    }
+  });
+}
+
+function* buildReflowSteps(pages: PdfReflowPageData[], pageCount: number): Generator<void, PdfReflowDocument> {
+  const extractionQuality = yield* validateReflowPagesSteps(pages, pageCount);
   const chapters: PdfReflowChapter[] = [{ id: "chapter-0", title: "Início", blocks: [] }];
-  const pageLines = pages.map((page) => ({ page, lines: groupTextItems(page) }));
+  const pageLines: Array<{ page: PdfReflowPageData; lines: VisualLine[] }> = [];
+  for (const page of pages) { pageLines.push({ page, lines: groupTextItems(page) }); yield; }
   const repeatedHeaders = findRepeatedPageFurniture(pageLines);
   const toc: PdfReflowTocEntry[] = [];
   const textPages = new Set<number>();
@@ -59,6 +104,7 @@ export function buildPdfReflowDocument(
   };
 
   for (const { page, lines } of pageLines) {
+    yield;
     const bodyFontSize = median(lines.filter((line) => line.text.length > 35).map((line) => line.fontSize));
     const dropCapImages = new Set(
       page.images.filter((image) => isDropCapImage(image, page, lines))
@@ -164,6 +210,7 @@ export function buildPdfReflowDocument(
     : "text-based";
 
   return {
+    extractionQuality,
     classification,
     pageCount,
     textPageCount: textPages.size,

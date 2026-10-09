@@ -12,9 +12,14 @@ function load(file, dependencies = {}) {
 const srs = load('src/domain/study/flashcardSrs.ts');
 const generation = load('src/domain/study/flashcardGeneration.ts', { '@/src/domain/study/flashcardSrs': srs });
 const memory = new Map();
+const types = load('src/domain/types/flashcards.ts');
+const scoring = load('src/domain/study/flashcardScoring.ts', { '../types/flashcards': types });
 const { LocalFlashcardRepository } = load('src/data/local/FlashcardRepository.ts', {
+  './flashcardStorage': { flashcardStorage: { getItem: async key => memory.get(key) ?? null, setItem: async (key, value) => memory.set(key, value) } },
   '@react-native-async-storage/async-storage': { getItem: async key => memory.get(key) ?? null, setItem: async (key, value) => memory.set(key, value) },
   '@/src/domain/study/flashcardSrs': srs,
+  '@/src/domain/types/flashcards': types,
+  '@/src/domain/study/flashcardScoring': scoring,
 });
 const first = srs.computeFlashcardSrs(4, 1, 0, 2.5, 0);
 assert.deepEqual(first, { interval: 1, repetition: 1, easeFactor: 2.6, dueAt: 86400000 });

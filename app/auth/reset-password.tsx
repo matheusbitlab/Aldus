@@ -13,10 +13,13 @@ export default function ResetPassword() {
     if (password.length < 8) { setError("A senha precisa ter pelo menos 8 caracteres."); return; }
     if (password !== confirmation) { setError("As senhas não coincidem."); return; }
     setBusy(true); setError(null);
-    const { error: failure } = await requireSupabase().auth.updateUser({ password });
-    setBusy(false);
-    if (failure) { setError("Não foi possível atualizar a senha. Solicite um novo link."); return; }
-    router.replace("/");
+    try {
+      const { error: failure } = await requireSupabase().auth.updateUser({ password });
+      if (failure) { setError("Não foi possível atualizar a senha. Solicite um novo link."); return; }
+      router.replace("/");
+    } catch {
+      setError("Não foi possível atualizar a senha. Verifique a conexão e tente novamente.");
+    } finally { setBusy(false); }
   };
   return <AuthForm title="Redefinir senha" subtitle="Escolha uma nova senha para sua conta.">
     <AuthInput label="Nova senha" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" />

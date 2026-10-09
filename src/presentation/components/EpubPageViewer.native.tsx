@@ -3,10 +3,13 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { createEpubReaderDocument } from "@/src/presentation/components/EpubReaderDocument";
 import { EpubPageInfo, EpubPageViewerProps, ReaderStudyResult } from "@/src/presentation/components/EpubPageViewerProps";
+import { readerNavigationDiagnostic, ReaderNavigationOrigin } from "@/src/utils/readerNavigationDiagnostics";
 
 export function EpubPageViewer({
   chapters,
   pageNumber,
+  initialRestorePending = false,
+  restoreTargetReady = false,
   navigationRequest,
   fontSize,
   fontFamily,
@@ -37,12 +40,15 @@ export function EpubPageViewer({
     if (studyHighlights) webView.current?.injectJavaScript(`window.readerStudy && window.readerStudy(${JSON.stringify({ type: "studyRenderHighlights", id: -1, highlights: studyHighlights })}); true;`);
   }, [studyHighlights]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [layoutReady, setLayoutReady] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
 
   // Generate initial HTML once per chapters list
   const html = useMemo(
     () =>
       createEpubReaderDocument(chapters, {
+        initialRestorePending,
         fontSize,
         fontFamily,
         marginSize,
@@ -57,6 +63,7 @@ export function EpubPageViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [chapters]
   );
+  const source = useMemo(() => ({ html, baseUrl: "https://kindle-reader.local/" }), [html]);
 
   useEffect(() => {
     callback.current = onPageInfo;
@@ -68,29 +75,39 @@ export function EpubPageViewer({
 
   useEffect(() => {
     setLoading(true);
+    setLoaded(false);
+    setLayoutReady(false);
     setRenderError(null);
   }, [html]);
 
   // Turn page smoothly via JS injection
   useEffect(() => {
-    webView.current?.injectJavaScript(`window.goToPage && window.goToPage(${pageNumber}); true;`);
-  }, [pageNumber]);
+    if (!loaded || !initialRestorePending || !layoutReady || !restoreTargetReady) return;
+    webView.current?.injectJavaScript(`window.goToPage && window.goToPage(${pageNumber}, 0, 'RESTORE'); true;`);
+  }, [loaded, initialRestorePending, layoutReady, restoreTargetReady, pageNumber]);
 
   useEffect(() => {
-    if (!navigationRequest) return;
-    webView.current?.injectJavaScript(
-      `window.navigatePage && window.navigatePage(${navigationRequest.direction}); true;`
-    );
-  }, [navigationRequest]);
+    if (!loaded) return;
+    const type = initialRestorePending ? "beginInitialRestore" : "completeInitialRestore";
+    webView.current?.injectJavaScript(`window.dispatchEvent(new MessageEvent('message', { data: {type: '${type}'} })); true;`);
+  }, [loaded, initialRestorePending]);
 
   useEffect(() => {
-    if (searchTerm) {
+    if (!loaded || !navigationRequest) return;
+    const command = { ...navigationRequest, operationId: navigationRequest.id,
+      type: navigationRequest.pageNumber !== undefined ? "goToPage" : "navigatePage" };
+    webView.current?.injectJavaScript(`window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(command)} })); true;`);
+  }, [loaded, navigationRequest]);
+
+  useEffect(() => {
+    if (loaded && searchTerm) {
       webView.current?.injectJavaScript(`window.searchText && window.searchText(${JSON.stringify(searchTerm)}); true;`);
     }
-  }, [searchTerm]);
+  }, [loaded, searchTerm]);
 
   // Update typography dynamically without reloading WebView
   useEffect(() => {
+    if (!loaded) return;
     const payload = JSON.stringify({
       type: "updateTypography",
       fontSize,
@@ -105,15 +122,19 @@ export function EpubPageViewer({
       backgroundColor,
     });
     webView.current?.injectJavaScript(`window.updateTypography && window.updateTypography(${payload}); true;`);
-  }, [fontSize, fontFamily, marginSize, lineHeight, paragraphSpacing, maxWidth, alignment, allowTextSelection, textColor, backgroundColor]);
+  }, [loaded, fontSize, fontFamily, marginSize, lineHeight, paragraphSpacing, maxWidth, alignment, allowTextSelection, textColor, backgroundColor]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const info = JSON.parse(event.nativeEvent.data) as EpubPageInfo & { type?: string; message?: string; found?: boolean };
-      if (info?.type === "error") {
+      if (info?.type === "navigationDiagnostic") {
+        const record = info as unknown as Record<string, unknown>;
+        readerNavigationDiagnostic(record.origin as ReaderNavigationOrigin, record);
+      } else if (info?.type === "error") {
         setRenderError(info.message ?? "Não foi possível renderizar este EPUB.");
         setLoading(false);
       } else if (info && info.type === "page") {
+        if (info.layoutReady) setLayoutReady(true);
         setLoading(false);
         callback.current(info);
       } else if (info?.type === "study") {
@@ -130,7 +151,7 @@ export function EpubPageViewer({
     <View style={[styles.viewport, { backgroundColor }]}>
       <WebView
         ref={webView}
-        source={{ html, baseUrl: "https://kindle-reader.local/" }}
+        source={source}
         style={[styles.webview, { backgroundColor }]}
         originWhitelist={["*"]}
         scrollEnabled={false}
@@ -143,6 +164,8 @@ export function EpubPageViewer({
         setSupportMultipleWindows={false}
         onMessage={handleMessage}
         onLoadEnd={() => {
+          setLoaded(true);
+          if (!initialRestorePending) webView.current?.injectJavaScript(`window.goToPage && window.goToPage(${pageNumber}, 0, 'RESTORE'); true;`);
           if (studyHighlights) webView.current?.injectJavaScript(`window.readerStudy && window.readerStudy(${JSON.stringify({ type: "studyRenderHighlights", id: -1, highlights: studyHighlights })}); true;`);
         }}
         onError={({ nativeEvent }) => {

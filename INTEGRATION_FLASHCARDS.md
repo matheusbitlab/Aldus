@@ -1,5 +1,11 @@
 # Integração Flashcards ↔ Kindle Reader — auditoria e etapas
 
+## Estado vigente — 09/10/2026
+
+Reaproveitada a integração local e a autenticação Supabase do Reader. Editor completo, imagem/desenho/edição, estudo durável e pontuação comum ±10/±5 implementados; SQLite Native/IndexedDB Web com cópia do legado por conta. Batalha agora possui cliente/RPC/migration próprios no Supabase, com identidade auth.uid, snapshots privados, pontuação autoritativa, retomada e resultado. Migration/teste SQL aprovados em PostgreSQL WASM isolado; configuração remota e batalha com dois usuários reais PENDENTES. O gateway NestJS doador permanece separado/intacto: usa JWT diferente, acerto informado pelo cliente e regras de HP/velocidade incompatíveis com o novo pedido.
+
+Guia canônico: `FLASHCARDS_IMPLEMENTACAO.md`. Nenhum APK novo/dependência nativa/configuração Android; JS pode ser testado via Metro em development build compatível. APK release atual precisa de recompilação/reinstalação futura. Novo módulo Android NÃO TESTADO; verificações físicas anteriores do Reader não o validam. Registros abaixo são históricos.
+
 Atualizado em 2026-10-06. O Kindle Reader permanece o aplicativo principal. Esta integração começou pela camada local; o serviço online doador continua separado até que seus contratos sejam corrigidos e um ambiente real seja disponibilizado.
 
 ## Inventário dos dois projetos

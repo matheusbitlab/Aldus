@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readerNavigationDiagnostic, ReaderNavigationOrigin } from "@/src/utils/readerNavigationDiagnostics";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { createEpubReaderDocument } from "@/src/presentation/components/EpubReaderDocument";
 import { EpubPageInfo, EpubPageViewerProps, ReaderStudyResult } from "@/src/presentation/components/EpubPageViewerProps";
@@ -103,7 +104,10 @@ function EpubPageViewerComponent({
           message?: string;
           found?: boolean;
         };
-        if (info?.type === "error") {
+        if (info?.type === "navigationDiagnostic") {
+          const record = info as unknown as Record<string, unknown>;
+          readerNavigationDiagnostic(record.origin as ReaderNavigationOrigin, record);
+        } else if (info?.type === "error") {
           console.log(`[FORENSIC:EpubPageViewer:message] t=${performance.timeOrigin + performance.now()} error message=${info.message ?? ""}`);
           setRenderError(info.message ?? "Não foi possível renderizar este EPUB.");
           setLoading(false);
@@ -147,9 +151,9 @@ function EpubPageViewerComponent({
 
   // Update page position dynamically
   useEffect(() => {
-    if (initialRestorePending && (!layoutReady || !restoreTargetReady)) return;
+    if (!initialRestorePending || !layoutReady || !restoreTargetReady) return;
     console.log(`[FORENSIC:EpubPageViewer:postMessage] t=${performance.timeOrigin + performance.now()} effect -> iframe goToPage(${pageNumber})`);
-    frame.current?.contentWindow?.postMessage({ type: "goToPage", pageNumber }, "*");
+    frame.current?.contentWindow?.postMessage({ type: "goToPage", pageNumber, origin: "RESTORE", operationId: 0 }, "*");
   }, [initialRestorePending, layoutReady, pageNumber, restoreTargetReady]);
 
   const wasRestorePending = useRef(initialRestorePending);
@@ -168,7 +172,7 @@ function EpubPageViewerComponent({
     if (!navigationRequest) return;
     console.log(`[FORENSIC:EpubPageViewer:postMessage] t=${performance.timeOrigin + performance.now()} effect -> iframe navigatePage(${navigationRequest.direction}) id=${navigationRequest.id}`);
     frame.current?.contentWindow?.postMessage(
-      { type: "navigatePage", direction: navigationRequest.direction },
+      { ...navigationRequest, operationId: navigationRequest.id, type: navigationRequest.pageNumber !== undefined ? "goToPage" : "navigatePage" },
       "*"
     );
   }, [navigationRequest]);

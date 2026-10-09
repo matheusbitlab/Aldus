@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { UserSource, SourceKind } from "@/src/domain/types/sources";
-import { UserSourceSearchPlugin } from "@/src/data/scraping/UserSourceSearchPlugin";
+import { configuredCatalog, BUILTIN_CATALOG_NAMES } from "@/src/data/scraping/catalogPlugins";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { appDependencies } from "@/src/presentation/services/dependencies";
 import { useSourceStore } from "@/src/presentation/stores/sourceStore";
@@ -38,7 +38,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
     try {
       const response = await appDependencies.searchBooks.executeDetailed(
         "Dom Casmurro",
-        [new UserSourceSearchPlugin(source)]
+        [configuredCatalog(source)]
       );
       const outcome = response.sources[0];
       if (!outcome || outcome.status === "error") {
@@ -68,7 +68,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       setFormError("Informe o nome da fonte e uma URL HTTP ou HTTPS.");
       return;
     }
-    if (["Todos", "Gutendex", "Minhas Fontes"].includes(name.trim()) || sources.some((source) => source.id !== editingId && source.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase())) {
+    if (["Todos", ...BUILTIN_CATALOG_NAMES, "BNDigital", "Minhas Fontes"].some(reserved => reserved.toLocaleLowerCase() === name.trim().toLocaleLowerCase()) || sources.some((source) => source.id !== editingId && source.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase())) {
       setFormError("Escolha um nome único para a fonte.");
       return;
     }

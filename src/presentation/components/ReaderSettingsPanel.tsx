@@ -1,5 +1,5 @@
 import { MotionCuesControl } from "./MotionCuesControl";
-import Slider from "@react-native-community/slider";
+import { ReaderSettingsSlider as Slider } from "./ReaderSettingsSlider";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,7 @@ import { useReaderSettings } from "@/src/presentation/contexts/ReaderSettingsCon
 import { PdfReaderSettings, PdfReadingMode } from "@/src/domain/types/pdfReader";
 import { pdfReaderThemes } from "@/src/theme/tokens";
 import { PdfReaderTheme } from "@/src/domain/types/pdfReader";
+import { readerUiDiagnostic } from "@/src/utils/readerUiDiagnostics";
 
 interface Props {
   visible: boolean;
@@ -76,9 +77,14 @@ export function ReaderSettingsPanel({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, { paddingTop: Math.max(insets.top, 12), paddingBottom: Math.max(insets.bottom, 12) }]} onPress={onClose}>
-        <Pressable style={[styles.panel, { backgroundColor: palette.panel }]} onPress={(event) => event.stopPropagation()}>
-          <ScrollView style={styles.panelScroll} contentContainerStyle={styles.panelContent} keyboardShouldPersistTaps="handled">
+      <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 12), paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <Pressable accessibilityLabel="Fechar preferências" style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={[styles.panel, { backgroundColor: palette.panel }]}>
+          <ScrollView style={styles.panelScroll} contentContainerStyle={styles.panelContent} keyboardShouldPersistTaps="handled"
+            onLayout={event => readerUiDiagnostic("LAYOUT", "preferencesViewport", undefined, event.nativeEvent.layout)}
+            onContentSizeChange={(width, height) => readerUiDiagnostic("LAYOUT", "preferencesContent", undefined, { x: 0, y: 0, width, height })}
+            onScroll={event => readerUiDiagnostic("LAYOUT", "preferencesScroll", undefined, { x: event.nativeEvent.contentOffset.x, y: event.nativeEvent.contentOffset.y, width: event.nativeEvent.layoutMeasurement.width, height: event.nativeEvent.layoutMeasurement.height })}
+          >
           <View style={styles.handle} />
           <Text style={[styles.title, { color: palette.text }]}>
             {panelMode === "contents" ? "Sumário" : panelMode === "search" ? "Buscar no livro" : pdfSettings ? "Aparência do PDF" : "Aparência"}
@@ -303,8 +309,8 @@ export function ReaderSettingsPanel({
           ) : null}
           {panelMode === "appearance" ? <MotionCuesControl color={palette.text} /> : null}
           </ScrollView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

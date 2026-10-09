@@ -51,6 +51,7 @@ export interface DocumentReaderAdapterProps {
   onStudyResult?: (result: ReaderStudyResult) => void;
   studyHighlights?: Highlight[];
   studySelecting?: boolean;
+  panelOpen?: boolean;
 }
 
 /**
@@ -87,6 +88,7 @@ export function DocumentReaderAdapter({
   onStudyResult,
   studyHighlights,
   studySelecting,
+  panelOpen,
 }: DocumentReaderAdapterProps) {
   const renderCount = useRef(0);
   const previousEpubProps = useRef<{
@@ -189,7 +191,7 @@ export function DocumentReaderAdapter({
       )}
 
       {/* Unified touch zones overlay: Left 30% prev, Center 40% toggle, Right 30% next */}
-      {!studySelecting ? <ReadingTouchZones
+      {!studySelecting && !panelOpen ? <ReadingTouchZones
         onPreviousPage={onPreviousPage}
         onNextPage={onNextPage}
         onToggleControls={onToggleControls}

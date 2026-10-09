@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),cache=new Map();
+function load(file){if(cache.has(file))return cache.get(file);const out={};cache.set(file,out);new Function('require','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText)(name=>name.startsWith('@/')?load(name.slice(2)+'.ts'):name.startsWith('.')?load(path.posix.join(path.posix.dirname(file),name)+'.ts'):require(name),out);return out;}
+const item=(title,author,id)=>({title,author,url:'https://catalog.example/'+id+'.epub',sourceSite:'Fixture',format:'epub',estimatedSize:null});
+const books=[item('Dom Casmurro','Machado de Assis',1),item('Memórias Póstumas de Brás Cubas','Machado de Assis',2),item('A Revolução dos Bichos','George Orwell',3),item('Os Demônios','Fiódor Dostoiévski',4),item('Quincas Borba','Machado de Assis',5),item('O Universo','Outro Autor',6),item('Memorias Posthumas de Braz Cubas','Machado de Assis',7)];
+(async()=>{
+ const {rankCatalogBooks,normalizeCatalogText,catalogRemoteQueries}=load('src/domain/search/catalogRanking.ts');
+ const cases=[['Dom Casmurro',1],['MEMÓRIAS   PÓSTUMAS: de Brás Cubas!',2],['revolucao bichos',3],['Revolução',3],['Orw',3],['machado bras cubas',2],['cubas machado bras',2],['dom casmuro',1],['dom casmruro',1],['dostoievski demonios',4],['nenhum titulo inexistente',null]];
+ for(const [query,id] of cases){const ranked=rankCatalogBooks(books,query);assert.equal(ranked[0]?.url,id?'https://catalog.example/'+id+'.epub':undefined,query);if(query.startsWith('dom casm'))assert.equal(ranked.length,1,'Fuzzy must not include unrelated books');console.log('PASS ranking '+query+' -> '+(id??'empty'));}
+ assert.equal(normalizeCatalogText('  REVOLUÇÃO—dos  Bichos! '),'revolucao dos bichos');assert.deepEqual(rankCatalogBooks(books,'a o de'),[]);
+ const {SearchBooksUseCase}=load('src/domain/usecases/SearchBooksUseCase.ts');const requests=[];
+ const plugin={name:'Remote',skipLinkValidation:true,supportsQueryFallback:true,getSearchEndpoint:q=>'https://catalog.example/?q='+encodeURIComponent(q),parseResults:body=>JSON.parse(body)};
+ const uc=new SearchBooksUseCase([plugin],{getText:async url=>{requests.push(url);return JSON.stringify(requests.length===1?[]:books);}},{canFetch:async()=>true},{waitFor:async()=>{}},{validate:async x=>x},{save:async()=>{}});
+ const result=await uc.executeDetailed('machado bras cubas');assert.equal(requests.length,2);assert.ok(result.results.some(b=>b.url===books[1].url));assert.ok(result.results.every(b=>/Cubas/.test(b.title)));assert.equal(new URL(requests[1]).searchParams.get('q'),catalogRemoteQueries('machado bras cubas').fallback);
+ requests.length=0;await uc.executeDetailed('nenhum titulo inexistente');assert.equal(requests.length,2,'Exactly one bounded fallback, even for empty results');
+ requests.length=0;await uc.executeDetailed('dom casmurro',[plugin],{Remote:'https://catalog.example/page2'});assert.equal(requests.length,1,'Pagination must not start a fallback query');
+ const controller=new AbortController();const cancelled=new SearchBooksUseCase([plugin],{getText:async()=>{controller.abort();return '[]';}},{canFetch:async()=>true},{waitFor:async()=>{}},{validate:async x=>x},{save:async()=>{}});await assert.rejects(cancelled.executeDetailed('dom casmuro',[plugin],{},controller.signal));
+ console.log('PASS normalized remote query, bounded fallback, original relevance ranking, empty terminal, pagination isolation and cancellation before fallback');
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -222,7 +222,14 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
 </div>
 <script>
 (function() {
-  var readerCssFontFamily = ${readerCssFontFamily.toString()};
+  // Hermes Function.toString() supplies a bytecode placeholder, not source.
+  // Keep this WebView boundary literal; parity is checked against the host helper.
+  function readerCssFontFamily(font) {
+    if (font === "System") return "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif";
+    if (font === "Verdana") return "Verdana, sans-serif";
+    var family = font.replace(/[<>";]/g, "");
+    return family.includes("serif") ? family : (family || "Georgia") + ", serif";
+  }
   // Keep the high-volume forensic trace opt-in.
   var console = {
     log: function() {
@@ -249,10 +256,21 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
   var initialLayoutReady = false;
   var initialLayoutReadinessScheduled = false;
   var restorationPending = ${options.initialRestorePending ? "true" : "false"};
+  var typographyPending = false, typographyAnchor = null, typographyGeneration = 0, pendingTypographyOptions = null;
+  var activeOperationId = 0, activeOrigin = 'RESTORE';
+  var navigationDiagnostics = ${process.env.EXPO_PUBLIC_READER_NAVIGATION_DIAGNOSTICS === "1" ? "true" : "false"};
+  function navigationDiagnostic(origin, requestedPage) {
+    if (!navigationDiagnostics) return;
+    var record = { type: 'navigationDiagnostic', origin: origin, operationId: activeOperationId,
+      requestedPage: requestedPage, confirmedPage: currentPage, currentPage: currentPage,
+      targetPage: targetPage, totalPages: totalPages, viewerElapsedMs: performance.now() };
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(record));
+    if (window.parent && window.parent !== window) window.parent.postMessage(record, '*');
+  }
   console.log('[FORENSIC:iframe:init] t=' + (performance.timeOrigin + performance.now()) + ' initial currentPage=' + currentPage + ' targetPage=' + targetPage + ' totalPages=' + totalPages + ' width=' + getPageWidth() + ' height=' + getPageHeight());
 
   function getPageWidth() {
-    return viewport && viewport.clientWidth || document.documentElement.clientWidth || window.innerWidth || 360;
+    return viewport && viewport.getBoundingClientRect().width || document.documentElement.getBoundingClientRect().width || window.innerWidth || 360;
   }
 
   ${readerAnchorDocumentScript()}
@@ -269,8 +287,18 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
   function calculateTotalPages() {
     var width = getPageWidth();
     if (!content || width <= 0) return 1;
-    var scrollW = content.scrollWidth;
-    return Math.max(1, Math.ceil(scrollW / width));
+    // Full-width chapter fragments start at column boundaries. Measuring their
+    // integer column indices avoids rounding an extent into a phantom page.
+    var left = content.getBoundingClientRect().left;
+    var pages = 1;
+    Array.prototype.forEach.call(content.children, function(section) {
+      Array.prototype.forEach.call(section.getClientRects(), function(fragment) {
+        if (fragment.width > 0 && fragment.height > 0) {
+          pages = Math.max(pages, Math.round((fragment.left - left) / width) + 1);
+        }
+      });
+    });
+    return pages;
   }
 
   function sendPageState() {
@@ -303,6 +331,10 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     var state = {
       type: "page",
       pageNumber: currentPage,
+      currentPage: currentPage,
+      targetPage: targetPage,
+      operationId: activeOperationId,
+      origin: activeOrigin,
       totalPages: totalPages,
       chapterIndex: currentChapterIndex,
       chapterTitle: currentChapterTitle,
@@ -325,7 +357,9 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
 
   function recalculateLayout() {
     var reason = arguments.length ? arguments[0] : 'unspecified';
+    navigationDiagnostic(reason.indexOf('resize') >= 0 ? 'RESIZE' : 'LAYOUT_RECALC', currentPage);
     if (!content) return;
+    if (typographyPending) return;
     if (isAnimating) {
       recalculateAfterTransition = true;
       console.log('[FORENSIC:iframe:recalculateLayout] t=' + (performance.timeOrigin + performance.now()) + ' deferred during animation reason=' + reason + ' currentPage=' + currentPage + ' targetPage=' + targetPage);
@@ -346,24 +380,28 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
       totalPages = calculateTotalPages();
       var targetPage = Math.max(1, Math.min(totalPages, pageToPreserve));
       console.log('[FORENSIC:iframe:recalculateLayout:raf] t=' + (performance.timeOrigin + performance.now()) + ' reason=' + reason + ' totalPages=' + totalPages + ' pageToPreserve=' + pageToPreserve + ' → targetPage=' + targetPage);
-      window.goToPage(targetPage);
+      window.goToPage(targetPage, undefined, 'LAYOUT_RECALC');
     });
   }
 
-  window.goToPage = function(page) {
+  window.goToPage = function(page, operationId, origin) {
+    if (typographyPending) typographyAnchor = null; // An explicit navigation supersedes the old anchor.
     totalPages = calculateTotalPages();
     var requestedPage = Math.max(1, Math.min(totalPages, page));
     console.log('[FORENSIC:iframe:goToPage] t=' + (performance.timeOrigin + performance.now()) + ' requested=' + page + ' actual=' + requestedPage + ' totalPages=' + totalPages + ' currentPage=' + currentPage + ' targetPage=' + targetPage + ' width=' + getPageWidth() + ' scrollWidth=' + content.scrollWidth + ' stack=' + (new Error().stack || '').replace(/\\n/g, ' | '));
     if (isAnimating) {
-      deferredPage = requestedPage;
+      deferredPage = { page: requestedPage, operationId: operationId, origin: origin };
       return;
     }
+    if (typeof operationId === 'number') activeOperationId = operationId;
+    if (origin) activeOrigin = origin;
     currentPage = requestedPage;
     targetPage = currentPage;
     transitionDirection = 0;
     content.classList.remove("is-transitioning");
     var width = getPageWidth();
     content.style.transform = "translateX(-" + ((currentPage - 1) * width) + "px)";
+    navigationDiagnostic(activeOrigin, page);
     sendPageState();
   };
 
@@ -375,15 +413,21 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     targetPage = currentPage;
     transitionDirection = 0;
     isAnimating = false;
+    navigationDiagnostic('TRANSITION_END', currentPage);
     sendPageState();
 
     if (deferredPage !== null) {
       var page = deferredPage;
       deferredPage = null;
-      window.goToPage(page);
+      window.goToPage(page.page, page.operationId, page.origin);
     } else if (recalculateAfterTransition) {
       recalculateAfterTransition = false;
       recalculateLayout('deferred-after-transitionend');
+    }
+    if (pendingTypographyOptions) {
+      var nextTypography = pendingTypographyOptions;
+      pendingTypographyOptions = null;
+      window.updateTypography(nextTypography);
     }
   }
 
@@ -391,14 +435,22 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     if (event.target === content && event.propertyName === "transform") finishNavigation();
   });
 
-  window.navigatePage = function(direction) {
-    if (isAnimating || (direction !== -1 && direction !== 1)) return;
+  window.navigatePage = function(direction, operationId, origin) {
+    if (direction !== -1 && direction !== 1) return;
+    if (isAnimating) {
+      deferredPage = { page: Math.max(1, Math.min(totalPages, targetPage + direction)), operationId: operationId, origin: origin };
+      return;
+    }
     totalPages = calculateTotalPages();
     transitionDirection = direction;
     targetPage = Math.max(1, Math.min(totalPages, currentPage + transitionDirection));
+    if (typeof operationId === 'number') activeOperationId = operationId;
+    activeOrigin = origin || (direction > 0 ? 'NEXT_PAGE' : 'PREVIOUS_PAGE');
+    navigationDiagnostic(activeOrigin, targetPage);
     console.log('[FORENSIC:iframe:navigatePage] t=' + (performance.timeOrigin + performance.now()) + ' direction=' + direction + ' currentPage=' + currentPage + ' targetPage=' + targetPage + ' totalPages=' + totalPages);
     if (targetPage === currentPage) {
       transitionDirection = 0;
+      sendPageState();
       return;
     }
 
@@ -411,6 +463,8 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
   };
 
   window.display = function() {
+    if (isAnimating) { recalculateAfterTransition = true; return; }
+    if (typographyPending) return;
     var width = getPageWidth();
     console.log('[FORENSIC:iframe:display] t=' + (performance.timeOrigin + performance.now()) + ' called, width=' + width + ' currentPage=' + currentPage);
     if (!width || width <= 0) {
@@ -439,6 +493,13 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
 
   window.updateTypography = function(options) {
     if (!options) return;
+    if (isAnimating) { pendingTypographyOptions = options; return; }
+    if (!typographyPending && !restorationPending) {
+      try { typographyAnchor = studyVisibleAnchor(); } catch (error) { typographyAnchor = null; }
+    }
+    typographyPending = true;
+    var generation = ++typographyGeneration;
+    ++layoutFrame; // Invalidate pre-typography geometry work.
     console.log('[FORENSIC:iframe:updateTypography] t=' + (performance.timeOrigin + performance.now()) + ' currentPage=' + currentPage + ' totalPages=' + totalPages);
     var dynamicStyle = document.getElementById("dynamic-typography");
     if (!dynamicStyle) {
@@ -486,46 +547,34 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
         "background: transparent !important; " +
       "}";
 
-    // Keep the established typography path for normal reading. During the
-    // restore handshake, wait for fonts/layout and never replay a page captured
-    // before the saved position was applied.
-    if (!restorationPending) {
-      var pageToPreserve = currentPage;
-      console.log('[FORENSIC:iframe:updateTypography] scheduled layout update t=' + (performance.timeOrigin + performance.now()) + ' pageToPreserve=' + pageToPreserve);
-      setTimeout(function() {
+    var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    fontsReady.then(function() {
+      requestAnimationFrame(function() {
+        if (generation !== typographyGeneration) return;
+        typographyPending = false;
         if (isAnimating) {
           recalculateAfterTransition = true;
-          console.log('[FORENSIC:iframe:updateTypography] deferred during animation currentPage=' + currentPage + ' targetPage=' + targetPage);
+          typographyAnchor = null;
           return;
         }
         syncPageDimensions();
         totalPages = calculateTotalPages();
-        var typographyTargetPage = Math.max(1, Math.min(totalPages, pageToPreserve));
-        console.log('[FORENSIC:iframe:updateTypography:apply] t=' + (performance.timeOrigin + performance.now()) + ' pageToPreserve=' + pageToPreserve + ' measuredTotal=' + totalPages + ' target=' + typographyTargetPage);
-        window.goToPage(typographyTargetPage);
-      }, 60);
-      return;
-    }
-
-    console.log('[FORENSIC:iframe:updateTypography] waiting for fonts/layout t=' + (performance.timeOrigin + performance.now()) + ' currentPage=' + currentPage + ' restorePending=true');
-    var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
-    fontsReady.then(function() {
-      requestAnimationFrame(function() {
-        if (isAnimating) {
-          recalculateAfterTransition = true;
-          console.log('[FORENSIC:iframe:updateTypography] deferred during animation currentPage=' + currentPage + ' targetPage=' + targetPage);
-          return;
+        var pageToPreserve = currentPage;
+        if (typographyAnchor && !restorationPending) {
+          var section = Array.from(content.querySelectorAll('.epub-chapter')).find(function(s) { return s.getAttribute('data-chapter-id') === typographyAnchor.chapterId; });
+          var model = section && studyText(section);
+          var range = model && studyRange(model, typographyAnchor.start, typographyAnchor.start + 1);
+          var rect = range && range.getClientRects()[0];
+          if (rect) pageToPreserve = Math.floor((rect.left + (currentPage - 1) * getPageWidth()) / getPageWidth()) + 1;
         }
-        syncPageDimensions();
+        typographyAnchor = null;
         if (restorationPending) {
           recalculateLayout('typography-during-restore');
           return;
         }
-        var pageToPreserve = currentPage;
-        totalPages = calculateTotalPages();
         var typographyTargetPage = Math.max(1, Math.min(totalPages, pageToPreserve));
         console.log('[FORENSIC:iframe:updateTypography:apply] t=' + (performance.timeOrigin + performance.now()) + ' pageToPreserve=' + pageToPreserve + ' measuredTotal=' + totalPages + ' target=' + typographyTargetPage);
-        window.goToPage(typographyTargetPage);
+        window.goToPage(typographyTargetPage, undefined, 'SETTINGS_LAYOUT');
       });
     });
   };
@@ -546,9 +595,9 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
       restorationPending = false;
       console.log('[FORENSIC:iframe:restore] t=' + (performance.timeOrigin + performance.now()) + ' confirmed; currentPage=' + currentPage + ' totalPages=' + totalPages);
     } else if (data.type === "goToPage" && typeof data.pageNumber === "number") {
-      window.goToPage(data.pageNumber);
+      window.goToPage(data.pageNumber, data.operationId, data.origin);
     } else if (data.type === "navigatePage" && typeof data.direction === "number") {
-      window.navigatePage(data.direction);
+      window.navigatePage(data.direction, data.operationId, data.origin);
     } else if (data.type === "search" && typeof data.query === "string") {
       window.searchText(data.query);
     } else if (data.type === "display") {

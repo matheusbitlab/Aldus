@@ -1,10 +1,41 @@
-import { parseReadingAnchor, resolveTextAnchor } from "@/src/domain/types/readingAnchor";
-
 /** Runs inside the existing reader closure; commands never replace the document. */
 export function readerAnchorDocumentScript(): string {
   return `
-  var resolveStudyAnchor = ${resolveTextAnchor.toString()};
-  var parseStudyAnchor = ${parseReadingAnchor.toString()};
+  // Literal WebView source: Hermes Function.toString() is not executable source.
+  // Domain parity is verified by test-reader-bytecode.cjs.
+  function resolveStudyAnchor(text, anchor) {
+    function fits(start) {
+      return text.slice(start, start + anchor.quote.length) === anchor.quote &&
+        (!anchor.prefix || text.slice(Math.max(0, start - anchor.prefix.length), start) === anchor.prefix) &&
+        (!anchor.suffix || text.slice(start + anchor.quote.length, start + anchor.quote.length + anchor.suffix.length) === anchor.suffix);
+    }
+    var matches = [];
+    if (!anchor.quote) return { status: "missing" };
+    var offset = text.indexOf(anchor.quote);
+    while (offset !== -1) {
+      if (fits(offset)) matches.push(offset);
+      if (matches.length > 1) return { status: "ambiguous" };
+      offset = text.indexOf(anchor.quote, offset + 1);
+    }
+    if (!matches.length) return { status: "missing" };
+    var start = matches[0];
+    return { status: start === anchor.start ? "exact" : "relocated", start: start, end: start + anchor.quote.length };
+  }
+  function parseStudyAnchor(value) {
+    if (!value || typeof value !== "object") throw new Error("Localização inválida.");
+    var a = value;
+    if (a.version !== 1) throw new Error("Versão de localização não suportada.");
+    if (a.kind === "pdf-page") {
+      if (!Number.isSafeInteger(a.sourcePage) || a.sourcePage < 1 || a.sourcePage > 1000000) throw new Error("Página fonte inválida.");
+      return { version: 1, kind: "pdf-page", sourcePage: a.sourcePage };
+    }
+    if (a.kind !== "epub-text" || typeof a.chapterId !== "string" || !a.chapterId || a.chapterId.length > 2000 ||
+        !Number.isSafeInteger(a.start) || a.start < 0 || !Number.isSafeInteger(a.end) || a.end <= a.start ||
+        typeof a.quote !== "string" || !a.quote.trim() || a.quote.length > 10000 || a.end - a.start !== a.quote.length ||
+        typeof a.prefix !== "string" || a.prefix.length > 128 || typeof a.suffix !== "string" || a.suffix.length > 128 ||
+        !Array.isArray(a.path) || a.path.length > 100 || a.path.some(function(v) { return !Number.isSafeInteger(v) || v < 0; })) throw new Error("Localização textual inválida.");
+    return { version: 1, kind: "epub-text", chapterId: a.chapterId, start: a.start, end: a.end, quote: a.quote, prefix: a.prefix, suffix: a.suffix, path: a.path };
+  }
   function studyReply(request, extra) {
     var payload = JSON.stringify(Object.assign({type:'study', id:request.id}, extra));
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(payload);

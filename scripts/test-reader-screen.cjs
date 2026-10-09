@@ -1,0 +1,55 @@
+// Actual ReaderScreen orchestration; storage, viewers and native hardware boundaries controlled.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),cp=require('node:child_process');
+const React=require('../.expo/auth-test-tools/node_modules/react'),{act,create}=require('../.expo/auth-test-tools/node_modules/react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
+const baseline=process.argv.includes('--baseline'),cache=new Map(),timers=new Map(),listeners=new Set(),writes=[],back=new Set();let timerId=0,fixture='reflow';
+let reader={progress:0,controlsVisible:false,setProgress:v=>setReader({progress:v}),setControlsVisible:v=>setReader({controlsVisible:v}),toggleControls:()=>setReader({controlsVisible:!reader.controlsVisible})};
+function setReader(next){reader={...reader,...next};listeners.forEach(fn=>fn());}
+const readerStore=()=>React.useSyncExternalStore(fn=>{listeners.add(fn);return()=>listeners.delete(fn)},()=>reader);readerStore.getState=()=>reader;
+const noop=()=>{},widget=name=>props=>React.createElement(name,props,props.children);
+const palette={background:'#fff',panel:'#eee',text:'#222',secondaryText:'#777',accent:'#a54'};
+const dependencies={highlightRepository:{listByBookId:async()=>[]},openBook:{execute:async id=>({book:{id,title:'Fixture',mimeType:fixture==='epub'?'application/epub+zip':'application/pdf',filePath:'file:///fixture',fileName:'fixture.pdf',fileSize:123,fileHash:'fixture-signature'},chapters:fixture==='epub'?[{id:'epub',title:'Chapter',html:'<p>Text</p>',characterCount:4}]:[],progress:{percentage:.5}})},pdfReaderSettings:{get:async()=>({...load('src/domain/types/pdfReader.ts').defaultPdfReaderSettings,mode:fixture==='original'?'original':'reflow',reflowProgress:.5,originalProgress:.2}),save:async()=>{}},pdfReflowCache:{findByBookId:async()=>null,save:async()=>{}},updateReadingProgress:{execute:async x=>writes.push(x)}};
+function load(file){if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);const input=baseline&&file.endsWith('ReaderScreen.tsx')?cp.execFileSync('git',['show','77c490c:'+file],{encoding:'utf8'}):fs.readFileSync(file,'utf8');const code=ts.transpileModule(input,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
+new Function('require','exports','setTimeout','clearTimeout',code)(name=>{
+if(name==='react')return React;if(name==='react/jsx-runtime')return require('../.expo/auth-test-tools/node_modules/react/jsx-runtime');if(name==='react-native')return {View:'View',Text:'Text',Pressable:'Pressable',ActivityIndicator:'Spinner',StatusBar:'StatusBar',Platform:{OS:'android'},StyleSheet:{create:x=>x,absoluteFill:{position:'absolute',top:0,bottom:0,left:0,right:0}},AppState:{currentState:'active',addEventListener:()=>({remove:noop})},BackHandler:{addEventListener:(_,fn)=>{back.add(fn);return {remove:()=>back.delete(fn)}}},useWindowDimensions:()=>({width:420,height:780})};if(name==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:32,bottom:24,left:5,right:7})};if(name==='expo-router')return {router:{push:noop}};if(name==='expo-brightness')return {isAvailableAsync:async()=>false};if(name.includes('/services/dependencies'))return {appDependencies:dependencies};if(name.includes('/stores/readerStore'))return {useReaderStore:readerStore};if(name.includes('/contexts/ReaderSettingsContext'))return {useReaderSettings:()=>({fontSize:16,fontFamily:'Georgia',marginSize:24,theme:'light',brightness:100,useSystemBrightness:true,palette})};if(name.includes('epubOpenMetrics'))return {epubDiagnosticConsole:{log:noop},markEpubOpenEvent:noop,markEpubOpenSpanStart:noop,markEpubOpenSpanEnd:noop};
+for(const component of ['MotionCuesOverlay','StudyBookmarksPanel','ReaderControls','ReaderSettingsPanel','DocumentReaderAdapter','PdfModeChooser','PdfReflowProcessor'])if(name.endsWith('/'+component))return {[component]:widget(component)};
+if(name.startsWith('@/')||name.startsWith('.')){const base=name.startsWith('@/')?name.slice(2):path.posix.join(path.posix.dirname(file),name);return load(['.ts','.tsx'].map(ext=>base+ext).find(p=>fs.existsSync(p)));}return require(name);},exports,fn=>{timers.set(++timerId,fn);return timerId},id=>timers.delete(id));return exports;}
+const flushTimers=async()=>act(async()=>{const due=[...timers.values()];timers.clear();due.forEach(fn=>fn());});
+(async()=>{
+ const {ReaderScreen}=load('src/presentation/screens/ReaderScreen.tsx');let renderer;
+ const builder=load('src/data/local/PdfReflowDocumentBuilder.ts');const valid=builder.buildPdfReflowDocument([{pageNumber:1,pageWidth:500,pageHeight:700,textItems:[{text:'A readable paragraph. '.repeat(100),x:20,y:600,width:300,height:12}],images:[]}],1);
+ await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'reflow'}));});
+ if(baseline){const doc=renderer.root.findByType('DocumentReaderAdapter');assert.equal(doc.props.pdfReflowChapters.length,0);await act(async()=>doc.props.onEpubPageInfo({pageNumber:1,totalPages:1,chapterIndex:0,layoutReady:true}));await flushTimers();assert.equal(writes.at(-1).percentage,0);console.log('REPRODUCED empty Reflow before publication clears saved .5 progress to 0');await act(async()=>renderer.root.findByType('PdfReflowProcessor').props.onCancel());const original=renderer.root.findByType('DocumentReaderAdapter');await act(async()=>original.props.onPdfTotalPages(101));assert.equal(renderer.root.findByType('DocumentReaderAdapter').props.pdfPage,51);console.log('REPRODUCED cancel restores Reflow .5 instead of Original .2');await act(async()=>renderer.unmount());return;}
+ assert.equal(renderer.root.findAllByType('DocumentReaderAdapter').length,0,'Must not instantiate an empty candidate document during preparation');assert.equal(reader.progress,.5);
+ await act(async()=>renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid));
+ const getDoc=()=>renderer.root.findByType('DocumentReaderAdapter');let doc=getDoc();assert.equal(doc.props.initialRestorePending,true);
+ const report=async(page,total,ready)=>act(async()=>getDoc().props.onEpubPageInfo({pageNumber:page,totalPages:total,chapterIndex:0,layoutReady:ready}));
+ await report(1,3,false);assert.equal(reader.progress,.5);assert.equal(writes.length,0);
+ await report(1,101,true);assert.equal(getDoc().props.epubPage,51);assert.equal(getDoc().props.restoreTargetReady,true);assert.equal(writes.length,0);
+ await report(51,101,true);await flushTimers();assert.equal(getDoc().props.initialRestorePending,false);assert.equal(writes.at(-1).pageNumber,51);assert.equal(writes.at(-1).percentage,.5);
+ const instance=getDoc();for(let i=0;i<4;i++)await act(async()=>reader.toggleControls());assert.strictEqual(getDoc(),instance);assert.equal(getDoc().props.epubPage,51);
+ await act(async()=>renderer.root.findByType('ReaderControls').props.onSettings());assert.strictEqual(getDoc(),instance);assert.equal(getDoc().props.epubPage,51);
+ await report(1,101,true);await flushTimers();assert.equal(writes.at(-1).pageNumber,1);assert.equal(writes.at(-1).percentage,0,'An acknowledged real navigation to page 1 must be accepted');
+ await act(async()=>renderer.unmount());assert.equal(back.size,0);
+ // Back during preparation returns to the preserved Original mode progress.
+ writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'cancel'}));});assert.equal(back.size,1);
+ await act(async()=>{assert.equal([...back][0](),true)});assert.equal(getDoc().props.pdfReadingMode,'original');
+ await act(async()=>getDoc().props.onPdfTotalPages(101));assert.equal(getDoc().props.pdfPage,21);assert.equal(reader.progress,.2);await act(async()=>renderer.unmount());
+ for(const terminal of ['onCancel','onError','onComplete']) {
+   await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'terminal-'+terminal}));});
+   const processor=renderer.root.findByType('PdfReflowProcessor');
+   await act(async()=>processor.props[terminal](terminal==='onComplete'?{...valid,extractionQuality:undefined}:'Invalid extracted text'));
+   assert.equal(getDoc().props.pdfReadingMode,'original');await act(async()=>getDoc().props.onPdfTotalPages(101));assert.equal(getDoc().props.pdfPage,21);assert.equal(reader.progress,.2);await act(async()=>renderer.unmount());
+ }
+ // A pending position write must neither revert mode nor be lost on closing.
+ await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'mode-race'}));});
+ await act(async()=>renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid));await report(1,101,true);await report(51,101,true);
+ await act(async()=>renderer.root.findByType('ReaderSettingsPanel').props.onPdfModeChange('original'));await flushTimers();assert.equal(getDoc().props.pdfReadingMode,'original');await act(async()=>renderer.unmount());
+ writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'close'}));});
+ await act(async()=>renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid));await report(1,101,true);await report(51,101,true);await act(async()=>renderer.unmount());await flushTimers();assert.equal(writes.at(-1)?.pageNumber,51,'Last acknowledged position must survive immediate close');
+ fixture='epub';writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'epub'}));});
+ await report(1,3,false);assert.equal(getDoc().props.epubPage,1);assert.equal(reader.progress,.5);
+ await report(1,101,true);assert.equal(getDoc().props.epubPage,51);await report(51,101,true);await flushTimers();assert.equal(writes.at(-1).pageNumber,51);
+ const surface=getDoc().parent.parent.props.style;assert.deepEqual(surface[1],{top:32,bottom:24,left:5,right:7});
+ await act(async()=>renderer.unmount());
+ console.log('PASS ReaderScreen Reflow publication/restore/persistence, EPUB layout acknowledgement, controls/settings identity, real page-1 navigation, hardware Back + preserved Original progress, Native safe owner');
+})().catch(e=>{console.error(e);process.exitCode=1;});

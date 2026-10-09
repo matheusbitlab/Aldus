@@ -31,7 +31,8 @@ let neutral=target; for(let i=0;i<100;i++) neutral=smooth(neutral,zero,33); asse
   receive(1); assert.equal(status,true); stop(); stop(); assert.equal(count,0,reason);
  }
  const stop=startMotionSession(options); await new Promise(r=>setImmediate(r)); receive(0);
- await new Promise(r=>setTimeout(r,40)); assert.equal(count,0); assert.equal(status,false); stop();
+ await new Promise(r=>setTimeout(r,40)); assert.equal(count,1); assert.equal(status,false);
+ receive(1); assert.equal(status,true); assert.equal(count,1); stop(); assert.equal(count,0);
  assert.ok(resets>0);
  const reader=fs.readFileSync('src/presentation/screens/ReaderScreen.tsx','utf8');
  assert.equal((reader.match(/<MotionCuesOverlay/g)||[]).length,1);

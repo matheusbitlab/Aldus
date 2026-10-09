@@ -22,9 +22,17 @@ assert.equal(rules.canUseFeature({ ...profile, account_status: 'disabled' }, {},
 assert.equal(rules.canUseFeature({ ...profile, username: null }, {}, 'flashcards'), false);
 assert.equal(rules.canUseFeature(null, {}, 'flashcards'), false);
 
+if (process.argv.includes('--auth-only')) {
+  console.log('PASS auth username, role, status and feature permission rules (no flashcard repository tests)');
+} else {
 const memory = new Map();
 const storage = { getItem: async key => memory.get(key) ?? null, setItem: async (key, value) => memory.set(key, value) };
+const flashcardTypes = load('src/domain/types/flashcards.ts');
+const flashcardScoring = load('src/domain/study/flashcardScoring.ts', { '../types/flashcards': flashcardTypes });
 const { LocalFlashcardRepository } = load('src/data/local/FlashcardRepository.ts', {
+  './flashcardStorage': { flashcardStorage: storage },
+  '@/src/domain/types/flashcards': flashcardTypes,
+  '@/src/domain/study/flashcardScoring': flashcardScoring,
   '@react-native-async-storage/async-storage': storage,
   '@/src/domain/study/flashcardSrs': { computeFlashcardSrs: () => ({ interval: 1, repetition: 1, easeFactor: 2.5, dueAt: 0 }) },
 });
@@ -37,3 +45,4 @@ const { LocalFlashcardRepository } = load('src/data/local/FlashcardRepository.ts
   assert.equal(memory.has('@kindle/flashcards.v1'), false);
   console.log('PASS auth rules and local flashcard account isolation');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+}

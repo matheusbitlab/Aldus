@@ -5,6 +5,8 @@ import { AuthButton, AuthError, AuthForm, AuthInput, AuthLink } from "@/src/pres
 import { loginWithGoogle, registerAccount } from "@/src/data/remote/authService";
 import { useAuth } from "@/src/presentation/contexts/AuthContext";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
+import { validUsername } from "@/src/domain/auth/authRules";
+import { authDiagnostic, beginAuthDiagnostic, finishAuthDiagnostic } from "@/src/utils/authDiagnostics";
 
 export default function Signup() {
   const { session, profile } = useAuth();
@@ -14,11 +16,25 @@ export default function Signup() {
   const [busy, setBusy] = useState(false); const [sent, setSent] = useState(false); const [error, setError] = useState<string | null>(null);
   if (session && profile) return <Redirect href="/" />;
   const submit = async () => {
-    if (!name.trim()) { setError("Informe seu nome."); return; }
-    if (password !== confirmation) { setError("As senhas não coincidem."); return; }
+    const operationId = beginAuthDiagnostic();
+    authDiagnostic("SIGNUP_STARTED", { operationId, result: "started", passwordLength: password.length,
+      confirmationSameLength: password.length === confirmation.length, confirmationMatches: password === confirmation,
+      usernameValid: validUsername(username), emailValid: /^\S+@\S+\.\S+$/.test(email.trim()) });
+    if (!name.trim() || password !== confirmation) {
+      setError(!name.trim() ? "Informe seu nome." : "As senhas não coincidem.");
+      authDiagnostic("SIGNUP_UI_RESULT", { operationId, result: "error", stage: "validation", errorShown: true, navigationExecuted: false });
+      finishAuthDiagnostic(operationId); return;
+    }
     setBusy(true); setError(null);
-    try { const result = await registerAccount(name, username, email, password); if (result.needsEmailConfirmation) setSent(true); else router.replace("/"); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : "Não foi possível criar a conta."); }
+    try {
+      const result = await registerAccount(name, username, email, password, operationId);
+      if (result.needsEmailConfirmation) setSent(true); else router.replace("/");
+      authDiagnostic("SIGNUP_UI_RESULT", { operationId, result: "success", stage: result.needsEmailConfirmation ? "confirmation" : "navigation", errorShown: false, navigationExecuted: !result.needsEmailConfirmation });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Não foi possível criar a conta.");
+      authDiagnostic("SIGNUP_UI_RESULT", { operationId, result: "error", errorShown: true, navigationExecuted: false });
+      finishAuthDiagnostic(operationId);
+    }
     finally { setBusy(false); }
   };
   const google = async () => {

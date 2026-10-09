@@ -1,3 +1,7 @@
-import * as cheerio from "cheerio/slim";
 import { SearchPlugin, ScrapedLink } from "@/src/domain/types/search";
-export class BNDigitalSearchPlugin implements SearchPlugin { name = "Biblioteca Nacional Digital"; getSearchEndpoint(query: string): string { return `https://bndigital.bn.gov.br/search/?q=${encodeURIComponent(query.trim())}`; } parseResults(html: string): ScrapedLink[] { const $ = cheerio.load(html); const results: ScrapedLink[] = []; $("a[href]").each((_, element) => { const href = $(element).attr("href") ?? ""; const title = $(element).text().trim(); if (!title || !/\.pdf(?:\?|$)|\.epub(?:\?|$)/i.test(href)) return; results.push({ url: new URL(href, "https://bndigital.bn.gov.br").toString(), title, estimatedSize: null, sourceSite: this.name, format: /\.pdf/i.test(href) ? "pdf" : "epub" }); }); return [...new Map(results.map((item) => [item.url, item])).values()]; } }
+export const BNDIGITAL_BLOCK_REASON = "BNDigital: integração indisponível. O portal bloqueou a consulta automatizada (HTTP 403), e a aquisição de EPUB/PDF pelo acervo ainda não foi validada.";
+export class BNDigitalSearchPlugin implements SearchPlugin {
+  name = "BNDigital";
+  getSearchEndpoint(): string { throw new Error(BNDIGITAL_BLOCK_REASON); }
+  parseResults(): ScrapedLink[] { return []; }
+}

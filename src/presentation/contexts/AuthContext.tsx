@@ -3,6 +3,8 @@ import type { Session, User } from "@supabase/supabase-js";
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AccountProfile, canUseFeature, FeatureKey, FeatureOverrides } from "@/src/domain/auth/authRules";
 import { supabase } from "@/src/data/remote/supabase";
+import { authFailureDetails } from "@/src/data/remote/authErrors";
+import { authDiagnostic, correlatedAuthDiagnostic } from "@/src/utils/authDiagnostics";
 
 type AuthState = {
   loading: boolean;
@@ -30,6 +32,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const resolve = useCallback(async (next: Session | null) => {
     const run = ++revision.current;
+    const operationId = correlatedAuthDiagnostic(next?.user.id);
     setSession(next);
     if (!next || !supabase) {
       activeUserId.current = null;
@@ -40,29 +43,40 @@ export function AuthProvider({ children }: PropsWithChildren) {
       activeUserId.current = next.user.id;
       setProfile(null); setOverrides({}); setLoading(true);
     }
+    authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: "remote", result: "started" });
+    let stage: "profile" | "profile_cache_write" = "profile";
     try {
       const [profileResult, overrideResult] = await Promise.all([
         supabase.from("profiles").select("id,username,display_name,avatar_url,role,account_status").eq("id", next.user.id).single(),
         supabase.from("user_feature_overrides").select("feature_key,enabled").eq("user_id", next.user.id),
       ]);
-      if (profileResult.error || !profileResult.data || overrideResult.error) throw new Error("Perfil indisponível.");
+      if (profileResult.error || !profileResult.data || overrideResult.error) {
+        throw profileResult.error ?? overrideResult.error ?? new Error("Perfil indisponível.");
+      }
       const found = profileResult.data as AccountProfile;
       const features: FeatureOverrides = {};
       for (const row of overrideResult.data ?? []) if (row.feature_key === "flashcards") features.flashcards = row.enabled;
       if (run !== revision.current) return;
       setProfile(found); setOverrides(features); setError(null);
-      await AsyncStorage.setItem(cacheKey(next.user.id), JSON.stringify({ profile: found, overrides: features }));
-    } catch {
+      authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: found.id, source: "remote", result: "success", username: !!found.username, accountStatus: found.account_status });
+      stage = "profile_cache_write";
+      await AsyncStorage.setItem(cacheKey(next.user.id), JSON.stringify({ profile: found, overrides: features, cachedAt: Date.now() }));
+    } catch (failure) {
+      authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: stage === "profile" ? "remote" : "cache", result: "error", stage, ...authFailureDetails(failure) });
+      authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: "cache", result: "started" });
       const cached = await AsyncStorage.getItem(cacheKey(next.user.id)).catch(() => null);
       if (run !== revision.current) return;
       if (cached) {
         try {
-          const parsed = JSON.parse(cached) as { profile: AccountProfile; overrides: FeatureOverrides };
+          const parsed = JSON.parse(cached) as { profile: AccountProfile; overrides: FeatureOverrides; cachedAt?: number };
           if (parsed.profile.id === next.user.id) {
+            authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: "cache", result: "success", username: !!parsed.profile.username, accountStatus: parsed.profile.account_status,
+              cacheAgeMs: typeof parsed.cachedAt === "number" && parsed.cachedAt <= Date.now() ? Date.now() - parsed.cachedAt : null });
             setProfile(parsed.profile); setOverrides(parsed.overrides); setError(null); return;
           }
         } catch { /* corrupt cache is ignored */ }
       }
+      authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: "cache", result: "missing" });
       setProfile(null); setOverrides({}); setError("Não foi possível carregar o perfil. Verifique a conexão e a configuração da conta.");
     } finally {
       if (run === revision.current) setLoading(false);
@@ -73,7 +87,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (!supabase) { setError("Supabase não configurado."); setLoading(false); return; }
     let alive = true;
     const client = supabase;
-    const { data: listener } = client.auth.onAuthStateChange((_event, next) => {
+    const { data: listener } = client.auth.onAuthStateChange((event, next) => {
+      authDiagnostic("AUTH_EVENT", { operationId: correlatedAuthDiagnostic(next?.user.id), correlation: "candidate", authEvent: event, uuid: next?.user.id, session: !!next });
       if (alive) setTimeout(() => { if (alive) void resolve(next); }, 0);
     });
     void client.auth.getSession().then(({ data }) => { if (alive) void resolve(data.session); })

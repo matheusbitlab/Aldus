@@ -1,0 +1,48 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript');
+const React=require('../.expo/auth-test-tools/node_modules/react'),{act,create}=require('../.expo/auth-test-tools/node_modules/react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
+const cache=new Map(),listeners=new Map(),storage=new Map();let studyRepository;const no=()=>{};let picked=0,generatedId=0;const palette={background:'#12171A',card:'#1E2529',surface:'#1B2125',surfaceSecondary:'#20292D',text:'#EEF2F4',secondaryText:'#AAB6BA',textSecondary:'#AAB6BA',separator:'#2F383D',accent:'#E59A76',panel:'#1B2125'};
+const navigation={addListener:(event,fn)=>{listeners.set(event,fn);return()=>listeners.delete(event);},dispatch:no};
+function load(file){if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;new Function('require','exports',code)(name=>{
+ if(name==='react')return React;if(name==='react/jsx-runtime')return require('../.expo/auth-test-tools/node_modules/react/jsx-runtime');
+ if(name==='react-native')return {View:'View',Text:'Text',Pressable:'Pressable',TextInput:'TextInput',Image:'Image',ScrollView:'ScrollView',KeyboardAvoidingView:'KeyboardAvoidingView',ActivityIndicator:'Spinner',Modal:({visible,children,...props})=>visible?React.createElement('Modal',props,children):null,Platform:{OS:'android'},StyleSheet:{create:x=>x},PanResponder:{create:x=>({panHandlers:x})},AccessibilityInfo:{isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove:no})},Animated:{View:'AnimatedView',Value:class{setValue(){}stopAnimation(){}interpolate(){return 0;}},timing:()=>({start:no,stop:no})}};
+ if(name==='expo-router')return {useNavigation:()=>navigation,useLocalSearchParams:()=>({deckId:'deck'}),router:{back:no}};if(name==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:32,bottom:24})};if(name==='@expo/vector-icons')return {Ionicons:'Icon'};
+ if(name.includes('/contexts/AuthContext'))return {useAuth:()=>({user:{id:'00000000-0000-4000-8000-000000000001'},canUse:()=>true})};if(name.includes('/contexts/AppThemeContext'))return {useAppTheme:()=>({palette})};
+ if(name==='@react-native-async-storage/async-storage')return {getItem:async key=>storage.get(key)??null,setItem:async(key,value)=>storage.set(key,value)};
+ if(name==='expo-document-picker')return {getDocumentAsync:async()=>{picked++;return{canceled:false,assets:[{uri:'file:///test.png',size:64,mimeType:'image/png'}]};}};
+ if(name==='expo-file-system/legacy')return {EncodingType:{Base64:'base64'},readAsStringAsync:async()=> 'AAAA'};
+ if(name.includes('/data/local/FlashcardRepository'))return {createFlashcardId:()=> `created-card-${++generatedId}`,flashcardsForUser:()=>studyRepository};
+ if(name.startsWith('@/')||name.startsWith('.')){const base=name.startsWith('@/')?name.slice(2):path.posix.join(path.posix.dirname(file),name);return load(['.ts','.tsx'].map(ext=>base+ext).find(p=>fs.existsSync(p)));}
+ return require(name);
+},exports);return exports;}
+const text=node=>typeof node==='string'?node:(node.children??[]).map(text).join('');
+const button=(renderer,label)=>renderer.root.findAllByType('Pressable').find(n=>text(n)===label);
+const press=async(renderer,label)=>{const b=button(renderer,label);assert.ok(b,'Missing button '+label);await act(async()=>{await b.props.onPress();});};
+(async()=>{
+ const {FlashcardCreateModal}=load('src/presentation/components/flashcards/FlashcardCreateModal.tsx');const deck={id:'deck',title:'Deck'};let saved=[],closed=0,fail=true;
+ let renderer;await act(async()=>{renderer=create(React.createElement(FlashcardCreateModal,{visible:true,decks:[deck],palette,onClose:()=>closed++,onSave:async card=>{saved.push(card);if(fail)throw Error('Falha de armazenamento');}}));});
+ const inputs=renderer.root.findAllByType('TextInput');assert.equal(inputs.length,3);await act(async()=>{inputs[0].props.onChangeText('Título');inputs[1].props.onChangeText('Uma afirmação longa. '.repeat(30));inputs[2].props.onChangeText('Explicação extensa. '.repeat(40));});
+ await press(renderer,'Salvar');assert.equal(saved.length,0);assert.ok(text(renderer.root).includes('Selecione conscientemente'));
+ await press(renderer,'Prévia (Verso)');assert.ok(text(renderer.root).includes('NÃO SELECIONADO'));await press(renderer,'Edição');await press(renderer,'Falso');
+ await press(renderer,'Anexar imagem');assert.equal(picked,1);assert.equal(renderer.root.findAllByType('Image').length,1);await press(renderer,'Remover imagem/desenho');assert.equal(renderer.root.findAllByType('Image').length,0);
+ await act(async()=>renderer.root.findByType('Modal').props.onRequestClose());assert.equal(closed,0);assert.ok(text(renderer.root).includes('Descartar as alterações'));await press(renderer,'Continuar editando');assert.equal(renderer.root.findAllByType('TextInput')[0].props.value,'Título');
+ let prevented=false;await act(async()=>listeners.get('beforeRemove')({preventDefault:()=>prevented=true,data:{action:{type:'BACK'}}}));assert.ok(prevented);await press(renderer,'Continuar editando');
+ await press(renderer,'Salvar');assert.equal(saved.length,1);assert.equal(saved[0].isTrue,false);assert.equal(closed,0);assert.equal(renderer.root.findAllByType('TextInput')[0].props.value,'Título');
+ fail=false;const save=button(renderer,'Salvar');await act(async()=>{save.props.onPress();save.props.onPress();});assert.equal(saved.length,2,'Duplicate save prevented');assert.equal(saved[0].id,saved[1].id,'Retry retains draft identity');assert.equal(closed,1);
+ await act(async()=>renderer.unmount());
+ const {DrawingEditor}=load('src/presentation/components/flashcards/FlashcardVisual.tsx');let drawing;
+ await act(async()=>{renderer=create(React.createElement(DrawingEditor,{palette,onCancel:no,onSave:value=>drawing=value}));});
+ const canvas=()=>renderer.root.findAllByType('View').find(n=>n.props.onPanResponderGrant);
+ await act(async()=>{canvas().props.onPanResponderGrant({nativeEvent:{locationX:20,locationY:20}});canvas().props.onPanResponderMove({nativeEvent:{locationX:40,locationY:40}});});await press(renderer,'Salvar desenho');assert.equal(drawing.strokes.length,1);assert.equal(drawing.strokes[0].length,2);
+ await press(renderer,'Apagar');await act(async()=>canvas().props.onPanResponderGrant({nativeEvent:{locationX:20,locationY:20}}));await press(renderer,'Salvar desenho');assert.equal(drawing.strokes.length,0);await press(renderer,'Usar lápis');await act(async()=>canvas().props.onPanResponderGrant({nativeEvent:{locationX:50,locationY:50}}));await press(renderer,'Limpar');await press(renderer,'Salvar desenho');assert.equal(drawing.strokes.length,0);await act(async()=>renderer.unmount());
+ const {FlashcardCardView}=load('src/presentation/components/flashcards/FlashcardCardView.tsx');const publicCard={id:'public',title:'Frente pública',statement:'Sem resposta',imageUrl:null,drawing:null};
+ await act(async()=>renderer=create(React.createElement(FlashcardCardView,{card:publicCard,isFlipped:false,evaluation:null,palette})));assert.ok(text(renderer.root).includes('Sem resposta'));assert.ok(!text(renderer.root).includes('Gabarito'));await act(async()=>renderer.unmount());
+ const {LocalFlashcardRepository}=load('src/data/local/FlashcardRepository.ts');studyRepository=new LocalFlashcardRepository();await studyRepository.createDeck(deck);
+ await studyRepository.createCards([{...saved[1],id:'one'}, {...saved[1],id:'two',isTrue:true}]);
+ const {FlashcardStudyScreen}=load('src/presentation/screens/FlashcardStudyScreen.tsx');await act(async()=>renderer=create(React.createElement(FlashcardStudyScreen)));
+ assert.ok(text(renderer.root).includes('−10'));await press(renderer,'Iniciar estudo');const answerControl=renderer.root.findAllByType('Pressable').find(n=>n.props.accessibilityLabel==='✓✓ - Certeza de que está correto');assert.ok(answerControl);
+ await act(async()=>{answerControl.props.onPress();answerControl.props.onPress();});assert.ok(text(renderer.root).includes('Você errou!'));assert.ok(text(renderer.root).includes('-10 pontos'));assert.equal((await studyRepository.studySession('deck')).answers.length,1);
+ await act(async()=>renderer.update(React.createElement(FlashcardStudyScreen)));assert.equal((await studyRepository.studySession('deck')).score,-10);await act(async()=>renderer.unmount());
+ await act(async()=>renderer=create(React.createElement(FlashcardStudyScreen)));await press(renderer,'Retomar sessão');assert.ok(text(renderer.root).includes('Você errou!'));assert.equal(renderer.root.findAllByType('Pressable').filter(n=>n.props.accessibilityLabel?.includes('Certeza')).length,0);await press(renderer,'Próximo flashcard');
+ const correct=renderer.root.findAllByType('Pressable').find(n=>n.props.accessibilityLabel==='✓ - Talvez esteja correto');await act(async()=>correct.props.onPress());await press(renderer,'Concluir e ver resultado');assert.ok(text(renderer.root).includes('Sessão concluída'));assert.ok(text(renderer.root).includes('1 acertos'));assert.ok(text(renderer.root).includes('1 erros'));await act(async()=>renderer.unmount());
+ console.log('PASS actual React components and StudyScreen: required explicit truth, preview, attach/remove, discard/navigation protection, save failure/double tap, drawing/erase/clear, dark/public front, answer locking, rerender/remount/resume and final summary. Not Android/browser runtime proof.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

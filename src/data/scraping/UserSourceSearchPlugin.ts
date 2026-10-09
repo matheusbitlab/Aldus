@@ -2,6 +2,8 @@ import * as cheerio from "cheerio/slim";
 import { XMLParser } from "fast-xml-parser";
 import { SearchPlugin, ScrapedLink } from "@/src/domain/types/search";
 import { UserSource } from "@/src/domain/types/sources";
+import { readOpdsCatalog } from "./OpdsCatalog";
+import { rankCatalogBooks } from "@/src/domain/search/catalogRanking";
 
 type AtomLink = Record<string, unknown>;
 type AtomEntry = Record<string, unknown>;
@@ -23,11 +25,11 @@ export class UserSourceSearchPlugin implements SearchPlugin {
   }
 
   getSearchEndpoint(query: string): string {
-    if (this.source.kind === "json") return this.source.url;
     const encodedQuery = encodeURIComponent(query.trim());
     if (this.source.url.includes("{query}")) {
       return this.source.url.replaceAll("{query}", encodedQuery);
     }
+    if (this.source.kind === "json") return this.source.url;
     const endpoint = new URL(this.source.url);
     endpoint.searchParams.set(this.source.kind === "opds" ? "q" : "search", query.trim());
     return endpoint.toString();
@@ -35,7 +37,7 @@ export class UserSourceSearchPlugin implements SearchPlugin {
 
   parseResults(payload: string): ScrapedLink[] {
     if (this.source.kind === "json") return this.parseJson(payload);
-    if (/<(?:[\w.-]+:)?feed\b/i.test(payload)) return this.parseOpds(payload);
+    if (this.source.kind === "opds") return readOpdsCatalog(payload, this.source.url, this.name).books;
     return this.parseHtml(payload);
   }
 
@@ -78,11 +80,9 @@ export class UserSourceSearchPlugin implements SearchPlugin {
   }
 
   filterResults(links: ScrapedLink[], query: string): ScrapedLink[] {
-    if (this.source.kind !== "json") return links;
-    const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
-    const terms = normalize(query).split(/\s+/).filter(Boolean);
-    return links.filter((book) => terms.every((term) => normalize(`${book.title} ${book.author ?? ""} ${book.description ?? ""}`).includes(term)));
+    return rankCatalogBooks(links, query);
   }
+  get supportsQueryFallback(): boolean { return this.source.url.includes("{query}") || this.source.kind === "opds"; }
 
   private parseOpds(payload: string): ScrapedLink[] {
     try {
@@ -119,8 +119,10 @@ export class UserSourceSearchPlugin implements SearchPlugin {
       const href = $(element).attr("href") ?? "";
       const title = $(element).text().trim();
       if (!title || !/\.epub(?:\?|$)/i.test(href)) return [];
+      const url = new URL(href, this.source.url);
+      if (!/^https?:$/.test(url.protocol)) return [];
       return [{
-        url: new URL(href, this.source.url).toString(),
+        url: url.toString(),
         title,
         estimatedSize: null,
         sourceSite: this.source.name,

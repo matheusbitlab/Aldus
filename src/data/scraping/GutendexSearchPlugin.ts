@@ -15,6 +15,7 @@ interface GutendexResponse {
 }
 
 export class GutendexSearchPlugin implements SearchPlugin {
+  readonly supportsQueryFallback = true;
 	name = "Gutendex";
 	skipLinkValidation = true;
 

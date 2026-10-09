@@ -2,19 +2,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import * as FileSystem from "expo-file-system/legacy";
-import { PdfReflowDocument, PdfReflowPageData } from "@/src/domain/types/pdfReader";
-import { buildPdfReflowDocument } from "@/src/data/local/PdfReflowDocumentBuilder";
-import { PdfReflowProgress, PdfReflowProcessorProps } from "@/src/presentation/components/PdfReflowProcessorProps";
+import { PdfReflowPageData } from "@/src/domain/types/pdfReader";
+import { buildPdfReflowDocumentAsync } from "@/src/data/local/PdfReflowDocumentBuilder";
+import { isValidatedReflowDocument, CORRUPT_PDF_TEXT } from "@/src/data/local/pdfReflowQuality";
+import { PdfReflowProgress, PdfReflowProcessorProps, reflowProgressLabel } from "@/src/presentation/components/PdfReflowProcessorProps";
+import { createReflowOperation } from "./reflowOperation";
+import { reflowDiagnostic } from "@/src/utils/reflowDiagnostics";
 
 export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCancel }: PdfReflowProcessorProps) {
   const webView = useRef<WebView>(null);
   const pages = useRef<PdfReflowPageData[]>([]);
+  const generation = useRef(0);
+  const operation = useRef<ReturnType<typeof createReflowOperation> | null>(null);
+  const started = useRef(false);
+  const assembling = useRef(false);
+  const callbacks = useRef({ onComplete, onError, onProgress, onCancel });
+  callbacks.current = { onComplete, onError, onProgress, onCancel };
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [progress, setProgress] = useState<PdfReflowProgress>({ currentPage: 0, totalPages: 0 });
   const source = useMemo(() => ({ html: getProcessorHtml(), baseUrl: "https://kindle-reader.local/" }), []);
 
   useEffect(() => {
-    let active = true;
+    const run = createReflowOperation();
+    operation.current = run;
+    generation.current++;
+    reflowDiagnostic("START", { operationId: generation.current, phase: "reading", engine: "WebView/PDF.js 3.11.174" });
+    started.current = false;
+    assembling.current = false;
     pages.current = [];
     setProgress({ currentPage: 0, totalPages: 0 });
     setPdfBase64(null);
@@ -25,22 +39,46 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
           ? uri.split(",", 2)[1]
           : uri.startsWith("file://") || uri.startsWith("content://") || !uri.includes("://")
           ? await FileSystem.readAsStringAsync(uri, { encoding: "base64" } as never)
-          : await readRemotePdf(uri);
-        if (active) setPdfBase64(base64);
+          : await readRemotePdf(uri, run.signal);
+        if (!base64) throw new Error("Arquivo PDF vazio.");
+        if (run.active) setPdfBase64(base64);
       } catch (failure) {
-        if (active) onError(failure instanceof Error ? failure.message : "Não foi possível ler o PDF neste dispositivo.");
+        if (run.finish()) callbacks.current.onError("Não foi possível ler o PDF neste dispositivo.");
       }
     })();
 
     return () => {
-      active = false;
+      run.finish();
+      webView.current?.injectJavaScript("window.cancelPdf && window.cancelPdf(); true;");
+      pages.current = [];
     };
-  }, [uri, onError]);
+  }, [uri]);
+
+  const fail = (message: string) => {
+    if (operation.current?.finish()) {
+      reflowDiagnostic("ERROR", { operationId: generation.current });
+      webView.current?.injectJavaScript("window.cancelPdf && window.cancelPdf(); true;");
+      pages.current = [];
+      callbacks.current.onError(message);
+    }
+  };
+  const cancel = () => {
+    if (operation.current?.finish()) {
+      reflowDiagnostic("CANCEL", { operationId: generation.current });
+      webView.current?.injectJavaScript("window.cancelPdf && window.cancelPdf(); true;");
+      pages.current = [];
+      callbacks.current.onCancel();
+    }
+  };
+  const update = (next: PdfReflowProgress) => {
+    if (operation.current?.active) { setProgress(next); callbacks.current.onProgress(next); }
+  };
 
   const handleWebViewLoaded = () => {
-    if (pdfBase64) {
+    if (pdfBase64 && operation.current?.active && !started.current) {
+      started.current = true;
       webView.current?.injectJavaScript(
-        `window.processPdf && window.processPdf(${JSON.stringify(pdfBase64)}); true;`
+        `window.processPdf && window.processPdf(${JSON.stringify(pdfBase64)},${generation.current}); true;`
       );
     }
   };
@@ -48,13 +86,26 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const message = JSON.parse(event.nativeEvent.data) as {
+        operationId?: number;
         type?: string;
         page?: PdfReflowPageData;
         currentPage?: number;
         totalPages?: number;
         imageCount?: number;
         message?: string;
+        phase?: string; pageNumber?: number; engine?: string; stack?: string;
+        file?: string; line?: number; column?: number; errorName?: string;
       };
+      const run = operation.current;
+      if (!run?.active || message.operationId !== generation.current) return;
+      if (message.type === "stage" || message.type === "error") {
+        reflowDiagnostic(message.type === "stage" ? "STAGE" : "RENDERER_ERROR", {
+          operationId: generation.current, phase: message.phase, pageNumber: message.pageNumber,
+          engine: message.engine, file: message.file, line: message.line, column: message.column,
+          error: { name: message.errorName, message: message.message, stack: message.stack },
+        });
+      }
+      if (assembling.current && message.type !== "error") return;
       if (message.type === "page" && message.page) {
         pages.current.push(message.page);
       } else if (message.type === "progress") {
@@ -63,22 +114,26 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
           totalPages: message.totalPages ?? 0,
           imageCount: message.imageCount ?? 0,
         };
-        setProgress(nextProgress);
-        onProgress(nextProgress);
+        update({ ...nextProgress, stage: "extracting" });
       } else if (message.type === "complete" && message.totalPages) {
-        const document = buildPdfReflowDocument(pages.current, message.totalPages);
-        onComplete(document);
+        assembling.current = true;
+        update({ stage: "building", currentPage: message.totalPages, totalPages: message.totalPages });
+        const extracted = pages.current;
+        pages.current = [];
+        void buildPdfReflowDocumentAsync(extracted, message.totalPages, run.signal).then(document => {
+          if (!run.active) return;
+          update({ stage: "validating", currentPage: document.pageCount, totalPages: document.pageCount });
+          if (!isValidatedReflowDocument(document)) throw new Error(CORRUPT_PDF_TEXT);
+          update({ stage: "finalizing", currentPage: document.pageCount, totalPages: document.pageCount });
+          if (run.finish()) { reflowDiagnostic("SUCCESS", { operationId: generation.current }); callbacks.current.onComplete(document); }
+        }).catch(error => { if (run.active) fail(error instanceof Error ? error.message : "Falha ao montar o documento PDF."); });
       } else if (message.type === "error") {
-        onError(message.message ?? "Não foi possível extrair o conteúdo deste PDF.");
+        fail("Não foi possível extrair o conteúdo deste PDF. O PDF Original continua disponível.");
       }
     } catch {
-      onError("O processador PDF retornou dados inválidos.");
+      fail("O processador PDF retornou dados inválidos.");
     }
   };
-
-  const percentage = progress.totalPages > 0
-    ? Math.round((progress.currentPage / progress.totalPages) * 100)
-    : 0;
 
   return (
     <View style={styles.overlay}>
@@ -89,19 +144,22 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
           style={styles.webView}
           originWhitelist={["*"]}
           javaScriptEnabled
+          pointerEvents="none"
           onLoadEnd={handleWebViewLoaded}
           onMessage={handleMessage}
+          onError={() => fail("Falha ao carregar o processador PDF.")}
+          onHttpError={() => fail("Falha de rede ao carregar o processador PDF.")}
+          onRenderProcessGone={() => fail("O processo de renderização PDF foi encerrado.")}
+          onContentProcessDidTerminate={() => fail("O processo de renderização PDF foi encerrado.")}
         />
       ) : null}
       <View style={styles.panel}>
         <ActivityIndicator size="large" color="#B65F42" />
         <Text style={styles.title}>Preparando leitura livre</Text>
         <Text style={styles.description}>
-          {progress.totalPages > 0
-            ? `Analisando página ${progress.currentPage} de ${progress.totalPages} (${percentage}%) · ${progress.imageCount ?? 0} ilustrações`
-            : "Abrindo PDF para análise..."}
+          {reflowProgressLabel(progress)}
         </Text>
-        <Pressable accessibilityRole="button" onPress={onCancel} style={styles.cancel}>
+        <Pressable accessibilityRole="button" onPress={cancel} style={styles.cancel}>
           <Text style={styles.cancelText}>Cancelar</Text>
         </Pressable>
       </View>
@@ -109,26 +167,38 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
   );
 }
 
-async function readRemotePdf(uri: string): Promise<string> {
-  const response = await fetch(uri);
+async function readRemotePdf(uri: string, signal: AbortSignal): Promise<string> {
+  const response = await fetch(uri, { signal });
   if (!response.ok) throw new Error("Não foi possível baixar o PDF para análise.");
   const blob = await response.blob();
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error ?? new Error("Falha ao ler o PDF."));
+    const abort = () => { reader.abort(); reject(new Error("Leitura cancelada.")); };
+    const finish = () => signal.removeEventListener("abort", abort);
+    signal.addEventListener("abort", abort, { once: true });
+    reader.onload = () => { finish(); resolve(String(reader.result ?? "")); };
+    reader.onerror = () => { finish(); reject(reader.error ?? new Error("Falha ao ler o PDF.")); };
+    reader.onabort = finish;
+    if (signal.aborted) { abort(); return; }
     reader.readAsDataURL(blob);
   });
   return dataUrl.split(",", 2)[1] ?? "";
 }
 
-function getProcessorHtml(): string {
+export function getProcessorHtml(): string {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script></head><body>
 <script>
 (function(){
-  function post(value){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(value));}
+  var operationId=0,cancelled=false,loadingTask=null,phase="opening",currentPage=0;
+  function post(value){value.operationId=operationId;if(!cancelled&&window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(value));}
+  function stage(value){phase=value;post({type:"stage",phase:phase,pageNumber:currentPage,engine:"WebView/PDF.js 3.11.174"});}
+  function report(error,event){post({type:"error",message:String(error&&error.message||error),errorName:error&&error.name,stack:error&&error.stack,file:event&&event.filename,line:event&&event.lineno,column:event&&event.colno,phase:phase,pageNumber:currentPage,engine:"WebView/PDF.js 3.11.174"});}
+  window.addEventListener("error",function(event){report(event.error||new Error("Renderer script error"),event);});
+  window.addEventListener("unhandledrejection",function(event){report(event.reason);});
+  window.cancelPdf=function(){cancelled=true;if(loadingTask)loadingTask.destroy().catch(function(){});};
+  function check(){if(cancelled)throw new Error("cancelled");}
   function toTextItems(items){
     return items.filter(function(item){return item&&typeof item.str==="string"&&item.str.length>0&&item.transform;}).map(function(item){return {text:item.str,direction:item.dir||"ltr",x:item.transform[4],y:item.transform[5],width:item.width||0,height:item.height||0,fontName:item.fontName||"",hasEOL:!!item.hasEOL};});
   }
@@ -188,20 +258,28 @@ function getProcessorHtml(): string {
     var resolved=await Promise.all(candidates.map(async function(candidate){var image=candidate.source instanceof Promise?await candidate.source:candidate.source;if(!image)return null;var src=imageDataUri(image);return src?Object.assign({src:src},candidate.bounds):null;}));
     return resolved.filter(function(image){return !!image;});
   }
-  window.processPdf=function(base64){
+  window.processPdf=async function(base64,id){
+    operationId=id;cancelled=false;
     try{
       pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
       var raw=window.atob(base64);var bytes=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-      pdfjsLib.getDocument({data:bytes,cMapUrl:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",cMapPacked:true}).promise.then(async function(pdf){
+      loadingTask=pdfjsLib.getDocument({data:bytes,cMapUrl:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",cMapPacked:true});
+      var pdf=await loadingTask.promise;check();
         for(var pageNumber=1;pageNumber<=pdf.numPages;pageNumber++){
-          var page=await pdf.getPage(pageNumber);var text=await page.getTextContent();var operators=await page.getOperatorList();var viewport=page.getViewport({scale:1});
+          check();currentPage=pageNumber;stage("getPage");
+          var page=await pdf.getPage(pageNumber);
+          try{check();stage("getTextContent");var text=await page.getTextContent();check();stage("getOperatorList");var operators=await page.getOperatorList();check();var viewport=page.getViewport({scale:1});
+          stage("extractImages");
           var images=await extractImages(page,operators,viewport.width,viewport.height);
+          check();stage("bridge");
           post({type:"page",page:{pageNumber:pageNumber,pageWidth:viewport.width,pageHeight:viewport.height,textItems:toTextItems(text.items),images:images}});
           post({type:"progress",currentPage:pageNumber,totalPages:pdf.numPages,imageCount:images.length});
+          }finally{page.cleanup();}
         }
+        check();stage("complete");
         post({type:"complete",totalPages:pdf.numPages});
-      }).catch(function(error){post({type:"error",message:error.message});});
-    }catch(error){post({type:"error",message:error.message});}
+    }catch(error){if(!cancelled)report(error);}
+    finally{if(loadingTask){await loadingTask.destroy().catch(function(){});loadingTask=null;}}
   };
 })();
 </script></body></html>`;

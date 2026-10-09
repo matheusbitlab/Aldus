@@ -1,9 +1,15 @@
-import * as cheerio from "cheerio/slim";
 import { SearchPlugin, ScrapedLink } from "@/src/domain/types/search";
+import { readOpdsCatalog } from "./OpdsCatalog";
+export const gutenbergContact = process.env.EXPO_PUBLIC_CATALOG_CONTACT ?? "";
 export class GutenbergSearchPlugin implements SearchPlugin {
-  name = "Project Gutenberg";
-  requiresRobotsPolicy = true;
-  getSearchEndpoint(query: string): string { return `https://www.gutenberg.org/ebooks/search/?query=${encodeURIComponent(query.trim())}`; }
-  parseResults(html: string): ScrapedLink[] { const $ = cheerio.load(html); const links: ScrapedLink[] = []; $("a").each((_, element) => { const href = $(element).attr("href"); const title = $(element).text().trim(); if (!href || !title) return; const format = /\.epub(?:\?|$)/i.test(href) ? "epub" : /\.mobi(?:\?|$)/i.test(href) ? "mobi" : "unknown"; if (format === "unknown") return; links.push({ url: new URL(href, "https://www.gutenberg.org").toString(), title, estimatedSize: null, sourceSite: this.name, format }); }); return deduplicate(links); }
+  name = "Gutenberg";
+  readonly skipLinkValidation = true;
+  readonly supportsQueryFallback = true;
+  get requestHeaders(): Record<string, string> { return { "User-Agent": `KindleReader/1.0 (+${gutenbergContact})` }; }
+  getSearchEndpoint(query: string): string {
+    if (!/^(https:\/\/|mailto:)[^\s\r\n]+$/.test(gutenbergContact)) throw new Error("Configure o contato público do aplicativo para usar o OPDS do Gutenberg.");
+    return `https://www.gutenberg.org/ebooks/search.opds/?query=${encodeURIComponent(query.trim())}`;
+  }
+  parseResults(payload: string): ScrapedLink[] { return readOpdsCatalog(payload, "https://www.gutenberg.org/", this.name, url => /^https:\/\/www\.gutenberg\.org\/ebooks\/\d+\.opds$/.test(url)).books; }
+  getNextPageUrl(payload: string): string | null { return readOpdsCatalog(payload, "https://www.gutenberg.org/", this.name).nextPageUrl; }
 }
-function deduplicate(links: ScrapedLink[]): ScrapedLink[] { return [...new Map(links.map((link) => [link.url, link])).values()]; }

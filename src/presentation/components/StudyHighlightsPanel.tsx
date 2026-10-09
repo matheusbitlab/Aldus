@@ -43,11 +43,31 @@ export function StudyHighlightsPanel({ book, capture, chapterTitle, highlights, 
     let deck = snapshot.decks.find(value => value.bookIds.includes(book.id) && value.category === "Grifos");
     const now = Date.now();
     if (!deck) {
-      deck = { id: createFlashcardDeckId(), title: `Grifos: ${book.title}`, description: "Cartões criados a partir dos grifos do livro", category: "Grifos", bookIds: [book.id], isGenerated: false, createdAt: now, updatedAt: now };
+      deck = { id: createFlashcardDeckId(), title: `Grifos: ${book.title}`, description: "Flashcards criados a partir dos grifos do livro", category: "Grifos", bookIds: [book.id], isGenerated: false, createdAt: now, updatedAt: now };
       await localFlashcards.createDeck(deck);
     }
     if (snapshot.cards.some(card => card.deckId === deck!.id && card.source.kind === "highlight" && card.source.quote === highlight.highlightedText)) return;
-    await localFlashcards.createCards([{ id: createFlashcardId(), deckId: deck.id, front: `Explique o trecho destacado em ${location.chapterTitle || "este capítulo"}.`, back: highlight.highlightedText, difficulty: "MEDIUM", tags: [book.title, "grifo"], status: "approved", interval: 1, repetition: 0, easeFactor: 2.5, dueAt: now, source: { kind: "highlight", bookId: book.id, chapterId: location.anchor.chapterId, chapterTitle: location.chapterTitle, quote: location.anchor.quote, prefix: location.anchor.prefix, suffix: location.anchor.suffix, sourcePage: null }, createdAt: now, updatedAt: now }]);
+    const highlightStatement = `Afirmação sobre o trecho em ${location.chapterTitle || "este capítulo"}: "${highlight.highlightedText.slice(0, 120)}${highlight.highlightedText.length > 120 ? "..." : ""}" representa fielmente o pensamento do autor.`;
+    await localFlashcards.createCards([{
+      id: createFlashcardId(),
+      deckId: deck.id,
+      title: location.chapterTitle || "Grifo do Livro",
+      statement: highlightStatement,
+      isTrue: true,
+      explanation: highlight.highlightedText,
+      front: highlightStatement,
+      back: highlight.highlightedText,
+      difficulty: "MEDIUM",
+      tags: [book.title, "grifo"],
+      status: "approved",
+      interval: 1,
+      repetition: 0,
+      easeFactor: 2.5,
+      dueAt: now,
+      source: { kind: "highlight", bookId: book.id, chapterId: location.anchor.chapterId, chapterTitle: location.chapterTitle, quote: location.anchor.quote, prefix: location.anchor.prefix, suffix: location.anchor.suffix, sourcePage: null },
+      createdAt: now,
+      updatedAt: now,
+    }]);
   });
   const normalize = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const visible = highlights.filter(h => (filter === "all" || h.colorLabel === filter) && normalize(`${h.highlightedText} ${readHighlightLocation(h)?.note ?? ""}`).includes(normalize(query)));

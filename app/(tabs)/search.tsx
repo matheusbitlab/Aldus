@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,8 +9,9 @@ import { useDownloadStore } from "@/src/presentation/stores/downloadStore";
 import { useSourceStore } from "@/src/presentation/stores/sourceStore";
 import { useLibraryStore } from "@/src/presentation/stores/libraryStore";
 import { ScrapedLink } from "@/src/domain/types/search";
-
-const upcomingSources = ["Gutenberg", "BNDigital"];
+import { BUILTIN_CATALOG_NAMES } from "@/src/data/scraping/catalogPlugins";
+import { BNDIGITAL_BLOCK_REASON } from "@/src/data/scraping/BNDigitalSearchPlugin";
+import { appDependencies } from "@/src/presentation/services/dependencies";
 
 export default function Search() {
   const insets = useSafeAreaInsets();
@@ -25,14 +26,22 @@ export default function Search() {
     setQuery,
     search,
     loadMore,
+    isSearching,
+    pendingSources,
+    cancel,
+    selectSource,
   } = useSearchStore();
   const { jobs, enqueue } = useDownloadStore();
   const sources = useSourceStore((state) => state.sources);
   const activeSources = useMemo(() => sources.filter((source) => source.enabled && source.status === "active"), [sources]);
   const [touched, setTouched] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState("Todos");
+  const [sourceFilter, setSourceFilter] = useState(useSearchStore.getState().selectedSource);
   const [selectedBook, setSelectedBook] = useState<ScrapedLink | null>(null);
   const [acquisitionMessage, setAcquisitionMessage] = useState<string | null>(null);
+  const [acquiring, setAcquiring] = useState(false);
+  const [sourceNotice, setSourceNotice] = useState<string | null>(null);
+  const acquisitionController = useRef<AbortController | null>(null);
+  useEffect(() => () => acquisitionController.current?.abort(), []);
   const loadSources = useSourceStore((state) => state.load);
 
   useEffect(() => {
@@ -40,26 +49,33 @@ export default function Search() {
   }, [loadSources]);
 
   const filters = useMemo(
-    () => ["Todos", "Gutendex", "Minhas Fontes", ...activeSources.map((source) => source.name)],
+    () => ["Todos", ...BUILTIN_CATALOG_NAMES, "Minhas Fontes", ...activeSources.map((source) => source.name)],
     [activeSources]
   );
   const visibleResults = useMemo(
-    () => results.filter((item) => sourceFilter === "Todos" || (sourceFilter === "Minhas Fontes" ? item.sourceSite !== "Gutendex" : item.sourceSite === sourceFilter)),
-    [results, sourceFilter]
+    () => results.filter((item) => sourceFilter === "Todos" || (sourceFilter === "Minhas Fontes" ? activeSources.some(source => source.name === item.sourceSite) : item.sourceSite === sourceFilter)),
+    [results, sourceFilter, activeSources]
   );
 
   useEffect(() => {
-    if (!filters.includes(sourceFilter)) setSourceFilter("Todos");
-  }, [filters, sourceFilter]);
+    if (!filters.includes(sourceFilter)) { setSourceFilter("Todos"); selectSource("Todos"); }
+  }, [filters, sourceFilter, selectSource]);
 
   const submitSearch = () => {
     setTouched(true);
     setAcquisitionMessage(null);
-    void search();
+    void search(sourceFilter);
   };
 
   const acquireBook = async (book: ScrapedLink) => {
+    if (acquiring) return;
     setAcquisitionMessage(null);
+    const controller = acquisitionController.current = new AbortController();
+    setAcquiring(true);
+    try {
+    book = await appDependencies.searchBooks.resolveAcquisition(book, controller.signal);
+    if (controller.signal.aborted) return;
+    setSelectedBook(book);
     const fileName = `${safeFileBase(book.title)}.epub`;
     await enqueue({
       id: book.url,
@@ -79,11 +95,16 @@ export default function Search() {
     } else if (job?.error) {
       setAcquisitionMessage(job.error);
     }
+    } catch (error) {
+      if (!controller.signal.aborted) setAcquisitionMessage(error instanceof Error ? error.message : "Não foi possível adquirir este livro.");
+    } finally {
+      if (acquisitionController.current === controller) { acquisitionController.current = null; setAcquiring(false); }
+    }
   };
 
   const retrySearch = () => {
     setTouched(true);
-    void search();
+    void search(sourceFilter);
   };
 
   return (
@@ -115,9 +136,9 @@ export default function Search() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Buscar"
-          disabled={status === "loading" || !query.trim()}
+          disabled={!query.trim()}
           onPress={submitSearch}
-          style={[styles.searchButton, { backgroundColor: palette.accent, opacity: status === "loading" || !query.trim() ? 0.5 : 1 }]}
+          style={[styles.searchButton, { backgroundColor: palette.accent, opacity: !query.trim() ? 0.5 : 1 }]}
         >
           <Ionicons name="arrow-forward" size={19} color="#FFFFFF" />
         </Pressable>
@@ -131,24 +152,26 @@ export default function Search() {
               key={filter}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              onPress={() => setSourceFilter(filter)}
+              onPress={() => { setSourceFilter(filter); selectSource(filter); if (touched && query.trim()) void search(filter); }}
               style={[styles.filterChip, { backgroundColor: selected ? palette.accent : palette.surfaceSecondary }]}
             >
               <Text style={[styles.filterText, { color: selected ? "#FFFFFF" : palette.text }]}>{filter}</Text>
             </Pressable>
           );
         })}
-        {upcomingSources.map((source) => (
-          <View key={source} style={[styles.futureChip, { borderColor: palette.separator }]}>
-            <Text style={[styles.futureText, { color: palette.secondaryText }]}>{source} · Em breve</Text>
-          </View>
-        ))}
+        <Pressable accessibilityRole="button" onPress={() => setSourceNotice(BNDIGITAL_BLOCK_REASON)} style={[styles.futureChip, { borderColor: palette.separator }]}>
+          <Text style={[styles.futureText, { color: palette.secondaryText }]}>BNDigital · Indisponível</Text>
+        </Pressable>
       </ScrollView>
 
-      {status === "loading" ? (
+      {sourceNotice ? <Text accessibilityRole="alert" style={[styles.stateText, { color: palette.secondaryText }]}>{sourceNotice}</Text> : null}
+      {sourceStatuses.length ? <Text accessibilityLiveRegion="polite" style={[styles.stateText, { color: palette.secondaryText }]}>{sourceStatuses.map(source => `${source.sourceName}: ${{ loading: "consultando", success: "concluída", empty: "sem resultados", error: "erro", cancelled: "cancelada" }[source.status]}`).join(" · ")}</Text> : null}
+
+      {isSearching ? (
         <View style={styles.stateRow}>
           <ActivityIndicator size="small" color={palette.accent} />
           <Text style={[styles.stateText, { color: palette.secondaryText }]}>Consultando fontes…</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Cancelar busca" onPress={cancel}><Text style={{ color: palette.accent }}>Cancelar</Text></Pressable>
         </View>
       ) : null}
 
@@ -163,14 +186,16 @@ export default function Search() {
         </View>
       ) : null}
 
-      {status === "partial" ? (
+      {status === "partial" && (pendingSources.length > 0 || sourceStatuses.some(source => source.status === "error")) ? (
         <View style={[styles.partialNotice, { backgroundColor: palette.surfaceSecondary }]}>
           <Ionicons name="alert-circle-outline" size={17} color={palette.accent} />
           <Text style={[styles.partialText, { color: palette.text }]}>
-            Algumas fontes falharam: {sourceStatuses.filter((source) => source.status === "error").map((source) => source.sourceName).join(", ")}.
+            {pendingSources.length ? `Resultados parciais. Aguardando: ${pendingSources.join(", ")}.` : `Algumas fontes falharam: ${sourceStatuses.filter((source) => source.status === "error").map((source) => source.sourceName).join(", ")}.`}
           </Text>
         </View>
       ) : null}
+
+      {status === "cancelled" ? <Text accessibilityLiveRegion="polite" style={[styles.stateText, { color: palette.secondaryText }]}>Busca cancelada. Os resultados já recebidos continuam disponíveis.</Text> : null}
 
       {touched && (status === "empty" || (status === "partial" && results.length === 0)) ? (
         <View style={styles.emptyState}>
@@ -220,7 +245,7 @@ export default function Search() {
             <Ionicons name="chevron-forward" size={18} color={palette.secondaryText} />
           </Pressable>
         )}
-        ListFooterComponent={nextPageUrl && status !== "loading" ? (
+        ListFooterComponent={nextPageUrl && !isSearching ? (
           <Pressable accessibilityRole="button" onPress={() => void loadMore()} style={[styles.loadMore, { borderColor: palette.separator }]}>
             <Text style={{ color: palette.accent, fontWeight: "600" }}>Carregar mais</Text>
           </Pressable>
@@ -231,8 +256,9 @@ export default function Search() {
         book={selectedBook}
         job={selectedBook ? jobs[selectedBook.url] : undefined}
         message={acquisitionMessage}
+        acquiring={acquiring}
         palette={palette}
-        onClose={() => setSelectedBook(null)}
+        onClose={() => { acquisitionController.current?.abort(); setSelectedBook(null); }}
         onAcquire={() => selectedBook ? void acquireBook(selectedBook) : undefined}
       />
     </View>
@@ -243,6 +269,7 @@ function BookDetailsModal({
   book,
   job,
   message,
+  acquiring,
   palette,
   onClose,
   onAcquire,
@@ -250,6 +277,7 @@ function BookDetailsModal({
   book: ScrapedLink | null;
   job?: ReturnType<typeof useDownloadStore.getState>["jobs"][string];
   message: string | null;
+  acquiring: boolean;
   palette: ReturnType<typeof useAppTheme>["palette"];
   onClose: () => void;
   onAcquire: () => void;
@@ -285,9 +313,9 @@ function BookDetailsModal({
             ) : null}
             {job?.error || message ? <Text accessibilityRole="alert" style={[styles.errorMessage, { color: palette.accent }]}>{message ?? job?.error}</Text> : null}
             {job?.status !== "completed" ? (
-              <Pressable accessibilityRole="button" disabled={job?.status === "downloading" || job?.status === "queued"} onPress={onAcquire} style={[styles.acquireButton, { backgroundColor: palette.accent, opacity: job?.status === "downloading" || job?.status === "queued" ? 0.6 : 1 }]}>
+              <Pressable accessibilityRole="button" disabled={acquiring || job?.status === "downloading" || job?.status === "queued"} onPress={onAcquire} style={[styles.acquireButton, { backgroundColor: palette.accent, opacity: acquiring || job?.status === "downloading" || job?.status === "queued" ? 0.6 : 1 }]}>
                 <Ionicons name="download-outline" size={19} color="#FFFFFF" />
-                <Text style={styles.acquireText}>Baixar e adicionar</Text>
+                <Text style={styles.acquireText}>{acquiring ? "Preparando aquisição…" : "Baixar e adicionar"}</Text>
               </Pressable>
             ) : null}
             {Platform.OS === "web" && job?.status === "failed" && book ? (
