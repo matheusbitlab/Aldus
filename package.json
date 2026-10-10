@@ -17,6 +17,7 @@
     "legal:notices:check": "node scripts/generate-third-party-notices.cjs --check",
     "test:legal": "node scripts/test-legal.cjs",
     "test:legal:browser": "node scripts/test-legal-browser.cjs",
+    "audit:supabase:public": "node scripts/audit-supabase-public.cjs",
     "export:web": "expo export --platform web && node scripts/copy-books-to-dist.mjs"
   },
   "dependencies": {
