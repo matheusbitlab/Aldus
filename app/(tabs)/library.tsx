@@ -13,17 +13,18 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as DocumentPicker from "expo-document-picker";
 import { LibraryBook } from "@/src/domain/entities/LibraryBook";
 import { useLibrary } from "@/src/presentation/hooks/useLibrary";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
-import { appDependencies, libraryOrganization } from "@/src/presentation/services/dependencies";
+import { libraryOrganization } from "@/src/presentation/services/dependencies";
 import { BookOrganizationModal, readingStatusLabels } from "@/src/presentation/components/BookOrganizationModal";
 import { OrganizationBackupModal } from "@/src/presentation/components/OrganizationBackupModal";
 import { inferredReadingStatus, normalizeLibraryText, OrganizationRecords } from "@/src/domain/types/libraryOrganization";
 import { BookCard as SharedBookCard } from "@/src/presentation/components/BookCard";
 import { Book, MOCK_BOOKS } from "@/src/constants/mockBooks";
 import { markEpubLibraryReady, startEpubOpenTrace } from "@/src/utils/epubOpenMetrics";
+import { useBookImport } from "@/src/presentation/hooks/useBookImport";
+import { BookImportModal } from "@/src/presentation/components/BookImportModal";
 
 type BookFilter = "all" | "reading" | "completed" | "unread" | "interrupted" | "favorites";
 type BookSort = "recent" | "title" | "author" | "progress" | "series";
@@ -57,8 +58,7 @@ export default function Library() {
   const insets = useSafeAreaInsets();
   const { books, status, error, reload } = useLibrary();
   const { palette, resolvedTheme, setMode } = useAppTheme();
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
+  const bookImport = useBookImport(reload);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<BookFilter>("all");
   const [sort, setSort] = useState<BookSort>("recent");
@@ -112,48 +112,6 @@ export default function Library() {
     });
   }, [books, filter, query, sort, organization, collection]);
 
-  const importBook = async () => {
-    setImportError(null);
-    setImporting(true);
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          "application/epub+zip",
-          "application/epub",
-          "application/pdf",
-          "application/octet-stream",
-        ],
-        copyToCacheDirectory: true,
-      });
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        if (asset.mimeType === "application/pdf" || /\.pdf$/i.test(asset.name)) {
-          await appDependencies.pdfImporter.importFromUri(
-            asset.uri,
-            asset.name,
-            undefined,
-            asset.file
-          );
-        } else {
-          await appDependencies.epubImporter.importFromUri(
-            asset.uri,
-            asset.name,
-            asset.file
-          );
-        }
-        await reload();
-      }
-    } catch (importFailure) {
-      setImportError(
-        importFailure instanceof Error
-          ? importFailure.message
-          : "Não foi possível importar este arquivo."
-      );
-    } finally {
-      setImporting(false);
-    }
-  };
-
   const selectedFilter =
     filters.find((item) => item.value === filter)?.label ?? "Todos";
   const selectedSort =
@@ -195,16 +153,16 @@ export default function Library() {
           accessibilityRole="button"
           accessibilityLabel="Importar livro"
           style={[styles.importButton, { backgroundColor: palette.accent }]}
-          onPress={() => void importBook()}
-          disabled={importing}
+          onPress={() => void bookImport.start()}
+          disabled={bookImport.busy}
         >
-          {importing ? (
+          {bookImport.busy ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <Ionicons name="add" size={21} color="#FFFFFF" />
           )}
           <Text style={styles.importLabel}>
-            {importing ? "Importando" : "Importar"}
+            {bookImport.selecting ? "Selecionando" : bookImport.busy ? "Importando" : "Importar"}
           </Text>
         </Pressable>
       </View>
@@ -336,14 +294,6 @@ export default function Library() {
         {collections.length ? ["", ...collections].map(name => <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected: collection === name }} onPress={() => setCollection(name)} style={[styles.collectionChip, { borderColor: collection === name ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{name || "Todas as coleções"}</Text></Pressable>) : null}
       </ScrollView>
       {organizationError ? <View><Text accessibilityRole="alert" style={{ color: palette.accent }}>{organizationError}</Text><Pressable onPress={() => void loadOrganization()}><Text style={{ color: palette.text }}>Recarregar organização</Text></Pressable></View> : null}
-      {importError ? (
-        <Text
-          accessibilityRole="alert"
-          style={[styles.error, { color: palette.accent }]}
-        >
-          {importError}
-        </Text>
-      ) : null}
       {(status === "loading" || status === "idle") && books.length === 0 ? (
         <View style={styles.loading}>
           <ActivityIndicator color={palette.accent} />
@@ -419,6 +369,17 @@ export default function Library() {
       ) : null}
       {organizing ? <BookOrganizationModal book={organizing} record={organization[organizing.id]} onClose={() => setOrganizing(null)} onSaved={refreshOrganization} /> : null}
       {backupVisible ? <OrganizationBackupModal records={organization} bookIds={books.map(book => book.id)} onClose={() => setBackupVisible(false)} onSaved={refreshOrganization} /> : null}
+      <BookImportModal
+        state={bookImport.state}
+        onCancel={bookImport.cancel}
+        onClose={bookImport.dismiss}
+        onImportAnother={() => { bookImport.dismiss(); void bookImport.start(); }}
+        onOpenBook={() => {
+          const bookId = bookImport.importedBook?.id;
+          bookImport.dismiss();
+          if (bookId) router.push({ pathname: "/reader/[bookId]", params: { bookId } });
+        }}
+      />
     </View>
   );
 }
@@ -584,10 +545,6 @@ const styles = StyleSheet.create({
   },
   menuLabel: {
     fontSize: 14,
-  },
-  error: {
-    fontSize: 13,
-    marginBottom: 10,
   },
   loading: {
     flex: 1,

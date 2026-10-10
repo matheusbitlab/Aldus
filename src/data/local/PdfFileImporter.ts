@@ -5,6 +5,8 @@ import { ChapterRepository } from "@/src/domain/repositories/ChapterRepository";
 import { LibraryBook, StoredChapter } from "@/src/domain/entities/LibraryBook";
 import { pdfThumbnailGenerator } from "@/src/presentation/services/PdfThumbnailGenerator";
 import { WebBookFileStore } from "@/src/data/database/connection/WebBookFileStore";
+import { throwIfAborted, withAbort } from "@/src/core/utils/cancellation";
+import { BookImportPhaseUpdate } from "@/src/domain/types/bookImport";
 
 export class PdfFileImporter {
   constructor(
@@ -17,42 +19,50 @@ export class PdfFileImporter {
     uri: string,
     fileName: string,
     stableId?: string,
-    pickedFile?: Blob
+    pickedFile?: Blob,
+    options: { signal?: AbortSignal; onPhase?: (update: BookImportPhaseUpdate) => void } = {}
   ): Promise<LibraryBook> {
+    throwIfAborted(options.signal);
     const id = stableId ?? `pdf-${Date.now()}`;
-    const existingBook = stableId ? await this.books.findById(id) : null;
+    options.onPhase?.({ phase: "preparing", cancellable: true });
+    const existingBook = stableId ? await withAbort(this.books.findById(id), options.signal) : null;
     if (existingBook) return existingBook;
 
     const isWeb = Platform.OS === "web";
     const isBundled = uri.startsWith("bundled-pdf://");
-    const info = isWeb || isBundled ? null : await FileSystem.getInfoAsync(uri);
+    options.onPhase?.({ phase: "reading", cancellable: true });
+    const info = isWeb || isBundled ? null : await withAbort(FileSystem.getInfoAsync(uri), options.signal);
     if (!isWeb && !isBundled && (!info?.exists || info.isDirectory)) {
       throw new Error("Arquivo PDF não encontrado.");
     }
 
     if (!isWeb && !isBundled) {
-      const header = await FileSystem.readAsStringAsync(uri, { encoding: "base64", position: 0, length: 5 } as never);
+      const header = await withAbort(FileSystem.readAsStringAsync(uri, { encoding: "base64", position: 0, length: 5 } as never), options.signal);
       if (!atob(header).startsWith("%PDF-")) throw new Error("O arquivo selecionado não é um PDF válido.");
     }
 
     let filePath = uri;
     let fileSize = info?.exists ? info.size ?? 0 : 0;
     let fileForThumbnail: Blob | undefined = pickedFile;
+    let savedWebFile = false;
 
+    try {
+    options.onPhase?.({ phase: "validating", cancellable: true, fileSize: pickedFile?.size ?? fileSize });
     if (isWeb && !isBundled) {
       let file: Blob;
       if (pickedFile) {
         file = pickedFile;
       } else {
-        const response = await fetch(uri);
+        const response = await fetch(uri, { signal: options.signal });
         if (!response.ok) throw new Error("Não foi possível ler o PDF no navegador.");
-        file = await response.blob();
+        file = await withAbort(response.blob(), options.signal);
       }
-      const header = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+      const header = new Uint8Array(await withAbort(file.slice(0, 5).arrayBuffer(), options.signal));
       if (String.fromCharCode(...header) !== "%PDF-") throw new Error("O arquivo selecionado não é um PDF válido.");
       fileForThumbnail = file;
       if (this.webFiles) {
-        await this.webFiles.save(id, fileName, file);
+        await withAbort(this.webFiles.save(id, fileName, file), options.signal);
+        savedWebFile = true;
         filePath = `web-pdf://${id}`;
       } else {
         filePath = await blobToDataUri(file);
@@ -63,13 +73,15 @@ export class PdfFileImporter {
     // Generate cover thumbnail from Page 1
     let coverImagePath: string | null = null;
     if (!isBundled) {
+      options.onPhase?.({ phase: "reading_metadata", cancellable: true, fileSize });
       try {
-        coverImagePath = await pdfThumbnailGenerator.generate(
+        coverImagePath = await withAbort(pdfThumbnailGenerator.generate(
           filePath,
           id,
           fileForThumbnail
-        );
-      } catch {
+        ), options.signal);
+      } catch (error) {
+        if (options.signal?.aborted) throw error;
         coverImagePath = null;
       }
     }
@@ -104,9 +116,20 @@ export class PdfFileImporter {
       html: "",
     };
 
-    await this.books.save(book);
-    await this.chapters.replaceForBook(id, [chapter]);
+    throwIfAborted(options.signal);
+    options.onPhase?.({ phase: "persisting", cancellable: false, fileSize });
+    try {
+      await this.books.save(book);
+      await this.chapters.replaceForBook(id, [chapter]);
+    } catch (error) {
+      try { await this.books.softDelete(id); } catch { /* keep original persistence error */ }
+      throw error;
+    }
     return book;
+    } catch (error) {
+      if (savedWebFile && this.webFiles) await this.webFiles.delete(id).catch(() => undefined);
+      throw error;
+    }
   }
 }
 

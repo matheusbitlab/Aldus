@@ -28,6 +28,7 @@ import { SqlitePdfReflowCacheRepository } from "@/src/data/repositories/SqlitePd
 import { IndexedDbPdfReflowCacheRepository } from "@/src/data/repositories/IndexedDbPdfReflowCacheRepository";
 import { PdfReaderSettingsStore } from "@/src/data/local/PdfReaderSettingsStore";
 import { LibraryOrganizationStore } from "@/src/data/local/LibraryOrganizationStore";
+import { LocalBookImportService } from "@/src/data/imports/LocalBookImportService";
 
 const useWebStorage = Platform.OS === "web";
 const bookRepository = useWebStorage ? new IndexedDbBookRepository() : new SqliteBookRepository();
@@ -41,9 +42,10 @@ const webBookFileStore = new WebBookFileStore();
 const epubImporter = new EpubFileImporter(importEpub, useWebStorage ? webBookFileStore : undefined);
 const bundledEpubCatalog = new BundledEpubCatalog(bookRepository);
 const pdfImporter = new PdfFileImporter(bookRepository, chapterRepository, useWebStorage ? webBookFileStore : undefined);
+const localBookImporter = new LocalBookImportService(epubImporter, pdfImporter);
 const bundledPdfCatalog = new BundledPdfCatalog(pdfImporter, bookRepository);
 const pdfReflowCache = useWebStorage ? new IndexedDbPdfReflowCacheRepository() : new SqlitePdfReflowCacheRepository();
 const pdfReaderSettings = new PdfReaderSettingsStore();
 const downloadManager = new DownloadManager(epubImporter);
 export const libraryOrganization = new LibraryOrganizationStore();
-export const appDependencies = { bookRepository, chapterRepository, readingProgressRepository, bookmarkRepository: useWebStorage ? new IndexedDbBookmarkRepository() : new SqliteBookmarkRepository(), highlightRepository: useWebStorage ? new IndexedDbHighlightRepository() : new SqliteHighlightRepository(), getLibrary: new GetLibraryUseCase(bookRepository, libraryOrganization), seedMockBook: new SeedMockBookUseCase(bookRepository, chapterRepository, readingProgressRepository), openBook: new OpenBookUseCase(bookRepository, chapterRepository, readingProgressRepository, libraryOrganization), updateReadingProgress: new UpdateReadingProgressUseCase(readingProgressRepository), epubImporter, bundledEpubCatalog, pdfImporter, bundledPdfCatalog, webBookFileStore, pdfReflowCache, pdfReaderSettings, searchBooks, downloadManager };
+export const appDependencies = { bookRepository, chapterRepository, readingProgressRepository, bookmarkRepository: useWebStorage ? new IndexedDbBookmarkRepository() : new SqliteBookmarkRepository(), highlightRepository: useWebStorage ? new IndexedDbHighlightRepository() : new SqliteHighlightRepository(), getLibrary: new GetLibraryUseCase(bookRepository, libraryOrganization), seedMockBook: new SeedMockBookUseCase(bookRepository, chapterRepository, readingProgressRepository), openBook: new OpenBookUseCase(bookRepository, chapterRepository, readingProgressRepository, libraryOrganization), updateReadingProgress: new UpdateReadingProgressUseCase(readingProgressRepository), epubImporter, localBookImporter, bundledEpubCatalog, pdfImporter, bundledPdfCatalog, webBookFileStore, pdfReflowCache, pdfReaderSettings, searchBooks, downloadManager };

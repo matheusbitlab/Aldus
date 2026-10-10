@@ -1,5 +1,11 @@
 # Campanha de correção dos bugs do APK
 
+## Itens novos — Importação, checkpoint 10/10/2026
+
+**IMPORTAÇÃO — EM INVESTIGAÇÃO.** Escopo restrito aos itens 2 e 6 do caderno: mapear os pipelines EPUB local, PDF local e download/importação remota; localizar a primeira operação sem estado terminal; implementar lifecycle determinístico, progresso somente mensurável, cancelamento real, cleanup e UX clara. Reader/Reflow, OCR, Auth, Sources/Search, Drive/Sync, Flashcards e Legal permanecem fora do escopo salvo dependência direta comprovada. Worktree iniciou limpo em `60da70f`; nenhum descarte Git ou alteração funcional executado neste checkpoint. Android físico ainda não testado.
+
+**IMPORTAÇÃO — CAUSA CONFIRMADA / LIFECYCLE LOCAL IMPLEMENTADO.** Primeira divergência: `library.tsx` ligava `importing=true` antes do DocumentPicker e mantinha um único `await` até picker→leitura→parser/thumbnail→persistência→reload; qualquer Promise pendente impedia o `finally`, sem operationId, cancelamento ou fase terminal. Native também persistia o URI do cache do picker; livro era salvo antes dos capítulos, podendo ficar parcial. Implementado lifecycle por operationId com eventos tardios ignorados; cancelamento cooperativo antes da persistência; persistência declaradamente não cancelável; cópia Native `content://`/`file://` para `books/temp` e move a caminho único em `books/imported`; cleanup em erro/cancel; rollback/soft-delete se capítulos falharem; Blob Web removido em falha; modal com fase, erro, sucesso e ações. Percentual local não é inventado: fases sem medida permanecem indeterminadas. `test:import`, typecheck e regressão de catálogos PASS; Android físico ainda **NÃO TESTADO**. Download remoto ainda será consolidado no próximo bloco.
+
 ## Etapa 3 — fechamento Auth/RLS, checkpoint 10/10/2026
 
 Auditoria remota administrativa **BLOQUEADA**: somente configuração pública disponível; CLI `npx` sem binário Windows, sem Dashboard/DB/SQL Editor autenticado. Nenhum SQL, migration, usuário ou configuração externa foi alterado. A sonda pública confirmou Auth 200/GoTrue v2.197.0, email/Google ativos, signup permitido e confirmação exigida; oito endpoints REST recusaram `anon` com 401/42501 e `username-login` retornou 404. Recusa pública não foi promovida a prova de RLS/policies/schema.
