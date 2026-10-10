@@ -20,7 +20,7 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
   callbacks.current = { onComplete, onError, onProgress, onCancel };
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [progress, setProgress] = useState<PdfReflowProgress>({ currentPage: 0, totalPages: 0 });
-  const source = useMemo(() => ({ html: getProcessorHtml(), baseUrl: "https://kindle-reader.local/" }), []);
+  const source = useMemo(() => ({ html: getProcessorHtml(), baseUrl: "https://aldus-reader.local/" }), []);
 
   useEffect(() => {
     const run = createReflowOperation();

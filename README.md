@@ -1,4 +1,4 @@
-# Kindle Reader
+# Aldus Reader
 
 Fase 1 de um leitor de e-books em Expo, com foco em uma experiencia de leitura limpa e preparada para EPUB real.
 
@@ -47,7 +47,7 @@ para testes locais. Para publicacao, configure uma chave de assinatura propria.
 - Biblioteca carregada do banco com estados de loading, vazio e erro.
 - Progresso restaurado ao abrir o livro e salvo apos 500 ms de inatividade.
 
-O banco usa `kindle-reader.db`. A importacao de arquivos locais, bookmarks e highlights persistidos ficam preparados nas interfaces de dominio para as fases seguintes.
+O banco continua usando o identificador legado `kindle-reader.db` para preservar compatibilidade com instalações e dados existentes. A importacao de arquivos locais, bookmarks e highlights persistidos ficam preparados nas interfaces de dominio para as fases seguintes.
 
 ## Fase 3
 

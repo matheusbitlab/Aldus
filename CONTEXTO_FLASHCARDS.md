@@ -1,6 +1,6 @@
 # Contexto funcional — decks, flashcards, estudo e batalha
 
-Este documento registra o comportamento desejado para o módulo de flashcards do projeto Kindle reader. Serve como fonte de contexto para futuros prompts de implementação. É uma especificação de produto; não comprova que as funcionalidades já existem no código.
+Este documento registra o comportamento desejado para o módulo de flashcards do projeto Aldus Reader. Serve como fonte de contexto para futuros prompts de implementação. É uma especificação de produto; não comprova que as funcionalidades já existem no código.
 
 ## Decisões e estado após o pedido de 09/10/2026
 

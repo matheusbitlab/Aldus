@@ -25,8 +25,8 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="kindlereader"/>
-        <data android:scheme="exp+matheus"/>
+        <data android:scheme="aldus"/>
+        <data android:scheme="exp+aldus-reader"/>
       </intent-filter>
     </activity>
   </application>

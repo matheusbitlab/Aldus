@@ -1,4 +1,4 @@
-# Integração Flashcards ↔ Kindle Reader — auditoria e etapas
+# Integração Flashcards ↔ Aldus Reader — auditoria e etapas
 
 ## Estado vigente — 09/10/2026
 
@@ -6,11 +6,11 @@ Reaproveitada a integração local e a autenticação Supabase do Reader. Editor
 
 Guia canônico: `FLASHCARDS_IMPLEMENTACAO.md`. Nenhum APK novo/dependência nativa/configuração Android; JS pode ser testado via Metro em development build compatível. APK release atual precisa de recompilação/reinstalação futura. Novo módulo Android NÃO TESTADO; verificações físicas anteriores do Reader não o validam. Registros abaixo são históricos.
 
-Atualizado em 2026-10-06. O Kindle Reader permanece o aplicativo principal. Esta integração começou pela camada local; o serviço online doador continua separado até que seus contratos sejam corrigidos e um ambiente real seja disponibilizado.
+Atualizado em 2026-10-10 para refletir a identidade Aldus Reader. O Aldus Reader permanece o aplicativo principal. Esta integração começou pela camada local; o serviço online doador continua separado até que seus contratos sejam corrigidos e um ambiente real seja disponibilizado.
 
 ## Inventário dos dois projetos
 
-| Área | Flashcards (`C:\Flashcards`) | Kindle Reader (`C:\KIndle`) | Decisão |
+| Área | Flashcards (`C:\Flashcards`) | Aldus Reader (`C:\KIndle`) | Decisão |
 |---|---|---|---|
 | Runtime | Expo `^57.0.21`, React Native `0.86.3`, React `19.2.3`, Router `~57.0.20`, Zustand 4, NativeWind 2 | Expo `~57.0.25`, React Native `0.86.3`, React `19.2.3`, Router `~57.0.23`, Zustand 5, NativeWind 4 | Não substituir manifests nem estilos do Reader |
 | Mobile | Rotas independentes, dados de demonstração em decks/estudo/batalha, Socket.IO cliente não presente nas telas | Tabs Biblioteca/Buscar/Ajustes, Reader EPUB/PDF e persistência local Web/SQLite/AsyncStorage | Integrar novas rotas no Router do Reader |
@@ -68,7 +68,7 @@ Produção adicionada ao Reader:
 1. Ambiente PostgreSQL/Redis/worker e migrations do doador não comprovados.
 2. Credenciais Gemini, API pública e política de custos ausentes.
 3. Contrato Socket.IO atual permite resultado de batalha controlado pelo cliente.
-4. Não há identidade online no Kindle Reader; login e troca de conta precisam ser desenhados sem misturar dados locais.
+4. Não havia identidade online no Aldus Reader nessa etapa histórica; login e troca de conta precisavam ser desenhados sem misturar dados locais.
 5. Android físico ausente para validar Native, safe area, origem no Reader e Socket.IO no telefone.
 
 ## Cliente remoto Supabase preparado — 2026-10-06
@@ -76,6 +76,6 @@ Produção adicionada ao Reader:
 - `@supabase/supabase-js` já estava instalado em `2.117.2` no `package.json`/lockfile; não foi executado um `npm install` redundante.
 - `.env.local` foi criado com a URL e a chave publishable fornecidas e passou a ser ignorado por `.gitignore` (`.env*.local`). A chave não é copiada para código-fonte.
 - `src/data/remote/supabase.ts` fornece o cliente com `AsyncStorage`, `persistSession`, `autoRefreshToken` e `detectSessionInUrl: false`. O cliente é opcional (`isSupabaseConfigured`/`requireSupabase`) para preservar o funcionamento offline quando um ambiente não fornecer variáveis.
-- O exemplo de `App.tsx` com tabela `todos` não foi aplicado: o Kindle usa Expo Router e o Reader continua o aplicativo principal. Nenhuma tabela, autenticação, sincronização ou batalha foi declarada como concluída sem contrato de dados.
+- O exemplo de `App.tsx` com tabela `todos` não foi aplicado: o Aldus Reader usa Expo Router e o Reader continua o aplicativo principal. Nenhuma tabela, autenticação, sincronização ou batalha foi declarada como concluída sem contrato de dados.
 - Validação após a configuração: `npm.cmd ls @supabase/supabase-js --depth=0`, `npm.cmd run typecheck` e `npm.cmd run export:web` PASS. O export confirmou carregamento de `.env.local` e bundle Web com 2260 módulos.
 - A configuração é somente JavaScript/TypeScript e usa dependências Native já presentes; não exige recompilar/reinstalar Android. Qualquer dependência Native futura será anunciada antes.

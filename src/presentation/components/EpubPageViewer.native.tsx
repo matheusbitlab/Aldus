@@ -63,7 +63,7 @@ export function EpubPageViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [chapters]
   );
-  const source = useMemo(() => ({ html, baseUrl: "https://kindle-reader.local/" }), [html]);
+  const source = useMemo(() => ({ html, baseUrl: "https://aldus-reader.local/" }), [html]);
 
   useEffect(() => {
     callback.current = onPageInfo;

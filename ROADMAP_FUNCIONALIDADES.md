@@ -1,4 +1,17 @@
-# Roadmap funcional — atualizado em 2026-10-09
+# Roadmap funcional — atualizado em 2026-10-10
+
+## IDENTIDADE / BRANDING — Aldus Reader
+
+Estado: **🟡 IMPLEMENTADO E VALIDADO LOCALMENTE / CONFIGURAÇÃO EXTERNA PENDENTE**.
+
+- ✅ Nome público atual: **Aldus Reader**; nome curto/Expo: **Aldus**; npm/slug: `aldus-reader`; Web name/title: **Aldus Reader**.
+- ✅ Deep link/callback Native: `aldus://auth/callback`; recovery: `aldus://auth/callback?next=reset-password`.
+- ✅ Android migrado de `com.kindle.reader` para `com.aldus.reader` em app config, Gradle, Kotlin, Manifest e manifesto mesclado, sem mistura entre packages.
+- ✅ UI, Auth, User-Agent, origens sintéticas WebView, download de backup, testes e documentação operacional atual usam Aldus.
+- ✅ Typecheck, Auth callback/recovery, integração de fonte, export Web, Expo config e merge do Manifest Android passaram localmente.
+- 🟡 Supabase Redirect URLs, Google Cloud/Play package+SHA-1 e conferência do vínculo EAS ainda dependem do operador. Nenhuma configuração externa foi declarada como alterada.
+- 🧪 Não testado: OAuth/recovery real, APK/AAB e instalação em aparelho sob o novo applicationId. O package novo não reutiliza automaticamente os dados privados do app Android antigo.
+- ↔️ Compatibilidade preservada: chaves/bancos/formatos persistidos `kindle-*` e `@kindle/*`, caminhos locais e documentação histórica permanecem intencionalmente; não são a identidade pública atual.
 
 ## Prioridades vigentes — campanha Reader de 09/10/2026
 
@@ -157,7 +170,7 @@ Este fechamento prevalece sobre os checkpoints intermediários acima, preservado
 | Profiles e override com RLS | 🟡 PARCIAL | Migrations preparadas, não aplicadas no remoto |
 | RLS das seis tabelas legadas | ⚠️ BLOQUEADO | Security Advisor CRITICAL remoto; migration deny all preparada; requer SQL Editor/admin |
 | Teste A/B e Security Advisor | ⚠️ BLOQUEADO | Precisa migrations, contas reais e acesso ao painel remoto |
-| Android deep link e Play Store | 🧪 IMPLEMENTADO — AGUARDANDO DEVICE | `kindlereader`, `com.kindle.reader` já no app/Manifest; SHA-1 da keystore real e Play Signing pendentes |
+| Android deep link e Play Store | 🟡 MIGRADO LOCALMENTE — AGUARDANDO CONFIG/DEVICE | `aldus`, `com.aldus.reader` no app/Manifest mesclado; Redirect URLs e SHA-1 da keystore real/EAS/Play Signing pendentes |
 
 Auditoria, matriz, migrations, limites e passos externos: `AUTH_IMPLEMENTATION.md`. Nenhum valor de secret foi registrado. O reset EPUB permanece ABERTO. Sem alteração Native nova; não houve APK/reinstalação nesta etapa.
 

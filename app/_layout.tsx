@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import Head from "expo-router/head";
 import { useEffect } from "react";
 import { ActivityIndicator, DimensionValue, Platform, StatusBar, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,15 +18,18 @@ export default function RootLayout() {
   }
 
   return (
-    <AppThemeProvider>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <ReaderSettingsProvider>
-            <AppShell />
-          </ReaderSettingsProvider>
-        </AuthProvider>
-      </SafeAreaProvider>
-    </AppThemeProvider>
+    <>
+      <Head><title>Aldus Reader</title></Head>
+      <AppThemeProvider>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <ReaderSettingsProvider>
+              <AppShell />
+            </ReaderSettingsProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </AppThemeProvider>
+    </>
   );
 }
 

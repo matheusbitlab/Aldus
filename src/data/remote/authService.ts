@@ -8,7 +8,7 @@ import { authDiagnostic, finishAuthDiagnostic } from "@/src/utils/authDiagnostic
 export function authCallbackUrl(next?: "reset-password") {
   const base = Platform.OS === "web"
     ? `${typeof window === "undefined" ? "http://localhost:8081" : window.location.origin}/auth/callback`
-    : "kindlereader://auth/callback";
+    : "aldus://auth/callback";
   return next ? `${base}?next=${next}` : base;
 }
 

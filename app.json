@@ -1,15 +1,20 @@
 {
   "expo": {
-    "name": "Kindle Reader",
-    "slug": "matheus",
+    "name": "Aldus",
+    "slug": "aldus-reader",
     "version": "1.0.0",
     "orientation": "portrait",
     "android": {
-      "package": "com.kindle.reader",
+      "package": "com.aldus.reader",
       "versionCode": 1
     },
     "userInterfaceStyle": "automatic",
-    "scheme": "kindlereader",
+    "scheme": "aldus",
+    "web": {
+      "name": "Aldus Reader",
+      "shortName": "Aldus",
+      "lang": "pt-BR"
+    },
     "plugins": [
       "expo-router",
       "expo-font",

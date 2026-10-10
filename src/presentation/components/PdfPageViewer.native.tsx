@@ -82,7 +82,7 @@ export function PdfPageViewer({ uri, pageNumber, pageMode, fitMode, zoom, rotati
   }, [pageNumber, pageMode, fitMode, zoom, rotation, pdfBase64]);
 
   const source = useMemo(
-    () => ({ html: getPdfViewerHtml(), baseUrl: "https://kindle-reader.local/" }),
+    () => ({ html: getPdfViewerHtml(), baseUrl: "https://aldus-reader.local/" }),
     []
   );
 

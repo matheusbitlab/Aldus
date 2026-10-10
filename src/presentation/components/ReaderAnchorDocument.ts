@@ -101,7 +101,7 @@ export function readerAnchorDocumentScript(): string {
           if(!section){missing++;return;}var model=studyText(section),resolved=resolveStudyAnchor(model.text,a);
           if(resolved.status==='ambiguous'){ambiguous++;return;}if(resolved.status==='missing'){missing++;return;}
           var range=studyRange(model,resolved.start,resolved.end);if(!range){missing++;return;}
-          var key='kindle-study-'+index;CSS.highlights.set(key,new Highlight(range));window.__studyHighlightKeys.push(key);rules+='::highlight('+key+'){background-color:'+(colors[h.colorLabel]||colors.yellow)+';}';
+          var key='aldus-study-'+index;CSS.highlights.set(key,new Highlight(range));window.__studyHighlightKeys.push(key);rules+='::highlight('+key+'){background-color:'+(colors[h.colorLabel]||colors.yellow)+';}';
         });
         var style=document.getElementById('reader-study-highlights');if(!style){style=document.createElement('style');style.id='reader-study-highlights';document.head.appendChild(style);}style.textContent=rules;
         studyReply(request,{status:'rendered',missing:missing,ambiguous:ambiguous});return;

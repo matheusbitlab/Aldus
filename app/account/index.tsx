@@ -11,7 +11,7 @@ export default function Account() {
   const { user, profile, signOut } = useAuth();
   const { palette } = useAppTheme();
   const [error, setError] = useState<string | null>(null);
-  return <AuthGuard><AuthForm title="Conta" subtitle="Seu perfil no Kindle Reader">
+  return <AuthGuard><AuthForm title="Conta" subtitle="Seu perfil no Aldus Reader">
     <View style={{ alignItems: "center", paddingVertical: 12, gap: 8 }}>
       {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={{ width: 72, height: 72, borderRadius: 36 }} /> : <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: palette.surfaceSecondary, alignItems: "center", justifyContent: "center" }}><Ionicons name="person-outline" color={palette.accent} size={30} /></View>}
       <Text style={{ color: palette.text, fontSize: 19, fontWeight: "700" }}>{profile?.display_name || user?.email || "Leitor"}</Text>

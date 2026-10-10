@@ -112,7 +112,7 @@ function StudyContent() {
       await localFlashcards.createDeck({
         id: createFlashcardDeckId(),
         title: title.trim(),
-        description: "Deck local do Kindle Reader",
+        description: "Deck local do Aldus Reader",
         category: category.trim() || "Leitura",
         bookIds: [],
         isGenerated: false,

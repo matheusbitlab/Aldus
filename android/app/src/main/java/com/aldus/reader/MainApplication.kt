@@ -1,4 +1,4 @@
-package com.kindle.reader
+package com.aldus.reader
 
 import android.app.Application
 import android.content.res.Configuration

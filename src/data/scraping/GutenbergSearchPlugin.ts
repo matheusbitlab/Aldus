@@ -5,7 +5,7 @@ export class GutenbergSearchPlugin implements SearchPlugin {
   name = "Gutenberg";
   readonly skipLinkValidation = true;
   readonly supportsQueryFallback = true;
-  get requestHeaders(): Record<string, string> { return { "User-Agent": `KindleReader/1.0 (+${gutenbergContact})` }; }
+  get requestHeaders(): Record<string, string> { return { "User-Agent": `AldusReader/1.0 (+${gutenbergContact})` }; }
   getSearchEndpoint(query: string): string {
     if (!/^(https:\/\/|mailto:)[^\s\r\n]+$/.test(gutenbergContact)) throw new Error("Configure o contato público do aplicativo para usar o OPDS do Gutenberg.");
     return `https://www.gutenberg.org/ebooks/search.opds/?query=${encodeURIComponent(query.trim())}`;

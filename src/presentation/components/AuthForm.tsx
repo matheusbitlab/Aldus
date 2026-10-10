@@ -11,7 +11,7 @@ export function AuthForm({ title, subtitle, children }: { title: string; subtitl
   return <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingTop: Math.max(insets.top, 28), paddingBottom: Math.max(insets.bottom, 28), backgroundColor: palette.background }}>
     <View style={{ width: "100%", maxWidth: 420, alignSelf: "center", gap: 15 }}>
       <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: palette.surfaceSecondary, alignItems: "center", justifyContent: "center" }}><Ionicons name="book-outline" size={27} color={palette.accent} /></View>
-      <Text style={{ color: palette.accent, fontWeight: "700", letterSpacing: 1.2, fontSize: 12 }}>KINDLE READER</Text>
+      <Text style={{ color: palette.accent, fontWeight: "700", letterSpacing: 1.2, fontSize: 12 }}>ALDUS READER</Text>
       <Text accessibilityRole="header" style={{ color: palette.text, fontSize: 28, fontWeight: "700" }}>{title}</Text>
       {subtitle ? <Text style={{ color: palette.secondaryText, lineHeight: 21 }}>{subtitle}</Text> : null}
       {children}

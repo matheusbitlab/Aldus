@@ -16,7 +16,7 @@ export function OrganizationBackupModal({ records, bookIds, onClose, onSaved }: 
       const json = exportOrganizationBackup(await libraryOrganization.list());
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-        const link = document.createElement("a"); link.href = url; link.download = "kindle-organizacao.json"; link.click();
+        const link = document.createElement("a"); link.href = url; link.download = "aldus-organizacao.json"; link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else await Share.share({ title: "Organização da biblioteca", message: json });
       setText(json); setPreview(null); setMessage("Backup gerado. Guarde o JSON para restaurar sua organização.");

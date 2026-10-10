@@ -57,11 +57,11 @@ function loader(mocks) {
   nextError={code:'unexpected_failure',status:500};
   if(baseline){await service.sendRecoveryEmail('fixture@example.invalid');console.log('REPRODUCED baseline: recovery SDK refusal silently accepted');}
   else await assert.rejects(service.sendRecoveryEmail('fixture@example.invalid'),/recuperação agora/);
-  assert.equal(urls.at(-1),'kindlereader://auth/callback?next=reset-password');
+  assert.equal(urls.at(-1),'aldus://auth/callback?next=reset-password');
   if(!baseline){
     const {readAuthCallback}=load('src/data/remote/authCallback.ts');
-    assert.deepEqual(readAuthCallback('kindlereader://auth/callback?next=reset-password#code=fixture').next,'reset-password');
-    assert.equal(readAuthCallback('kindlereader://auth/callback#error_description=Unable+to+exchange+external+code').error_description,'Unable to exchange external code');
+    assert.deepEqual(readAuthCallback('aldus://auth/callback?next=reset-password#code=fixture').next,'reset-password');
+    assert.equal(readAuthCallback('aldus://auth/callback#error_description=Unable+to+exchange+external+code').error_description,'Unable to exchange external code');
     // Remount/same code observes the settled operation instead of consuming it again.
     await service.exchangeCallbackCode('fixture-code');assert.equal(calls,1);
     console.log('PASS recovery exact URL, query/fragment parser, transport failure and bounded same-code exchange');

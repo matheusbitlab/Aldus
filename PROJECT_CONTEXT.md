@@ -1,5 +1,21 @@
 # PROJECT CONTEXT
 
+## Projeto atual: Aldus Reader — identidade/branding, 10/10/2026
+
+Esta seção é o estado canônico atual da identidade e prevalece sobre nomes e identificadores presentes nos registros históricos abaixo.
+
+**IMPLEMENTADO:** identidade pública migrada de Kindle Reader para **Aldus Reader**, com nome curto/Expo **Aldus**. `package.json`/lockfile usam `aldus-reader`; `app.json` usa slug `aldus-reader`, scheme `aldus`, Web name `Aldus Reader`/short name `Aldus` e Android package `com.aldus.reader`. O callback Native passou de `kindlereader://auth/callback` para `aldus://auth/callback`. Namespace/applicationId, classes Kotlin, diretórios Java, Manifest, intent filters, nome Gradle e label Android foram migrados em conjunto. UI de Auth/Conta/Estudo, título Web, origem sintética dos WebViews, nome de download e User-Agent do catálogo também usam Aldus. O repositório remoto já é `matheusbitlab/Aldus` e não foi alterado. O `extra.eas.projectId` foi preservado por ser identificador externo do projeto existente.
+
+**ARQUIVOS PRINCIPAIS ALTERADOS:** `app.json`, `package.json`, `package-lock.json`, `app/_layout.tsx`, telas/componentes com marca visível, `src/data/remote/authService.ts`, `android/app/build.gradle`, `android/settings.gradle`, `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/res/values/strings.xml`, `android/app/src/main/java/com/aldus/reader/{MainActivity,MainApplication}.kt`, testes de Auth/fontes e documentação atual.
+
+**VALIDADO LOCALMENTE:** `npm.cmd run typecheck` PASS; `node scripts/test-auth-callback.cjs`, `node scripts/test-auth-flows.cjs`, `node scripts/test-auth.cjs --auth-only` e `node scripts/test-source-integrations.cjs` PASS; `npm.cmd run export:web` PASS (2319 módulos e `<title>Aldus Reader</title>`); configuração pública do Expo confirmou `name=Aldus`, `slug=aldus-reader`, `scheme=aldus`, Web name `Aldus Reader` e `android.package=com.aldus.reader`; `:app:processDebugMainManifest` PASS e o manifesto mesclado confirmou package/classes/providers `com.aldus.reader`, schemes `aldus` e `exp+aldus-reader`; `git diff --check` PASS.
+
+**PENDENTE — CONFIGURAÇÃO EXTERNA:** no Supabase, cadastrar `aldus://auth/callback` e `aldus://auth/callback?next=reset-password` nas Redirect URLs; remover o callback antigo apenas quando nenhuma build antiga precisar dele. No Google Cloud/Play, registrar `com.aldus.reader` com os SHA-1 dos certificados efetivamente usados (debug/teste, EAS/produção e Play App Signing conforme aplicável). Provider/consentimento/Client Secret permanecem tarefas administrativas; nenhum painel externo foi alterado nesta etapa. O EAS `projectId` existente deve ser conferido antes da próxima build em nuvem, sem regeneração automática.
+
+**NÃO ALTERADO:** Reader, OCR, Reflow, Sources como funcionalidade, Flashcards como funcionalidade, sync, Google Drive, Política de Privacidade, Termos de Uso, Sobre Nós, migrations e configuração remota. Chaves `@kindle/*`, bancos `kindle-*.db`/IndexedDB e formatos `kindle-*` de backup/âncoras foram preservados como contratos legados de persistência para não perder dados nem invalidar imports; não representam a marca pública atual. Caminhos locais `C:\Kindle`/`C:\KIndle`, nomes de documentos históricos e evidências de APK anteriores também foram preservados.
+
+**NÃO TESTADO:** login Google/recovery real depois da troca de callback, entrega de email, retorno Native em aparelho, instalação/upgrade do novo applicationId, APK/AAB final e configurações Supabase/Google/Play. Como `com.aldus.reader` é um novo applicationId para o Android, ele instala como app distinto e não herda automaticamente o sandbox/dados privados de `com.kindle.reader`.
+
 ## Retomada prioritária Reader/Sources/Search — 09/10/2026
 
 Pedido mais recente: continuar todos os bugs da campanha, **EXCETO FLASHCARDS**, cujo trabalho anterior permanece preservado/NÃO ALTERADO nesta fase. Prioridades: trepidação ao arrastar barra; scroll/gestos de Preferências; fontes reais além de Gutendex; pesquisa tolerante. Este checkpoint prevalece para o escopo atual sobre a seção Flashcards seguinte, que registra a fase anterior.
