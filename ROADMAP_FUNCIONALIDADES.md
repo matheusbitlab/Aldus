@@ -1,5 +1,20 @@
 # Roadmap funcional — atualizado em 2026-10-10
 
+## AUTH / CONTA / SEGURANÇA — Etapa 3
+
+Estado: **🟡 CÓDIGO E TESTES CONTROLADOS APROVADOS / REMOTO ADMINISTRATIVO E FLUXOS REAIS BLOQUEADOS**.
+
+- ✅ Auditoria pública reproduzível: Auth saudável; email/Google habilitados; signup permitido; confirmação exigida; oito rotas privadas recusam `anon` com 401/42501 sem leitura de linhas.
+- ✅ Inventário SQL read-only cobre tabelas, colunas/defaults, PK/FK/UNIQUE/CHECK, índices, RLS, policies, grants, triggers, `SECURITY DEFINER`, `search_path` e histórico de migrations.
+- 🟡 Estado real de schema/RLS/migrations/triggers/policies continua **INCONCLUSIVO** sem SQL Editor/credencial administrativa. Nenhuma migration foi reaplicada ou alterada por hipótese.
+- ✅ BUG 5 A–E, logout, guards, conta disabled, cache sem identidade/UUID divergente e offline do mesmo UUID passaram em testes controlados; login válido real/APK segue não testado.
+- 🟡 BUG 6 classifica erros corretamente; signup real → `auth.users` → trigger → profile `user/active` → confirmação/email permanece não testado.
+- 🟡 Google e recovery têm callback Aldus, parser, troca única e erros sanitizados aprovados localmente; Redirect URLs, provider/secret, Auth Logs, template e cadeias reais dependem do operador.
+- ⚠️ `username-login` respondeu 404/`NOT_FOUND`; implantar/proteger a Edge Function antes de considerar login por username disponível.
+- ✅ Contrato local não permite self-promotion nem escrita cliente em role/status/overrides; master amplia features, não privacidade de dados.
+- 🧪 Roteiro transacional A×B/anon/autopromoção/override foi completado, mas contas MASTER/USER, override remoto, execução RLS, Security Advisor e testes funcionais completos ainda não foram executados.
+- ↔️ Flashcards funcionais, Reader, Reflow, OCR, Sources, Search, Drive, sync, anti-enjoo e textos jurídicos não foram alterados.
+
 ## LEGAL, PRIVACIDADE E SOBRE — Etapa 2
 
 Estado: **🟡 IMPLEMENTADO LOCALMENTE / REVISÃO JURÍDICA E VALIDAÇÃO OPERACIONAL PENDENTES**.

@@ -1,5 +1,13 @@
 # Campanha de correção dos bugs do APK
 
+## Etapa 3 — fechamento Auth/RLS, checkpoint 10/10/2026
+
+Auditoria remota administrativa **BLOQUEADA**: somente configuração pública disponível; CLI `npx` sem binário Windows, sem Dashboard/DB/SQL Editor autenticado. Nenhum SQL, migration, usuário ou configuração externa foi alterado. A sonda pública confirmou Auth 200/GoTrue v2.197.0, email/Google ativos, signup permitido e confirmação exigida; oito endpoints REST recusaram `anon` com 401/42501 e `username-login` retornou 404. Recusa pública não foi promovida a prova de RLS/policies/schema.
+
+BUG 5: A–E/SDK/guards revalidados **PASS controlado**; incidente físico e conta válida real continuam **PARCIAIS / NÃO TESTADOS**. BUG 6: validação e categorias sanitizadas **PASS controlado**; signup, trigger/profile, policy, rate limit e email reais **BLOQUEADOS EXTERNAMENTE**. BUG 4: pipeline local, callback Aldus, troca PKCE single-use e sanitização **PASS controlado**; causa Google→Supabase requer Auth Logs/provider e permanece **BLOQUEADA EXTERNAMENTE**. BUG 7: URL `aldus://auth/callback?next=reset-password`, parsing e erros operacionais **PASS controlado**; Site URL/Redirect URLs/template/entrega/reset/login reais seguem **BLOQUEADOS EXTERNAMENTE**.
+
+Migrations históricas preservadas, sem reaplicação. `supabase/audit/01_inventory.sql` foi ampliado para todas as propriedades exigidas; `scripts/audit-supabase-public.cjs` registra somente status/metadados públicos sanitizados; `supabase/tests/rls_manual.sql` agora cobre A→B, B→A, autopromoção, override, legados e `anon` dentro de rollback. Master/user, execução RLS real, conta disabled remota e Security Advisor **NÃO TESTADOS**; a tentativa PostgreSQL WASM não iniciou porque `.expo/flashcard-db-test` está ausente. Flashcards funcionais e demais áreas fora do Auth **NÃO ALTERADOS**. Gates: audit público, auth-flows, auth-only, auth-callback, typecheck, export Web 2331 e diff check PASS. Android local: `com.aldus.reader`; SHA-1 da chave debug versionada `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`, não equivalente a EAS/produção/Play.
+
 ## Nova campanha por evidência de drag — 09/10/2026
 
 Novo pedido prevalece sobre a fase Flashcards: **FLASHCARDS FORA DO ESCOPO / NÃO ALTERADO a partir desta retomada**. Trabalho anterior preservado; hashes congelados em `.expo/reader-campaign-flashcards-baseline.json`. Branch master/HEAD 77c490c, 46 arquivos rastreados modificados (+2097/-545), documentos/testes novos; nenhum descarte Git. Documentos de progresso, diagnóstico, interrupções, contextos EPUB, projeto/roadmap e Auth consultados. Estados históricos abaixo continuam válidos somente para os cenários registrados.
