@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Redirect, router } from "expo-router";
 import { Text, View } from "react-native";
-import { AuthButton, AuthError, AuthForm, AuthInput, AuthLink } from "@/src/presentation/components/AuthForm";
+import { AuthButton, AuthError, AuthForm, AuthInput, AuthLegalNotice, AuthLink } from "@/src/presentation/components/AuthForm";
 import { loginWithGoogle, loginWithIdentifier } from "@/src/data/remote/authService";
 import { useAuth } from "@/src/presentation/contexts/AuthContext";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
@@ -49,5 +49,6 @@ export default function Login() {
     <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}><View style={{ flex: 1, height: 1, backgroundColor: palette.border }} /><Text style={{ color: palette.secondaryText }}>ou</Text><View style={{ flex: 1, height: 1, backgroundColor: palette.border }} /></View>
     <AuthButton title="Continuar com Google" icon="logo-google" secondary disabled={busy} onPress={() => void google()} />
     <AuthLink title="Não tem conta? Criar conta" href="/auth/signup" />
+    <AuthLegalNotice intro="Antes de entrar, consulte os documentos aplicáveis:" />
   </AuthForm>;
 }

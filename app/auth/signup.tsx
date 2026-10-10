@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Redirect, router } from "expo-router";
 import { Text } from "react-native";
-import { AuthButton, AuthError, AuthForm, AuthInput, AuthLink } from "@/src/presentation/components/AuthForm";
+import { AuthButton, AuthError, AuthForm, AuthInput, AuthLegalNotice, AuthLink } from "@/src/presentation/components/AuthForm";
 import { loginWithGoogle, registerAccount } from "@/src/data/remote/authService";
 import { useAuth } from "@/src/presentation/contexts/AuthContext";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
@@ -52,6 +52,7 @@ export default function Signup() {
     <AuthInput label="Senha" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" />
     <AuthInput label="Confirmar senha" value={confirmation} onChangeText={setConfirmation} secureTextEntry autoComplete="new-password" />
     <AuthError message={error} />
+    <AuthLegalNotice intro="Ao criar uma conta, você declara que leu" />
     <AuthButton title={busy ? "Aguarde…" : "Criar conta"} disabled={busy} onPress={() => void submit()} />
     <AuthButton title="Continuar com Google" icon="logo-google" secondary disabled={busy} onPress={() => void google()} />
     <AuthLink title="Já tem conta? Entrar" href="/auth/login" />

@@ -46,7 +46,7 @@ function harness(options = {}) {
       : Promise.resolve({ data: [], error: null }) }) }),
   };
   const router = { replace: route => { navigation.push(route); if (options.routerError) throw new Error('CONTROLLED_ROUTER_FAILURE'); } };
-  const form = Object.fromEntries(['AuthForm', 'AuthInput', 'AuthButton', 'AuthError', 'AuthLink'].map(key => [key, key]));
+  const form = Object.fromEntries(['AuthForm', 'AuthInput', 'AuthButton', 'AuthError', 'AuthLink', 'AuthLegalNotice'].map(key => [key, key]));
   const dependencies = {
     react: React, 'react/jsx-runtime': testRequire('react/jsx-runtime'),
     'react-native': { Platform: { OS: 'android' }, View: 'View', Text: 'Text', ActivityIndicator: 'ActivityIndicator' },

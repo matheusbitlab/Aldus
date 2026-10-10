@@ -9,6 +9,7 @@ import { SourceManagerModal } from "@/src/presentation/components/SourceManagerM
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { AppThemeMode } from "@/src/theme/tokens";
 import { useAuth } from "@/src/presentation/contexts/AuthContext";
+import { getAppMetadata } from "@/src/legal/appMetadata";
 
 const themeOptions: Array<{ value: AppThemeMode; label: string }> = [
   { value: "system", label: "Sistema" },
@@ -22,6 +23,7 @@ export default function Settings() {
   const { profile, user } = useAuth();
   const [sourcesVisible, setSourcesVisible] = useState(false);
   const [readerSettingsVisible, setReaderSettingsVisible] = useState(false);
+  const appMetadata = getAppMetadata();
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
@@ -119,6 +121,24 @@ export default function Settings() {
               onPress={() => router.push("/services/mec" as never)}
               last
             />
+          </View>
+        </Section>
+
+        <Section title="LEGAL E INFORMAÇÕES" color={palette.secondaryText}>
+          <View style={[styles.group, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <SettingsRow icon="information-circle-outline" title="Sobre o Aldus Reader" description="Proposta, história do nome e princípios" color={palette.text} secondaryColor={palette.secondaryText} onPress={() => router.push("/legal/about" as never)} />
+            <View style={[styles.divider, { backgroundColor: palette.separator }]} />
+            <SettingsRow icon="shield-checkmark-outline" title="Política de Privacidade" description="Dados locais, conta, terceiros e direitos" color={palette.text} secondaryColor={palette.secondaryText} onPress={() => router.push("/legal/privacy" as never)} />
+            <View style={[styles.divider, { backgroundColor: palette.separator }]} />
+            <SettingsRow icon="document-text-outline" title="Termos de Uso" description="Condições e responsabilidades de uso" color={palette.text} secondaryColor={palette.secondaryText} onPress={() => router.push("/legal/terms" as never)} />
+            <View style={[styles.divider, { backgroundColor: palette.separator }]} />
+            <SettingsRow icon="book-outline" title="Direitos Autorais e Conteúdo" description="Livros, fontes, notas e comunicação" color={palette.text} secondaryColor={palette.secondaryText} onPress={() => router.push("/legal/copyright" as never)} />
+            <View style={[styles.divider, { backgroundColor: palette.separator }]} />
+            <SettingsRow icon="code-slash-outline" title="Licenças de terceiros" description="Pacotes, versões e textos de licença" color={palette.text} secondaryColor={palette.secondaryText} onPress={() => router.push("/legal/licenses" as never)} />
+            <View style={[styles.divider, { backgroundColor: palette.separator }]} />
+            <SettingsRow icon="server-outline" title="Privacidade e Dados" description="Resumo prático de onde os dados ficam" color={palette.text} secondaryColor={palette.secondaryText} onPress={() => router.push("/legal/data" as never)} />
+            <View style={[styles.divider, { backgroundColor: palette.separator }]} />
+            <SettingsRow icon="pricetag-outline" title="Versão do aplicativo" description={`${appMetadata.version} · build ${appMetadata.build}`} color={palette.text} secondaryColor={palette.secondaryText} onPress={() => router.push("/legal/version" as never)} last />
           </View>
         </Section>
       </ScrollView>

@@ -63,6 +63,13 @@ function AppShell() {
           {loading ? <View style={styles.fontLoading}><ActivityIndicator color={palette.accent} /></View> :
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
+              <Stack.Screen name="legal/privacy" />
+              <Stack.Screen name="legal/terms" />
+              <Stack.Screen name="legal/copyright" />
+              <Stack.Screen name="legal/licenses" />
+              <Stack.Screen name="legal/data" />
+              <Stack.Screen name="legal/about" />
+              <Stack.Screen name="legal/version" />
               <Stack.Protected guard={appReady}>
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="reader/[bookId]" />

@@ -1,5 +1,20 @@
 # Roadmap funcional — atualizado em 2026-10-10
 
+## LEGAL, PRIVACIDADE E SOBRE — Etapa 2
+
+Estado: **🟡 IMPLEMENTADO LOCALMENTE / REVISÃO JURÍDICA E VALIDAÇÃO OPERACIONAL PENDENTES**.
+
+- ✅ Sete entradas em Ajustes: Sobre, Privacidade, Termos, Direitos Autorais, Licenças, resumo Privacidade e Dados e versão/build em runtime.
+- ✅ Política de Privacidade e Termos públicos antes do login; Cadastro informa leitura sem consentimento genérico.
+- ✅ Conteúdo baseado no fluxo real de dados locais, Supabase/Google, catálogos, WebViews, sensores, diagnósticos e batalha.
+- ✅ Textos longos roláveis, retorno e temas claro/escuro validados no Web exportado; links externos conectados.
+- ✅ Avisos gerados para 37 dependências diretas de runtime, com agrupamento, busca e verificação de desatualização.
+- ✅ LGPD, Marco Civil e Direitos Autorais tratados como referências, sem alegação de conformidade definitiva.
+- 🟡 Configurar controlador e contato validados via `EXPO_PUBLIC_LEGAL_CONTROLLER_NAME` e `EXPO_PUBLIC_LEGAL_CONTACT_EMAIL`.
+- 🟡 Revisão jurídica: bases por finalidade, retenção, exclusão de conta, titulares, encarregado, menores, contratos e transferências.
+- 🟡 Auditoria de licenças transitivas/nativas e teste visual em Android/iOS físico antes de publicação comercial.
+- ↔️ OCR, Drive, sync, Reader/Reflow/Search/Sources, anti-enjoo, Flashcards e cobrança não tiveram comportamento alterado.
+
 ## IDENTIDADE / BRANDING — Aldus Reader
 
 Estado: **🟡 IMPLEMENTADO E VALIDADO LOCALMENTE / CONFIGURAÇÃO EXTERNA PENDENTE**.

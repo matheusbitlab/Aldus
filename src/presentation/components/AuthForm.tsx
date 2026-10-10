@@ -48,6 +48,18 @@ export function AuthLink({ title, href }: { title: string; href: string }) {
   return <Pressable accessibilityRole="link" onPress={() => router.push(href as never)} style={{ minHeight: 44, justifyContent: "center" }}><Text style={{ color: palette.accent, fontWeight: "600", textAlign: "center" }}>{title}</Text></Pressable>;
 }
 
+export function AuthLegalNotice({ intro }: { intro: string }) {
+  const { palette } = useAppTheme();
+  return <View style={{ alignItems: "center", gap: 5, paddingHorizontal: 6 }}>
+    <Text style={{ color: palette.secondaryText, fontSize: 12, lineHeight: 18, textAlign: "center" }}>{intro}</Text>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: 5 }}>
+      <Pressable accessibilityRole="link" onPress={() => router.push("/legal/terms" as never)} style={{ minHeight: 34, justifyContent: "center" }}><Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" }}>Termos de Uso</Text></Pressable>
+      <Text style={{ color: palette.secondaryText, fontSize: 12 }}>e a</Text>
+      <Pressable accessibilityRole="link" onPress={() => router.push("/legal/privacy" as never)} style={{ minHeight: 34, justifyContent: "center" }}><Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" }}>Política de Privacidade</Text></Pressable>
+    </View>
+  </View>;
+}
+
 export function AuthError({ message }: { message: string | null }) {
   const { palette } = useAppTheme();
   return message ? <Text accessibilityRole="alert" style={{ color: palette.accent, lineHeight: 20 }}>{message}</Text> : null;

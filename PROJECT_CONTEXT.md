@@ -1,5 +1,21 @@
 # PROJECT CONTEXT
 
+## Etapa 2 — Legal, Privacidade e Sobre, 10/10/2026
+
+**IMPLEMENTADO:** seção **Legal e Informações** em Ajustes, com Sobre o Aldus Reader, Política de Privacidade, Termos de Uso, Direitos Autorais e Conteúdo, Licenças de terceiros, Privacidade e Dados e versão/build derivados da configuração em execução. Privacidade e Termos também estão acessíveis em Login e Cadastro, fora do guard autenticado. O cadastro declara leitura dos documentos sem criar consentimento geral.
+
+Os textos públicos partem de auditoria do repositório: biblioteca/leitura/estudo individual predominantemente locais; Auth/perfil no Supabase; Google opcional; consultas e downloads diretos de catálogos; WebViews BibliON/MEC; sensor de movimento processado em memória; batalha de flashcards potencialmente remota. Retenção, controlador, canal legal, encarregado, transferências e aplicação das regras remotas não foram inventados. `EXPO_PUBLIC_LEGAL_CONTROLLER_NAME` e `EXPO_PUBLIC_LEGAL_CONTACT_EMAIL` permitem publicar identidade/canal depois da validação.
+
+**LICENÇAS:** `scripts/generate-third-party-notices.cjs` gera `THIRD_PARTY_NOTICES.md` e `src/legal/thirdPartyNotices.generated.ts` a partir das 37 dependências diretas de runtime, agrupando textos idênticos. A tela permite busca e abertura dos textos sob demanda. Auditoria transitiva/nativa continua pendente antes de distribuição comercial.
+
+**LIMITES DECLARADOS:** implementação jurídica inicial, sem alegação de conformidade definitiva. Revisão profissional, operação de direitos dos titulares, exclusão de conta, retenção remota, suboperadores/transferências, proteção de menores e conferência do ambiente Supabase/Google ainda são pendências. Detalhes e TODOs internos em `LEGAL_IMPLEMENTATION_NOTES.md`.
+
+**PENDENTE:** preencher controlador e contato validados, definir processos operacionais e concluir revisão jurídica. **NÃO TESTADO:** Android/iOS físico, canal real de titulares e ambiente remoto sob estas políticas. **INCONCLUSIVO:** identidade do controlador/encarregado, bases definitivas por finalidade, prazos de retenção e transferências internacionais não podem ser determinados apenas pelo código.
+
+**ESCOPO FUNCIONAL PRESERVADO:** nenhum fluxo de OCR, Drive, sync, Reader, Reflow, Search, Sources, anti-enjoo, Flashcards, cobrança ou conteúdo pré-existente foi alterado; a etapa acrescenta informação, rotas e navegação legal. A versão do app não foi duplicada em string fixa.
+
+**VALIDAÇÃO:** `npm run typecheck`, `npm run test:legal`, `npm run legal:notices:check`, `npm run export:web` e `git diff --check`. No Web exportado, `npm run test:legal:browser` confirmou paletas clara/escura distintas, rolagem da Política até o fim (4138/4138) e retorno direto para Login. Android/iOS físico ainda não foi testado nesta etapa.
+
 ## Projeto atual: Aldus Reader — identidade/branding, 10/10/2026
 
 Esta seção é o estado canônico atual da identidade e prevalece sobre nomes e identificadores presentes nos registros históricos abaixo.
