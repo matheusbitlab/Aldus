@@ -7,6 +7,7 @@ export interface LibraryBook {
   remotePath?: string | null;
   localEvictionPath?: string;
   remoteCleanupDone?: boolean;
+  syncUnjournaled?: boolean;
   id: string;
   title: string;
   author: string;

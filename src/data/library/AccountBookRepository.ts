@@ -2,15 +2,19 @@ import { LibraryBook } from "@/src/domain/entities/LibraryBook";
 import { BookRepository } from "@/src/domain/repositories/BookRepository";
 import { LibraryAccountScope, libraryAccountScope } from "./LibraryAccountScope";
 import { findBundledAsset } from './BundledBookIdentity';
+import { LibrarySyncService } from './LibrarySyncService';
+import { bookSyncPayload, libraryMutationEvents } from './LibrarySyncPayload';
 
 export interface LocalBookStorage extends BookRepository { listAll(): Promise<LibraryBook[]>; }
 export class AccountBookRepository implements BookRepository {
-  constructor(readonly storage: LocalBookStorage, readonly scope: LibraryAccountScope = libraryAccountScope) {}
+  private sync?: LibrarySyncService;
+  attachSync(sync: LibrarySyncService) { this.sync=sync; }
+  constructor(private readonly storage: LocalBookStorage, readonly scope: LibraryAccountScope = libraryAccountScope) {}
   async listOwned() { const run=this.scope.capture(); const books=await this.storage.listAll(); run.check(); return run.userId ? books.filter(book=>book.ownerUserId===run.userId) : []; }
   async listActive() {
     const run = this.scope.capture();
     const books = await this.storage.listActive(); run.check();
-    return run.userId ? books.filter(book => book.ownerUserId === run.userId) : [];
+    return run.userId ? books.filter(book => book.ownerUserId === run.userId && book.importComplete !== false) : [];
   }
   async findById(id: string) {
     const run = this.scope.capture();
@@ -23,12 +27,24 @@ export class AccountBookRepository implements BookRepository {
     const previous = (await this.storage.listAll()).find(item => item.id === book.id); run.check();
     if (previous && previous.ownerUserId !== run.userId) throw new Error("Este livro não pertence à conta atual.");
     if (book.ownerUserId !== undefined && book.ownerUserId !== run.userId) throw new Error("Conta do livro incompatível.");
-    await this.storage.save({ ...book, ownerUserId: run.userId }); run.check();
+    const owned = { ...book, ownerUserId: run.userId };
+    if (!this.sync || book.importComplete === false) { await this.storage.save(owned); run.check(); return; }
+    if (!previous || previous.importComplete === false) {
+      // Import success is local first. A durable book marker repairs an outbox failure.
+      await this.storage.save({ ...owned, syncUnjournaled: true }); run.check();
+      try { await this.sync.remember('book',book.id,book.id,bookSyncPayload(owned),book.isDeleted);
+        run.check(); await this.storage.save({ ...owned, syncUnjournaled: false }); }
+      catch { libraryMutationEvents.failedJournal(); }
+    } else await this.sync.change('book',book.id,book.id,bookSyncPayload(owned),book.isDeleted,()=>this.storage.save(owned));
+    run.check(); libraryMutationEvents.notify();
   }
   async softDelete(id: string) {
     const run = this.scope.capture();
     if (!await this.findById(id)) throw new Error("Livro não disponível nesta conta."); run.check();
-    await this.storage.softDelete(id); run.check();
+    const book=await this.findById(id);run.check();
+    if (this.sync) await this.sync.change('book',id,id,bookSyncPayload(book!),true,()=>this.storage.softDelete(id));
+    else await this.storage.softDelete(id);
+    run.check();libraryMutationEvents.notify();
   }
   async listLegacy() {
     const run = this.scope.capture();
@@ -47,6 +63,7 @@ export class AccountBookRepository implements BookRepository {
         ...(bundled ? { bundledAssetId: bundled.id, ...(book.filePath.startsWith('bundled-') ? { fileHash: bundled.hash, fileSize: bundled.size } : {}) } : {}) });
     }
     run.check();
+    libraryMutationEvents.notify();
   }
 }
 

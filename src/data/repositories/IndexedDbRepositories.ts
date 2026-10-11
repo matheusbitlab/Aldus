@@ -34,8 +34,8 @@ export class IndexedDbChapterRepository implements ChapterRepository {
 }
 
 export class IndexedDbReadingProgressRepository implements ReadingProgressRepository {
-  async findByBookId(bookId: string): Promise<ReadingProgress | null> { return (await webGetAll<ReadingProgress>("reading_progress")).find((item) => item.bookId === bookId) ?? null; }
-  async save(progress: ReadingProgress): Promise<void> { await webPut("reading_progress", progress); }
+  async findByBookId(bookId: string): Promise<ReadingProgress | null> { return (await webGetAllPersistent<ReadingProgress>("reading_progress")).find((item) => item.bookId === bookId) ?? null; }
+  async save(progress: ReadingProgress): Promise<void> { await webPutPersistent("reading_progress", progress); }
 }
 
 export class IndexedDbBookmarkRepository implements BookmarkRepository {

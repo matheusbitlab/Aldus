@@ -1,6 +1,6 @@
 import { newLibraryId } from '@/src/domain/entities/libraryId';
 import { LibraryAccountScope, libraryAccountScope } from './LibraryAccountScope';
-import { LibraryEntityKind, LibraryRemoteAdapter, LibrarySyncEntry, LibrarySyncPersistence, RemoteLibraryRow, syncKey, validateRemoteRow } from '@/src/domain/types/librarySync';
+import { equalSyncPayload, LibraryEntityKind, LibraryRemoteAdapter, LibrarySyncEntry, LibrarySyncPersistence, RemoteLibraryRow, syncKey, validateRemoteRow } from '@/src/domain/types/librarySync';
 
 export interface LibrarySyncStatus { running: boolean; pending: number; conflicts: number; lastSync: number | null; error: string | null; }
 export class LibrarySyncService {
@@ -11,11 +11,12 @@ export class LibrarySyncService {
     const job=this.localQueue.catch(()=>undefined).then(operation);this.localQueue=job;return job;
   }
   status: LibrarySyncStatus = { running: false, pending: 0, conflicts: 0, lastSync: null, error: null };
-  constructor(readonly persistence: LibrarySyncPersistence, private remote: LibraryRemoteAdapter,
+  constructor(private readonly persistence: LibrarySyncPersistence, private remote: LibraryRemoteAdapter,
     private applyLocal: (owner: string, entry: LibrarySyncEntry) => Promise<void>, private scope: LibraryAccountScope = libraryAccountScope) {
     scope.subscribe(() => { this.active?.controller.abort(); this.status = { running: false, pending: 0, conflicts: 0, lastSync: null, error: null }; this.emit(); });
   }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  async snapshot() { const run=this.scope.capture();if(!run.userId)return null;const state=await this.persistence.read(run.userId);run.check();return state; }
   private emit() { for (const listener of this.listeners) listener(); }
   async refreshStatus() {
     const run = this.scope.capture();
@@ -33,21 +34,57 @@ export class LibrarySyncService {
   private async changeNow(kind: LibraryEntityKind, id: string, bookId: string, payload: Record<string, any>, deleted: boolean, write: () => Promise<void>) {
     const run = this.scope.capture(); if (!run.userId) throw new Error('Entre na sua conta.');
     const owner = run.userId, key = syncKey(kind,id), operationId = newLibraryId();
+    let unchanged = false;
+    let prior: LibrarySyncEntry | undefined;
     await this.persistence.mutate(owner, state => {
       const old = state.entries[key];
+      prior=old ? JSON.parse(JSON.stringify(old)) : undefined;
+      if (old?.ready && !old.conflict && old.deleted === deleted && equalSyncPayload(old.payload,payload)) { unchanged = true; return; }
       if (old?.shadow?.deleted_at) throw new Error('Item removido da biblioteca da conta. Importe novamente para criar outra identidade.');
       state.entries[key] = { key,kind,id,bookId,payload,deleted,dirty:true,ready:false,operationId,baseRevision:old?.shadow?.revision??0,shadow:old?.shadow };
     }); run.check();
-    await write(); run.check();
-    await this.persistence.mutate(owner, state => { if (state.entries[key]?.operationId === operationId) state.entries[key].ready = true; });
+    try { await write(); }
+    catch(error) {
+      if((error as {code?:string})?.code==='LOCAL_REVISION_CONFLICT')await this.persistence.mutate(owner,state=>{
+        if(state.entries[key]?.operationId===operationId) { if(prior)state.entries[key]=prior;else delete state.entries[key]; }
+      });
+      throw error;
+    }
+    run.check();
+    if (!unchanged) await this.persistence.mutate(owner, state => { if (state.entries[key]?.operationId === operationId) state.entries[key].ready = true; });
     await this.refreshStatus();
   }
   async remember(kind: LibraryEntityKind, id: string, bookId: string, payload: Record<string, any>, deleted: boolean) {
     const run=this.scope.capture(); if(!run.userId) return;
     const previous=(await this.persistence.read(run.userId)).entries[syncKey(kind,id)]; run.check();
-    if(previous && previous.deleted===deleted && JSON.stringify(previous.payload)===JSON.stringify(payload)) return;
+    if(previous && previous.deleted===deleted && equalSyncPayload(previous.payload,payload)) return;
     if(previous?.shadow?.deleted_at || previous?.conflict) return;
     await this.change(kind,id,bookId,payload,deleted,async()=>undefined);
+  }
+  async seed(kind: LibraryEntityKind, id: string, bookId: string, read: () => Promise<Record<string, any>>, deleted = false, force = false) {
+    const run=this.scope.capture();if(!run.userId)return;
+    return this.exclusive(async()=>{
+      run.check();const old=(await this.persistence.read(run.userId!)).entries[syncKey(kind,id)];run.check();
+      if(old && ((!force && old.dirty) || old.conflict || old.deleted || old.shadow?.deleted_at))return;
+      const payload=await read();run.check();await this.changeNow(kind,id,bookId,payload,deleted,async()=>undefined);
+    });
+  }
+  async batch<T>(kind: LibraryEntityKind, prepare: () => Promise<Array<{id:string;bookId:string;payload:Record<string,any>}>>, write: () => Promise<T>): Promise<T> {
+    const run=this.scope.capture();if(!run.userId)throw new Error('Entre na sua conta.');
+    return this.exclusive(async()=>{
+      run.check();const entries=await prepare();run.check();const operations=new Map<string,string>();
+      await this.persistence.mutate(run.userId!,state=>{
+        for(const item of entries) {
+          const key=syncKey(kind,item.id),old=state.entries[key];
+          if(old?.shadow?.deleted_at)throw new Error('Item removido da biblioteca.');
+          if(old?.ready&&!old.conflict&&!old.deleted&&equalSyncPayload(old.payload,item.payload))continue;
+          const operationId=newLibraryId();operations.set(key,operationId);
+          state.entries[key]={key,kind,id:item.id,bookId:item.bookId,payload:item.payload,deleted:false,dirty:true,ready:false,operationId,baseRevision:old?.shadow?.revision??0,shadow:old?.shadow};
+        }
+      });run.check();const result=await write();run.check();
+      await this.persistence.mutate(run.userId!,state=>{for(const [key,operationId] of operations)if(state.entries[key]?.operationId===operationId)state.entries[key].ready=true;});
+      await this.refreshStatus();return result;
+    });
   }
   sync(): Promise<void> {
     const owner = this.scope.userId;

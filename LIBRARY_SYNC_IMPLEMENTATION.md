@@ -89,3 +89,19 @@ APK bloco3 94b6ecb PASS: C:/Kindle/artifacts/apk/Aldus-94b6ecb.apk,157812334byte
 
 PENDENTE: wiring/triggers/leitura/UI/legal/matriz final (blocos5?8). Checkpoint APK ap?s commit ? artifacts/apk/checkpoint.jsonl, n?o reutilizar APK de outro hash.
 Gates finais bloco4 PASS: typecheck, import, account, sync, files, RLS PostgreSQL controlado, legal/notices, export:web e diff check. Assets com cache já processado conservam caminho/capítulos/progresso. Próximo passo: staged review/commit/build oficial e conferir APK antes do bloco5.
+
+## Bloco 5 ? dados de leitura e liga??o aos repositories
+
+IMPLEMENTADO: composition root conecta AccountBookRepository e child/organization repositories ? engine; raw repositories ficam internos. LibraryLocalReplica faz apply/seed com owner+epoch, allowlist de campos, colis?es de IDs negadas e rejei??o de caminhos locais remotos. Livro recebido vira metadados/caminho vazio ou asset bundled com SHA confi?vel. UI ainda n?o dispara rede; ativa??o/gatilhos no bloco6. Import incomplete oculto; import completo gravado primeiro com syncUnjournaled dur?vel, falha de outbox n?o desfaz livro v?lido e pr?ximo seed recupera. Book normal/DELETE usa write-ahead. Seed l? dado atual dentro da fila exclusiva; preserva dirty/conflict/tombstone; equality can?nica evita eco de pulls.
+
+Progresso bidirecional com chapter/CFI/p?gina/percentual; updatedAt local n?o arbitra conflito. Marcadores/notas e grifos/coment?rios usam entidades est?veis independentes, remove offline vira tombstone individual. Favoritos, cole??es, tags, s?rie/volume/status e t?tulo/autor personalizados via organization, por livro; capa extra?da/customizada n?o enviada. PDF sincroniza modo e posi??es pr?prias Original/Reflow; apar?ncia/cache/OCR ficam no dispositivo. Recursos de estudo continuam limitados aos modos que j? os oferecem.
+
+Backups: importPreservingExisting mant?m atomicidade/idempot?ncia e seed recupera entidades novas; organization merge mant?m transa??o existente com intents de entidades escritas antecipadamente em lote. Revision conflict local rejeitado n?o vira replay: fila anterior restaurada por operationId. Guardas verificam key==bookId no merge, n?o apenas keys de UI. WebProgress agora estritamente IndexedDB; Blob save/delete verificam conta al?m do get. Dados j? locais n?o s?o destru?dos por ownership ou falha remota.
+
+VALIDADO CONTROLADO: duas bases SQLite reais com repositories completos, replica+journal e backend controlado: import local/offline, cloud metadata, A?B?A/progresso .9?.1+?ncora, marcadores independentes/edit notes/comments, exclus?es offline, favorito/cole??o/tags, posi??es PDF separadas, apar?ncia local, merge, conflict revision local n?o reaplicado, aus?ncia de QUALQUER novo RPC por eco de pull, tombstone vs nota offline e A/logout/B PASS. ReaderScreen regression/Import/StudyStorage/Organization PASS; typecheck e export:web PASS antes dos ?ltimos ajustes de batch. Gates finais abaixo.
+
+APK bloco4 1e5cae9 PASS: C:/Kindle/artifacts/apk/Aldus-1e5cae9.apk,251434314bytes, build oficial2m20s/981tasks. Aumento de tamanho inclui os PDFs bundled do diret?rio correto, antes n?o inclu?dos por aquele cat?logo. Hash/arquivo ignorado/n?o rastreado/worktree limpo conferidos. Android f?sico N?O TESTADO (ADB sem aparelhos). RLS/Storage REMOTO PENDENTE; migrations1+2 N?O APLICADAS. Sem admin: deploy BLOQUEADO EXTERNAMENTE/invent?rio INCONCLUSIVO.
+
+PENDENTE: gatilhos/UI/open sob demanda/cleanup remoto ligado e legal final, testes integra??o/restart/browser (blocos6?8). APK bloco5 obrigat?rio logo ap?s commit, ledger local artifacts/apk/checkpoint.jsonl. Os APKs dos hashes3be78c6/d77f6e8 ainda exigem build isolado para recupera??o das pend?ncias iniciais.
+
+Gates finais bloco5 PASS: typecheck, test:library:reading, test:library:sync, export:web e git diff --check. Staged review por lista explicita; APK oficial em seguida.

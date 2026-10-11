@@ -22,6 +22,11 @@ export interface LibraryRemoteAdapter {
   apply(owner: string, entry: LibrarySyncEntry, signal: AbortSignal): Promise<{ accepted: boolean; row: RemoteLibraryRow }>;
 }
 export const syncKey = (kind: LibraryEntityKind, id: string) => `${kind}:${id}`;
+export function equalSyncPayload(a: Record<string, any>, b: Record<string, any>) {
+  const canonical = (value: any): any => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+}
 export function emptySyncState(owner: string): LibrarySyncState { return { id: owner, entries: {}, lastSync: null }; }
 export function validateRemoteRow(row: RemoteLibraryRow, owner: string): void {
   if (!row || row.user_id !== owner || !libraryEntityKinds.includes(row.kind) || !row.id || !row.book_id

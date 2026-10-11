@@ -8,8 +8,9 @@ interface StoredBookFile {
 }
 
 export class WebBookFileStore {
-  constructor(private readonly canRead?: (bookId: string) => Promise<boolean>) {}
+  constructor(private readonly canRead?: (bookId: string) => Promise<boolean>, private readonly canWrite?: (bookId: string) => Promise<boolean>) {}
   async save(bookId: string, fileName: string, file: Blob): Promise<void> {
+    if(this.canWrite && !await this.canWrite(bookId))throw new Error('Arquivo não disponível nesta conta.');
     await webPutPersistent("documents", {
       id: bookId,
       data: file,
@@ -26,6 +27,7 @@ export class WebBookFileStore {
   }
 
   async delete(bookId: string): Promise<void> {
+    if(this.canWrite && !await this.canWrite(bookId))throw new Error('Arquivo não disponível nesta conta.');
     await webDeletePersistent("documents", bookId);
   }
 }

@@ -35,8 +35,8 @@ export class LibraryOrganizationStore implements LibraryOrganizationRepository {
     return this.enqueue(async () => {
       const records = await this.read();
       const previous = records[record.bookId];
-      if (previous && previous.revision !== record.revision - 1) throw new Error("Este livro foi alterado em outra janela. Reabra a organização antes de salvar.");
-      if (!previous && record.revision !== 1) throw new Error("A versão inicial deste registro é inválida.");
+      if (previous && previous.revision !== record.revision - 1) throw Object.assign(new Error("Este livro foi alterado em outra janela. Reabra a organização antes de salvar."),{code:'LOCAL_REVISION_CONFLICT'});
+      if (!previous && record.revision !== 1) throw Object.assign(new Error("A versão inicial deste registro é inválida."),{code:'LOCAL_REVISION_CONFLICT'});
       records[record.bookId] = record;
       await this.storage.setItem(LIBRARY_ORGANIZATION_KEY, JSON.stringify(Object.values(records)));
     });
