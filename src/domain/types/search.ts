@@ -1,4 +1,6 @@
 export interface ScrapedLink {
+  remoteBookId?: string;
+  modifiedAt?: string;
   sourceId?: string;
   drive?: { fileId: string; resourceKey?: string; modifiedTime?: string; canDownload?: boolean };
 	url: string;

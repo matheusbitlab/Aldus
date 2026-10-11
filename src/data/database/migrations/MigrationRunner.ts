@@ -16,6 +16,9 @@ const migrations: Migration[] = [{ version: 1, statements: [
   "CREATE TABLE IF NOT EXISTS web_search_history (id TEXT PRIMARY KEY NOT NULL, query TEXT NOT NULL, results_count INTEGER NOT NULL DEFAULT 0, searched_at INTEGER NOT NULL);"
 ]}, { version: 2, statements: [
   "CREATE TABLE IF NOT EXISTS pdf_reflow_cache (book_id TEXT PRIMARY KEY NOT NULL, source_signature TEXT NOT NULL, processor_version INTEGER NOT NULL, document_json TEXT NOT NULL, updated_at INTEGER NOT NULL, FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE);"
+]}, { version: 3, statements: [
+  "CREATE TABLE IF NOT EXISTS source_catalogs (source_id TEXT PRIMARY KEY NOT NULL, snapshot_json TEXT NOT NULL);",
+  "CREATE TABLE IF NOT EXISTS source_import_links (source_id TEXT NOT NULL, remote_book_id TEXT NOT NULL, book_id TEXT NOT NULL, PRIMARY KEY (source_id, remote_book_id));"
 ]}];
 
 export async function runMigrations(database: SQLiteDatabase): Promise<void> {

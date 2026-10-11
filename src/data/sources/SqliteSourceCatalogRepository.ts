@@ -1,0 +1,25 @@
+import { getDatabase } from "@/src/data/database/connection/database";
+import { SourceCatalogRepository } from "@/src/domain/repositories/SourceCatalogRepository";
+import { SourceCatalog, SourceImportLink } from "@/src/domain/types/sourceCatalog";
+
+export class SqliteSourceCatalogRepository implements SourceCatalogRepository {
+  async get(sourceId: string): Promise<SourceCatalog | null> {
+    const row = await (await getDatabase()).getFirstAsync<{ snapshot_json: string }>("SELECT snapshot_json FROM source_catalogs WHERE source_id = ?", sourceId);
+    return row ? JSON.parse(row.snapshot_json) as SourceCatalog : null;
+  }
+  async save(catalog: SourceCatalog): Promise<void> {
+    await (await getDatabase()).runAsync("INSERT INTO source_catalogs (source_id, snapshot_json) VALUES (?, ?) ON CONFLICT(source_id) DO UPDATE SET snapshot_json = excluded.snapshot_json", catalog.sourceId, JSON.stringify(catalog));
+  }
+  async links(sourceId: string): Promise<SourceImportLink[]> {
+    return (await getDatabase()).getAllAsync<SourceImportLink>("SELECT source_id AS sourceId, remote_book_id AS remoteBookId, book_id AS bookId FROM source_import_links WHERE source_id = ?", sourceId);
+  }
+  async link(value: SourceImportLink): Promise<void> {
+    await (await getDatabase()).runAsync("INSERT INTO source_import_links (source_id, remote_book_id, book_id) VALUES (?, ?, ?) ON CONFLICT(source_id, remote_book_id) DO UPDATE SET book_id = excluded.book_id", value.sourceId, value.remoteBookId, value.bookId);
+  }
+  async remove(sourceId: string): Promise<void> {
+    await (await getDatabase()).withExclusiveTransactionAsync(async transaction => {
+      await transaction.runAsync("DELETE FROM source_catalogs WHERE source_id = ?", sourceId);
+      await transaction.runAsync("DELETE FROM source_import_links WHERE source_id = ?", sourceId);
+    });
+  }
+}

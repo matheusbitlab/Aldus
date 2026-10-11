@@ -1,0 +1,15 @@
+# Biblioteca permanente por fonte — 11/10/2026
+
+SOURCE LIBRARY — AUDITORIA: concluída. Fontes/configuração AsyncStorage, SearchPlugin/ScrapedLink/catalogRanking, Drive paginado, BookCard, Library e DownloadManager reaproveitados. Nenhuma sincronização/upload/Auth/OCR/Reader novo.
+
+SOURCE CATALOG — PERSISTÊNCIA: implementada, testes controlados PASS. SourceCatalog contém identidade da fonte, nome/tipo, itens e lastUpdated; SourceCatalogView contém status/erro transitórios. SourceCatalogItem estende ScrapedLink com sourceId/remoteBookId/modifiedAt/availability. Continuação é interna ao adapter Drive; apenas coleção completa entra no snapshot. Import links em tabela/store independente usam sourceId + remoteBookId -> bookId, não títulos.
+
+Native: migration SQLite v3, source_catalogs com PK source_id e snapshot JSON (UPSERT único atômico); source_import_links com PK composta (source_id, remote_book_id), sem cascata para livros pessoais. Web: DB existente kindle-reader-web v4, stores source_catalogs/source_import_links, índice sourceId e gravação estrita reconhecida apenas em transaction.oncomplete; sem fallback silencioso de memória. Remoção dos dois stores/tabelas é transacional e nunca acessa livros/progresso/anotações.
+
+Fonte suportada: Google Drive (EPUB/PDF, pasta direta, paginação existente); JSON estático completo V1 (EPUB, array ou books[], sem {query}, identidade explícita id ou URL). JSON paginado é rejeitado; OPDS/HTML/Gutenberg/BNDigital/WebView/JSON parametrizado permanecem pesquisa/serviço, sem alegação de catálogo completo. Capabilities centralizadas. URLs com credenciais/tokens/assinaturas são rejeitadas para persistência; allowlist de metadados não inclui headers/token/conteúdo. Capa remota pode gerar pedido de imagem, nunca download de EPUB/PDF ao indexar.
+
+SOURCE LIBRARY — REFRESH: serviço com gerações, AbortController e fila de gravação por fonte. Paginação/validação antes de substituir; erros de rede/auth/limite/armazenamento preservam snapshot anterior. Escrita antiga em andamento precede a nova na fila; remoção invalida operações e purga depois de writes pendentes. Edição de identidade deve invalidar catálogo/vínculos; reabertura não chama rede, snapshot conhecido é stale ou auth_required.
+
+Testes atuais: npm run typecheck, npm run test:source-catalog, test-catalog-ranking PASS. SQLite real Node com ponte Expo controlada: 20 itens, fechamento/reabertura de conexão, novos/removidos/alterados, falhas, identidade persistida, corridas de rede/disco/remoção, preservação de livro/progresso, rollback disk full, storage Web ausente rejeita. Fixture 1000 (~381 KB): persistência ~19 ms, leitura ~2 ms, busca ~12 ms, duas ordenações <1 ms nesta máquina; não benchmark Android. IndexedDB real/visual Web: PENDENTES neste checkpoint. UI/ações: PENDENTES.
+
+GOOGLE DRIVE REAL — NÃO TESTADO. ANDROID FÍSICO — NÃO TESTADO. Próxima etapa: BIBLIOTECA VINCULADA À CONTA / SYNC ENTRE APARELHOS, fora deste escopo.

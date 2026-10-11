@@ -1,10 +1,34 @@
-type StoreName = "books" | "book_metadata" | "chapters" | "documents" | "reading_progress" | "bookmarks" | "highlights" | "web_search_history" | "pdf_reflow_cache";
+type StoreName = "books" | "book_metadata" | "chapters" | "documents" | "reading_progress" | "bookmarks" | "highlights" | "web_search_history" | "pdf_reflow_cache" | "source_catalogs" | "source_import_links";
 type StoredValue = { id: string };
 
-const storeNames: StoreName[] = ["books", "book_metadata", "chapters", "documents", "reading_progress", "bookmarks", "highlights", "web_search_history", "pdf_reflow_cache"];
+const storeNames: StoreName[] = ["books", "book_metadata", "chapters", "documents", "reading_progress", "bookmarks", "highlights", "web_search_history", "pdf_reflow_cache", "source_catalogs", "source_import_links"];
 const memoryStores = new Map<StoreName, Map<string, StoredValue>>(storeNames.map((name) => [name, new Map()]));
 const memoryDeleted = new Map<StoreName, Set<string>>(storeNames.map((name) => [name, new Set()]));
 let databasePromise: Promise<IDBDatabase | null> | null = null;
+
+export async function webGetPersistent<T extends StoredValue>(storeName: StoreName, id: string): Promise<T | null> {
+  const database = await openDatabase();
+  if (!database) throw new Error("Armazenamento persistente indisponível para esta fonte.");
+  return await request<T | undefined>(database.transaction(storeName, "readonly").objectStore(storeName).get(id)) ?? null;
+}
+export async function webSourceLinksPersistent<T>(sourceId: string): Promise<T[]> {
+  const database = await openDatabase();
+  if (!database) throw new Error("Armazenamento persistente indisponível para esta fonte.");
+  return request<T[]>(database.transaction("source_import_links", "readonly").objectStore("source_import_links").index("sourceId").getAll(sourceId));
+}
+/** One transaction; no mutation of book stores. */
+export async function webRemoveSourcePersistent(sourceId: string): Promise<void> {
+  const database = await openDatabase();
+  if (!database) throw new Error("Não foi possível remover o índice persistente da fonte.");
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(["source_catalogs", "source_import_links"], "readwrite");
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = transaction.onabort = () => reject(transaction.error ?? new Error("Falha ao remover a fonte."));
+    transaction.objectStore("source_catalogs").delete(sourceId);
+    const cursor = transaction.objectStore("source_import_links").index("sourceId").openCursor(IDBKeyRange.only(sourceId));
+    cursor.onsuccess = () => { if (cursor.result) { cursor.result.delete(); cursor.result.continue(); } };
+  });
+}
 
 /** Study data must be durable: do not silently acknowledge an in-memory write. */
 export async function webGetAllPersistent<T extends StoredValue>(storeName: StoreName): Promise<T[]> {
@@ -117,10 +141,12 @@ async function openDatabase(): Promise<IDBDatabase | null> {
     databasePromise = new Promise((resolve) => {
       if (typeof indexedDB === "undefined") { resolve(null); return; }
       try {
-        const request = indexedDB.open("kindle-reader-web", 3);
+        const request = indexedDB.open("kindle-reader-web", 4);
         request.onupgradeneeded = (event) => {
           const database = request.result;
           for (const storeName of storeNames) if (!database.objectStoreNames.contains(storeName)) database.createObjectStore(storeName, { keyPath: "id" });
+          const sourceLinks = request.transaction!.objectStore("source_import_links");
+          if (!sourceLinks.indexNames.contains("sourceId")) sourceLinks.createIndex("sourceId", "sourceId");
           if (event.oldVersion < 2) {
             const books = request.transaction!.objectStore("books");
             const metadata = request.transaction!.objectStore("book_metadata");
@@ -139,7 +165,10 @@ async function openDatabase(): Promise<IDBDatabase | null> {
             };
           }
         };
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => {
+          request.result.onversionchange = () => { request.result.close(); databasePromise = null; };
+          resolve(request.result);
+        };
         request.onerror = () => resolve(null);
         request.onblocked = () => resolve(null);
       } catch {

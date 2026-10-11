@@ -1,5 +1,9 @@
 # Campanha de correção dos bugs do APK
 
+## SOURCE LIBRARY — AUDITORIA / PERSISTÊNCIA, 11/10/2026
+
+SQLite v3/IndexedDB v4 e serviço de snapshots completo/atômico, gerações/fila de writes/remoção segura implementados. typecheck/source-catalog/ranking PASS controlado, incluindo reabertura SQLite e 1000 metadados. UI/visual/ponte Expo física PENDENTES. Não alterados Reader/Auth/OCR/módulos nativos. Drive real/Android físico NÃO TESTADOS. Roteiro SOURCE_LIBRARY_IMPLEMENTATION.md.
+
 ## DRIVE — AUDITORIA / SEARCH, 11/10/2026
 
 DRIVE — DOWNLOAD/IMPORT / FINAL: IMPLEMENTADO, mocks EPUB/PDF/8 MiB/headers/HTTP/401/cancel/preparação/transferência/cleanup tardio Native PASS. Importadores existentes não alterados; extensão mínima DownloadManager para PDF e auth, checagem HTTP e cleanup necessário. Gates typecheck/ranking/Drive/Sources/pipeline/catalogs/import/legal/notices/Web export2345/diff check PASS. Autolinking Android PASS, compileDebugKotlin/manifest BLOQUEADOS por SDK 36/Build Tools 35/licenças, nenhum APK novo nem teste físico. Google real NÃO TESTADO. Legal público0.3, configuração/limites/fixtures em GOOGLE_DRIVE_IMPLEMENTATION.md. Checkpoints anteriores de download pendente superados; Reader/OCR/Auth geral congelados.

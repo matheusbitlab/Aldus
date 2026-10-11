@@ -35,7 +35,7 @@ export function scoreCatalogBook(book: ScrapedLink, query: string): number {
   if (missing.length === 1 && (exact.length > 0 || terms.length === 1 && missing[0].length >= 6) && missing[0].length >= 4 && words.some(word => word.length >= 4 && word[0] === missing[0][0] && oneEdit(missing[0],word))) return 100;
   return 0;
 }
-export function rankCatalogBooks(books: ScrapedLink[], query: string): ScrapedLink[] {
+export function rankCatalogBooks<T extends ScrapedLink>(books: T[], query: string): T[] {
   return books.map((book,index) => ({book,index,score:scoreCatalogBook(book,query)})).filter(row => row.score > 0).sort((a,b) => b.score-a.score || a.index-b.index).map(row => row.book);
 }
 export function catalogRemoteQueries(query: string): { primary: string; fallback: string | null } {

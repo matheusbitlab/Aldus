@@ -70,11 +70,13 @@ export class UserSourceSearchPlugin implements SearchPlugin {
       const cover = typeof book.coverUrl === "string" ? new URL(book.coverUrl, this.source.url) : null;
       if (cover && !/^https?:$/.test(cover.protocol)) throw new Error("URL de capa inválida.");
       return {
+        remoteBookId: typeof book.id === "string" && book.id.trim() ? book.id : undefined,
+        modifiedAt: typeof book.modifiedAt === "string" ? book.modifiedAt : undefined,
         url: url.href, title: book.title.trim(),
         author: typeof book.author === "string" ? book.author : undefined,
         language: typeof book.language === "string" ? book.language : undefined,
         description: typeof book.description === "string" ? book.description : undefined,
-        coverUrl: cover?.href, estimatedSize: null, sourceSite: this.name, format: "epub" as const,
+        coverUrl: cover?.href, estimatedSize: typeof book.size === "number" && Number.isFinite(book.size) && book.size >= 0 ? book.size : null, sourceSite: this.name, format: "epub" as const,
       };
     });
   }

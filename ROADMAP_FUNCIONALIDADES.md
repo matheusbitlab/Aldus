@@ -1,5 +1,9 @@
 # Roadmap funcional — atualizado em 2026-10-11
 
+## Item 5 — biblioteca permanente por fonte, quarta etapa em andamento
+
+SOURCE LIBRARY — AUDITORIA e SOURCE CATALOG — PERSISTÊNCIA: implementados, SQLite real controlado/reabertura/1000 itens/concorrência/preservação da Library PASS. Drive e JSON estático têm capability de catálogo; search endpoints não fingem coleção completa. UI/ações/IndexedDB real/visual PENDENTES. SOURCE_LIBRARY_IMPLEMENTATION.md registra arquitetura/evidência. Próxima etapa é biblioteca vinculada à conta/sync, não iniciada.
+
 ## Google Drive / Fontes — terceira etapa implementada, validação externa pendente
 
 DRIVE — DOWNLOAD/IMPORT e BUSCA TOLERANTE: IMPLEMENTADOS / gates controlados PASS (ranking, Drive, Sources, catalogs, import, typecheck/legal/notices/export Web/diff check). EPUB/PDF passam aos importadores existentes por ação explícita, sem baixar livros na indexação. Android autolinking PASS; build BLOQUEADO SDK/licenças, aparelho NÃO TESTADO. Google real NÃO TESTADO; configuração Cloud externamente PENDENTE. Checkpoints anteriores PENDENTE são históricos. Próxima etapa: BIBLIOTECA PERMANENTE POR FONTE, NÃO implementada aqui.
