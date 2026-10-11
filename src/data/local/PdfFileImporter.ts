@@ -1,3 +1,5 @@
+import { newLibraryId } from "@/src/domain/entities/libraryId";
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import { BookRepository } from "@/src/domain/repositories/BookRepository";
@@ -22,8 +24,9 @@ export class PdfFileImporter {
     pickedFile?: Blob,
     options: { signal?: AbortSignal; onPhase?: (update: BookImportPhaseUpdate) => void } = {}
   ): Promise<LibraryBook> {
+    const accountRun = libraryAccountScope.capture();
     throwIfAborted(options.signal);
-    const id = stableId ?? `pdf-${Date.now()}`;
+    const id = stableId ?? newLibraryId();
     options.onPhase?.({ phase: "preparing", cancellable: true });
     const existingBook = stableId ? await withAbort(this.books.findById(id), options.signal) : null;
     if (existingBook) return existingBook;
@@ -87,7 +90,8 @@ export class PdfFileImporter {
     }
 
     const now = Date.now();
-    const book: LibraryBook = {
+    accountRun.check();
+    const book: LibraryBook = { ownerUserId: accountRun.userId, importComplete: false,
       id,
       title: fileName.replace(/\.pdf$/i, ""),
       author: "Arquivo local",
@@ -125,6 +129,9 @@ export class PdfFileImporter {
       try { await this.books.softDelete(id); } catch { /* keep original persistence error */ }
       throw error;
     }
+    accountRun.check();
+    book.importComplete = true;
+    await this.books.save(book);
     return book;
     } catch (error) {
       if (savedWebFile && this.webFiles) await this.webFiles.delete(id).catch(() => undefined);

@@ -1,3 +1,5 @@
+import { AccountBookRepository, scopeBookData } from "@/src/data/library/AccountBookRepository";
+import { AccountOrganizationRepository } from "@/src/data/library/AccountOrganizationRepository";
 import { Platform } from "react-native";
 import { GetLibraryUseCase } from "@/src/domain/usecases/GetLibraryUseCase";
 import { SeedMockBookUseCase } from "@/src/domain/usecases/SeedMockBookUseCase";
@@ -32,21 +34,22 @@ import { LocalBookImportService } from "@/src/data/imports/LocalBookImportServic
 import { driveDownloadResolver } from "@/src/data/drive/DriveDownloadResolver";
 
 const useWebStorage = Platform.OS === "web";
-const bookRepository = useWebStorage ? new IndexedDbBookRepository() : new SqliteBookRepository();
-const chapterRepository = useWebStorage ? new IndexedDbChapterRepository() : new SqliteChapterRepository();
-const readingProgressRepository = useWebStorage ? new IndexedDbReadingProgressRepository() : new SqliteReadingProgressRepository();
+const rawBookRepository = useWebStorage ? new IndexedDbBookRepository() : new SqliteBookRepository();
+const bookRepository = new AccountBookRepository(rawBookRepository);
+const chapterRepository = scopeBookData(useWebStorage ? new IndexedDbChapterRepository() : new SqliteChapterRepository(), bookRepository);
+const readingProgressRepository = scopeBookData(useWebStorage ? new IndexedDbReadingProgressRepository() : new SqliteReadingProgressRepository(), bookRepository);
 const importEpub = new ImportEpubUseCase(new EpubParserService(), bookRepository, chapterRepository);
 const networkFetcher = new NetworkFetcherService();
 const searchHistoryRepository = useWebStorage ? new IndexedDbSearchHistoryRepository() : new SqliteSearchHistoryRepository();
 const searchBooks = new SearchBooksUseCase([new GutendexSearchPlugin()], networkFetcher, new RobotsCacheService(networkFetcher), new ThrottleQueue(), new LinkValidatorService(networkFetcher), searchHistoryRepository);
-const webBookFileStore = new WebBookFileStore();
+const webBookFileStore = new WebBookFileStore(async id => !!await bookRepository.findById(id));
 const epubImporter = new EpubFileImporter(importEpub, useWebStorage ? webBookFileStore : undefined);
 const bundledEpubCatalog = new BundledEpubCatalog(bookRepository);
 const pdfImporter = new PdfFileImporter(bookRepository, chapterRepository, useWebStorage ? webBookFileStore : undefined);
 const localBookImporter = new LocalBookImportService(epubImporter, pdfImporter);
 const bundledPdfCatalog = new BundledPdfCatalog(pdfImporter, bookRepository);
-const pdfReflowCache = useWebStorage ? new IndexedDbPdfReflowCacheRepository() : new SqlitePdfReflowCacheRepository();
-const pdfReaderSettings = new PdfReaderSettingsStore();
+const pdfReflowCache = scopeBookData(useWebStorage ? new IndexedDbPdfReflowCacheRepository() : new SqlitePdfReflowCacheRepository(), bookRepository);
+const pdfReaderSettings = scopeBookData(new PdfReaderSettingsStore(), bookRepository);
 const downloadManager = new DownloadManager(epubImporter, undefined, pdfImporter, driveDownloadResolver);
-export const libraryOrganization = new LibraryOrganizationStore();
-export const appDependencies = { bookRepository, chapterRepository, readingProgressRepository, bookmarkRepository: useWebStorage ? new IndexedDbBookmarkRepository() : new SqliteBookmarkRepository(), highlightRepository: useWebStorage ? new IndexedDbHighlightRepository() : new SqliteHighlightRepository(), getLibrary: new GetLibraryUseCase(bookRepository, libraryOrganization), seedMockBook: new SeedMockBookUseCase(bookRepository, chapterRepository, readingProgressRepository), openBook: new OpenBookUseCase(bookRepository, chapterRepository, readingProgressRepository, libraryOrganization), updateReadingProgress: new UpdateReadingProgressUseCase(readingProgressRepository), epubImporter, localBookImporter, bundledEpubCatalog, pdfImporter, bundledPdfCatalog, webBookFileStore, pdfReflowCache, pdfReaderSettings, searchBooks, downloadManager };
+export const libraryOrganization = new AccountOrganizationRepository(new LibraryOrganizationStore(), bookRepository);
+export const appDependencies = { bookRepository, chapterRepository, readingProgressRepository, bookmarkRepository: scopeBookData(useWebStorage ? new IndexedDbBookmarkRepository() : new SqliteBookmarkRepository(), bookRepository), highlightRepository: scopeBookData(useWebStorage ? new IndexedDbHighlightRepository() : new SqliteHighlightRepository(), bookRepository), getLibrary: new GetLibraryUseCase(bookRepository, libraryOrganization), seedMockBook: new SeedMockBookUseCase(bookRepository, chapterRepository, readingProgressRepository), openBook: new OpenBookUseCase(bookRepository, chapterRepository, readingProgressRepository, libraryOrganization), updateReadingProgress: new UpdateReadingProgressUseCase(readingProgressRepository), epubImporter, localBookImporter, bundledEpubCatalog, pdfImporter, bundledPdfCatalog, webBookFileStore, pdfReflowCache, pdfReaderSettings, searchBooks, downloadManager };

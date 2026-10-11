@@ -1,4 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
+import { newLibraryId } from "@/src/domain/entities/libraryId";
 import { Platform } from "react-native";
 import { ImportEpubUseCase } from "@/src/domain/usecases/ImportEpubUseCase";
 import { WebBookFileStore } from "@/src/data/database/connection/WebBookFileStore";
@@ -24,6 +26,7 @@ export class EpubFileImporter {
     stableId?: string,
     options: { signal?: AbortSignal; onPhase?: (update: BookImportPhaseUpdate) => void } = {}
   ) {
+    const accountRun = libraryAccountScope.capture();
     throwIfAborted(options.signal);
     const isWeb = Platform.OS === "web";
     const fileUri = isWeb ? uri : encodeFileUri(uri);
@@ -37,7 +40,7 @@ export class EpubFileImporter {
     markEpubOpenSpanEnd("bytes_read", readStartedAt, {
       fileSizeBytes: bytes.byteLength,
     });
-    const webBookId = isWeb ? stableId ?? `web-epub-${Date.now()}` : stableId;
+    const webBookId = isWeb ? stableId ?? newLibraryId() : stableId;
     const fileSize = pickedFile?.size ?? (info?.exists ? info.size ?? bytes.byteLength : bytes.byteLength);
     let savedWebFile = false;
     try {
@@ -48,6 +51,7 @@ export class EpubFileImporter {
         savedWebFile = true;
       }
       const storedPath = isWeb ? `web-epub://${webBookId}` : fileUri;
+      accountRun.check();
       return await this.importEpub.execute({ bytes, fileName, filePath: storedPath, fileSize, bookId: webBookId }, options);
     } catch (error) {
       if (savedWebFile && webBookId && this.webFiles) await this.webFiles.delete(webBookId).catch(() => undefined);

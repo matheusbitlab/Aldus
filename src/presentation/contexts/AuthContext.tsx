@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AccountProfile, canUseFeature, FeatureKey, FeatureOverrides } from "@/src/domain/auth/authRules";
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const activeUserId = useRef<string | null>(null);
 
   const resolve = useCallback(async (next: Session | null) => {
+    libraryAccountScope.set(next?.user.id ?? null);
     const run = ++revision.current;
     const operationId = correlatedAuthDiagnostic(next?.user.id);
     setSession(next);
@@ -88,6 +90,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let alive = true;
     const client = supabase;
     const { data: listener } = client.auth.onAuthStateChange((event, next) => {
+      libraryAccountScope.set(next?.user.id ?? null);
       authDiagnostic("AUTH_EVENT", { operationId: correlatedAuthDiagnostic(next?.user.id), correlation: "candidate", authEvent: event, uuid: next?.user.id, session: !!next });
       if (alive) setTimeout(() => { if (alive) void resolve(next); }, 0);
     });

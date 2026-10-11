@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import { Platform } from "react-native";
 import { throwIfAborted, withAbort } from "@/src/core/utils/cancellation";
 import { EpubFileImporter } from "@/src/data/epub/EpubFileImporter";
@@ -38,12 +39,14 @@ export class LocalBookImportService {
   ) {}
 
   async import(file: PickedBookFile, options: LocalBookImportOptions): Promise<LibraryBook> {
+    const accountRun = libraryAccountScope.capture();
     throwIfAborted(options.signal);
     options.onPhase({ phase: "preparing", cancellable: true, fileSize: file.size ?? undefined });
     const format = await this.detectFormat(file, options.signal);
     const size = file.size ?? undefined;
 
     if (this.platform === "web") {
+      accountRun.check();
       return format === "pdf"
         ? this.pdfImporter.importFromUri(file.uri, normalizedName(file.name, format), undefined, file.file, {
             signal: options.signal,
@@ -88,6 +91,7 @@ export class LocalBookImportService {
       }
       throwIfAborted(options.signal);
 
+      accountRun.check();
       return format === "pdf"
         ? await this.pdfImporter.importFromUri(importedUri, safeName, undefined, undefined, {
             signal: options.signal,

@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import { Platform } from "react-native";
 import { DownloadError } from "@/src/core/errors/DownloadErrors";
 import { throwIfAborted, withAbort } from "@/src/core/utils/cancellation";
@@ -34,6 +35,10 @@ export class DownloadManager {
     const controller = new AbortController();
     const active: ActiveDownload = { operationId, controller, nativeTask: null, cancellable: true };
     this.active.set(job.id, active);
+    const initialAccount = libraryAccountScope.userId;
+    const unsubscribeAccount = libraryAccountScope.subscribe(() => {
+      if (libraryAccountScope.userId !== initialAccount) { controller.abort(); void active.nativeTask?.cancelAsync().catch(() => undefined); }
+    });
     const initial: DownloadJob = {
       ...job,
       operationId,
@@ -87,6 +92,7 @@ export class DownloadManager {
       this.publish(terminal, publishUpdate);
       throw error;
     } finally {
+      unsubscribeAccount();
       if (this.active.get(job.id)?.operationId === operationId) this.active.delete(job.id);
     }
   }

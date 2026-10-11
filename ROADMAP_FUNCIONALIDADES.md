@@ -1,3 +1,5 @@
+
+USER LIBRARY SYNC — etapa mestre 11/10/2026: bloco1 ownership local implementado; SQLite v4/IndexedDB v5, legados preservados sem adoção automática, repositories e organização isolados por conta, IDs novos UUID e assets bundled por conta. Checkpoint canônico LIBRARY_SYNC_IMPLEMENTATION.md. Sync remoto/blocos2–8 pendentes. Regra APK por commit via script oficial + arquivo ignorado artifacts/apk/checkpoint.jsonl. Build inicial confirmou bloqueio de ambiente Platform36/Build Tools35/licenças; correção legítima em avaliação. Android físico/Supabase real NÃO TESTADOS.
 # Roadmap funcional — atualizado em 2026-10-11
 
 ## Item 5 — biblioteca permanente por fonte, quarta etapa em andamento

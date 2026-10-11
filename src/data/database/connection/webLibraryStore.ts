@@ -141,7 +141,7 @@ async function openDatabase(): Promise<IDBDatabase | null> {
     databasePromise = new Promise((resolve) => {
       if (typeof indexedDB === "undefined") { resolve(null); return; }
       try {
-        const request = indexedDB.open("kindle-reader-web", 4);
+        const request = indexedDB.open("kindle-reader-web", 5);
         request.onupgradeneeded = (event) => {
           const database = request.result;
           for (const storeName of storeNames) if (!database.objectStoreNames.contains(storeName)) database.createObjectStore(storeName, { keyPath: "id" });

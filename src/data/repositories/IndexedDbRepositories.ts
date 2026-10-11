@@ -9,6 +9,7 @@ import { SearchHistory } from "@/src/domain/types/search";
 import { webDelete, webGet, webGetAll, webPut, webGetAllPersistent, webPutPersistent, webDeletePersistent, webImportStudyPersistent } from "@/src/data/database/connection/webLibraryStore";
 
 export class IndexedDbBookRepository implements BookRepository {
+  async listAll(): Promise<LibraryBook[]> { return webGetAllPersistent<LibraryBook>("book_metadata"); }
   async listActive(): Promise<LibraryBook[]> {
     const [books, progress] = await Promise.all([webGetAll<LibraryBook>("book_metadata"), webGetAll<ReadingProgress>("reading_progress")]);
     const progressByBook = new Map(progress.map((item) => [item.bookId, item.percentage]));

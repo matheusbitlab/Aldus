@@ -17,6 +17,8 @@ node_modules/
 /debug-reflow-metrics-temp.mjs
 /debug-reflow-scan.js
 *.apk
+artifacts/
+modules/*/android/.gradle/
 *.aab
 credentials.json
 *.jks

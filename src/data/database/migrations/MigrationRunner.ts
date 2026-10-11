@@ -19,6 +19,10 @@ const migrations: Migration[] = [{ version: 1, statements: [
 ]}, { version: 3, statements: [
   "CREATE TABLE IF NOT EXISTS source_catalogs (source_id TEXT PRIMARY KEY NOT NULL, snapshot_json TEXT NOT NULL);",
   "CREATE TABLE IF NOT EXISTS source_import_links (source_id TEXT NOT NULL, remote_book_id TEXT NOT NULL, book_id TEXT NOT NULL, PRIMARY KEY (source_id, remote_book_id));"
+]}, { version: 4, statements: [
+  "ALTER TABLE books ADD COLUMN owner_user_id TEXT;",
+  "ALTER TABLE books ADD COLUMN account_json TEXT;",
+  "CREATE INDEX books_owner_idx ON books(owner_user_id, is_deleted);"
 ]}];
 
 export async function runMigrations(database: SQLiteDatabase): Promise<void> {

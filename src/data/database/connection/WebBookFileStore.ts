@@ -8,6 +8,7 @@ interface StoredBookFile {
 }
 
 export class WebBookFileStore {
+  constructor(private readonly canRead?: (bookId: string) => Promise<boolean>) {}
   async save(bookId: string, fileName: string, file: Blob): Promise<void> {
     await webPut("documents", {
       id: bookId,
@@ -18,7 +19,9 @@ export class WebBookFileStore {
   }
 
   async get(bookId: string): Promise<Blob | null> {
+    if (this.canRead && !await this.canRead(bookId)) return null;
     const storedFile = await webGet<StoredBookFile>("documents", bookId);
+    if (this.canRead && !await this.canRead(bookId)) return null;
     return storedFile?.data ?? null;
   }
 

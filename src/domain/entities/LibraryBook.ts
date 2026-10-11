@@ -1,4 +1,8 @@
 export interface LibraryBook {
+  /** Missing/null means preserved legacy local data, never silently claimed. */
+  ownerUserId?: string | null;
+  bundledAssetId?: string;
+  importComplete?: boolean;
   id: string;
   title: string;
   author: string;

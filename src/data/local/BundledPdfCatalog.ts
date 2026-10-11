@@ -1,3 +1,4 @@
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import { Asset } from "expo-asset";
 import { Platform } from "react-native";
 import { BookRepository } from "@/src/domain/repositories/BookRepository";
@@ -21,17 +22,20 @@ export class BundledPdfCatalog {
   ) {}
 
   async importAll(): Promise<void> {
+    if (!libraryAccountScope.userId) return;
     for (const key of pdfFiles.keys()) {
       const fileName = key.replace(/^\.\//, "");
-      const id = getBookId(fileName);
+      const assetId = getBookId(fileName);
+      const id = assetId + "--" + libraryAccountScope.userId;
       const existing = await this.books.findById(id);
       if (existing) continue;
-      await this.importer.importFromUri(`bundled-pdf://${id}`, fileName, id);
+      const book = await this.importer.importFromUri(`bundled-pdf://${assetId}`, fileName, id);
+      await this.books.save({ ...book, bundledAssetId: assetId });
     }
   }
 
   async resolveUri(bookId: string): Promise<string> {
-    const key = pdfFiles.keys().find((file) => getBookId(file.replace(/^\.\//, "")) === bookId);
+    const key = pdfFiles.keys().find((file) => getBookId(file.replace(/^\.\//, "")) === bookId.split("--")[0]);
     if (!key) throw new Error("PDF local não encontrado no pacote do aplicativo.");
 
     const asset = Asset.fromModule(pdfFiles(key));

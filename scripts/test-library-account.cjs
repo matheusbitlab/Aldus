@@ -1,0 +1,33 @@
+const assert = require('node:assert/strict');
+const { DatabaseSync } = require('node:sqlite');
+const { loader, sqliteAdapter } = require('./library-test-utils.cjs');
+(async () => {
+  const db = new DatabaseSync(':memory:'); db.exec('PRAGMA foreign_keys=ON');
+  const load = loader({ '@/src/data/database/connection/database': { getDatabase: async () => sqliteAdapter(db) } });
+  await load('src/data/database/migrations/MigrationRunner.ts').runMigrations(sqliteAdapter(db));
+  const raw = new (load('src/data/repositories/SqliteBookRepository.ts').SqliteBookRepository)();
+  const { LibraryAccountScope } = load('src/data/library/LibraryAccountScope.ts');
+  const scope = new LibraryAccountScope();
+  const { AccountBookRepository, scopeBookData } = load('src/data/library/AccountBookRepository.ts');
+  const books = new AccountBookRepository(raw, scope);
+  const book = { id:'legacy',title:'Legado',author:'Autor',fileName:'x.epub',filePath:'file:///app/books/x.epub',fileHash:null,mimeType:'application/epub+zip',fileSize:5,coverImagePath:null,totalChapters:1,totalWords:3,addedDate:1,lastOpenedDate:null,isDeleted:false,progress:0 };
+  await raw.save(book); scope.set('A');
+  assert.deepEqual(await books.listActive(), []); assert.equal(await books.findById('legacy'), null);
+  await assert.rejects(books.save(book), /não pertence/);
+  await books.claimLegacy(['legacy']); assert.equal((await books.findById('legacy')).ownerUserId,'A');
+  const child = scopeBookData(new (load('src/data/repositories/SqliteBookmarkRepository.ts').SqliteBookmarkRepository)(), books);
+  await child.save({id:'mark',bookId:'legacy',chapterId:'c',cfiPosition:null,textPreview:'t',note:'Private',createdAt:1});
+  scope.set(null); assert.deepEqual(await books.listActive(), []); assert.equal(await child.findById('mark'), null);
+  scope.set('B'); assert.equal(await books.findById('legacy'), null); assert.equal(await child.findById('mark'), null);
+  await assert.rejects(child.save({id:'intruder',bookId:'legacy'}), /conta/);
+  await books.save({...book,id:'B-book'}); assert.deepEqual((await books.listActive()).map(b=>b.id),['B-book']);
+  await assert.rejects(child.save({id:'mark',bookId:'B-book'}), /outro livro/);
+  scope.set('A'); assert.equal((await child.findById('mark')).note,'Private');
+  await books.save({...await books.findById('legacy'), title:'Edited'});
+  assert.equal((await child.findById('mark')).note,'Private'); // UPSERT cannot cascade-delete children.
+  const captured = scope.capture(); scope.set('B'); assert.throws(captured.check,/conta mudou/);
+  let release; const delayed = new AccountBookRepository({ ...raw, listActive: () => new Promise(r=>release=r) }, scope);
+  const pending = delayed.listActive(); scope.set('A'); release([book]); await assert.rejects(pending,/conta mudou/);
+  assert.equal(db.prepare('SELECT version FROM schema_version').get().version,4);
+  db.close(); console.log('PASS account ownership: real SQLite migration, legacy preservation/explicit claim, A/logout/B/A, child ID/read/write guards, stale reads, UPSERT preserves annotations.');
+})().catch(error=>{ console.error(error);process.exitCode=1; });

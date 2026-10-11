@@ -1,3 +1,5 @@
+import { newLibraryId } from "@/src/domain/entities/libraryId";
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import { LibraryBook, StoredChapter } from "@/src/domain/entities/LibraryBook";
 import { BookRepository } from "@/src/domain/repositories/BookRepository";
 import { ChapterRepository } from "@/src/domain/repositories/ChapterRepository";
@@ -16,6 +18,7 @@ export class ImportEpubUseCase {
     input: { bytes: Uint8Array; fileName: string; filePath: string; fileSize: number; fileHash?: string | null; bookId?: string },
     options: { signal?: AbortSignal; onPhase?: (update: BookImportPhaseUpdate) => void } = {}
   ): Promise<LibraryBook> {
+    const accountRun = libraryAccountScope.capture();
     throwIfAborted(options.signal);
     options.onPhase?.({ phase: "validating", cancellable: true, fileSize: input.fileSize || input.bytes.byteLength });
     const parseStartedAt = markEpubOpenSpanStart("parse_and_validation", {
@@ -28,10 +31,11 @@ export class ImportEpubUseCase {
       plainTextCharacters: parsed.chapters.reduce((total, chapter) => total + chapter.characterCount, 0),
     });
     options.onPhase?.({ phase: "reading_metadata", cancellable: true, fileSize: input.fileSize || input.bytes.byteLength });
-    const bookId = input.bookId ?? (input.fileHash ? `book-${input.fileHash}` : `book-${Date.now()}`);
+    const bookId = input.bookId ?? newLibraryId();
     const previousBook = await withAbort(this.books.findById(bookId), options.signal);
     const now = Date.now();
-    const book: LibraryBook = { id: bookId, title: parsed.title, author: parsed.author, fileName: input.fileName, filePath: input.filePath, fileHash: input.fileHash ?? null, mimeType: "application/epub+zip", fileSize: input.fileSize, coverImagePath: parsed.coverImagePath, totalChapters: parsed.chapters.length, totalWords: parsed.chapters.reduce((total, chapter) => total + chapter.characterCount, 0), addedDate: now, lastOpenedDate: null, isDeleted: false, progress: 0 };
+    accountRun.check();
+    const book: LibraryBook = { ...previousBook, ownerUserId: accountRun.userId, importComplete: false, id: bookId, title: parsed.title, author: parsed.author, fileName: input.fileName, filePath: input.filePath, fileHash: input.fileHash ?? null, mimeType: "application/epub+zip", fileSize: input.fileSize, coverImagePath: parsed.coverImagePath, totalChapters: parsed.chapters.length, totalWords: parsed.chapters.reduce((total, chapter) => total + chapter.characterCount, 0), addedDate: now, lastOpenedDate: null, isDeleted: false, progress: 0 };
     const storedChapters: StoredChapter[] = parsed.chapters.map((chapter) => ({ ...chapter, id: `${bookId}:${chapter.id}`, bookId }));
     throwIfAborted(options.signal);
     options.onPhase?.({ phase: "persisting", cancellable: false, fileSize: input.fileSize || input.bytes.byteLength });
@@ -54,6 +58,9 @@ export class ImportEpubUseCase {
       chapterCount: storedChapters.length,
       htmlCharacters: storedChapters.reduce((total, chapter) => total + chapter.html.length, 0),
     });
+    accountRun.check();
+    book.importComplete = true;
+    await this.books.save(book);
     return book;
   }
 }

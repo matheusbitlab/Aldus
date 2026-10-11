@@ -1,3 +1,4 @@
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import { Asset } from "expo-asset";
 import { Platform } from "react-native";
 import { LibraryBook } from "@/src/domain/entities/LibraryBook";
@@ -19,9 +20,11 @@ export class BundledEpubCatalog {
   constructor(private readonly books: BookRepository) {}
 
   async registerAll(): Promise<void> {
+    if (!libraryAccountScope.userId) return;
     for (const key of epubFiles.keys()) {
       const fileName = key.replace(/^\.\//, "");
-      const id = getBookId(fileName);
+      const assetId = getBookId(fileName);
+      const id = assetId + "--" + libraryAccountScope.userId;
       const existing = await this.books.findById(id);
       if (existing) {
         if (existing.filePath.startsWith("web-epub://")) {
@@ -35,7 +38,7 @@ export class BundledEpubCatalog {
       );
       const now = Date.now();
       const book: LibraryBook = {
-        id,
+        id, bundledAssetId: assetId, importComplete: true,
         title: mock?.title ?? fileName.replace(/\.epub$/i, ""),
         author: mock?.author ?? "Arquivo local",
         fileName,
@@ -56,7 +59,7 @@ export class BundledEpubCatalog {
   }
 
   async resolveUri(bookId: string): Promise<string> {
-    const key = epubFiles.keys().find((file) => getBookId(file.replace(/^\.\//, "")) === bookId);
+    const key = epubFiles.keys().find((file) => getBookId(file.replace(/^\.\//, "")) === bookId.split("--")[0]);
     if (!key) throw new Error("EPUB local não encontrado no pacote do aplicativo.");
 
     const asset = Asset.fromModule(epubFiles(key));
