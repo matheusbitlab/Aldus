@@ -5,7 +5,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MotionCuesControl } from "@/src/presentation/components/MotionCuesControl";
 import { ReaderSettingsPanel } from "@/src/presentation/components/ReaderSettingsPanel";
-import { SourceManagerModal } from "@/src/presentation/components/SourceManagerModal";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { AppThemeMode } from "@/src/theme/tokens";
 import { useAuth } from "@/src/presentation/contexts/AuthContext";
@@ -21,7 +20,6 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const { palette, mode, setMode } = useAppTheme();
   const { profile, user } = useAuth();
-  const [sourcesVisible, setSourcesVisible] = useState(false);
   const [readerSettingsVisible, setReaderSettingsVisible] = useState(false);
   const appMetadata = getAppMetadata();
 
@@ -82,11 +80,11 @@ export default function Settings() {
           <View style={[styles.group, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <SettingsRow
               icon="albums-outline"
-              title="Gerenciar minhas fontes"
-              description="Adicionar, testar, editar ou desativar"
+              title="Minhas fontes"
+              description="Abrir bibliotecas, adicionar e gerenciar fontes"
               color={palette.text}
               secondaryColor={palette.secondaryText}
-              onPress={() => setSourcesVisible(true)}
+              onPress={() => router.push("/sources" as never)}
             />
           </View>
         </Section>
@@ -148,7 +146,6 @@ export default function Settings() {
         panelMode="appearance"
         onClose={() => setReaderSettingsVisible(false)}
       />
-      <SourceManagerModal visible={sourcesVisible} onClose={() => setSourcesVisible(false)} />
     </View>
   );
 }

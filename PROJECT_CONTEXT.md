@@ -1,5 +1,7 @@
 # PROJECT CONTEXT
 
+SOURCE LIBRARY — UI: rotas protegidas /sources e /sources/[sourceId], overview com nome/tipo/quantidade/data/conexão, biblioteca virtualizada FlatList grade/lista reutilizando BookCard/placeholder, busca local ranker original, A–Z/Z–A/recentes e estados explícitos. Ajustes agora abre Fontes; endpoints somente pesquisa não recebem biblioteca fictícia. typecheck PASS. Ações de aquisição e lifecycle de fonte em integração; visual Web ainda PENDENTE.
+
 SOURCE LIBRARY — AUDITORIA / SOURCE CATALOG — PERSISTÊNCIA (quarta etapa, 11/10/2026): contrato genérico, capabilities, SQLite v3/IndexedDB v4 e refresh atômico implementados. Testes controlados de snapshot/reabertura/gerações/remoção/1000 itens e typecheck/ranking PASS; UI/ações/IndexedDB real/visual ainda PENDENTES. Fonte removida não acessa livros pessoais. Detalhes em SOURCE_LIBRARY_IMPLEMENTATION.md. Checkpoints anteriores sobre índice exclusivamente em memória são históricos. Sem Cloud Sync; próxima etapa BIBLIOTECA VINCULADA À CONTA.
 
 ## Itens novos — Google Drive, 11/10/2026 (implementado; validação externa pendente)

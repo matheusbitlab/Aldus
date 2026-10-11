@@ -1,5 +1,7 @@
 # Biblioteca permanente por fonte — 11/10/2026
 
+SOURCE LIBRARY — UI: implementada, typecheck PASS. /sources e /sources/[sourceId] dentro do Stack protegido existente; entrada Ajustes > Minhas fontes. Overview mostra tipo/contagem/data/autorização; fontes só de busca entram em Search. Biblioteca FlatList virtualizada (12 iniciais, batches 10, window 5), grade 2 colunas/lista, BookCard compartilhado com placeholder e indicador remoto em vez de progresso de leitura. Capas são URLs de imagens, sem extração de arquivo remoto. Query/ordenação memoizadas, ranker original integral (apenas assinatura genérica para preservar tipo do item). Status loading/empty/ready/refreshing/stale/offline/error/auth_required, contagem/data sempre do snapshot. Aquisição/remoção lifecycle em integração; validação visual PENDENTE.
+
 SOURCE LIBRARY — AUDITORIA: concluída. Fontes/configuração AsyncStorage, SearchPlugin/ScrapedLink/catalogRanking, Drive paginado, BookCard, Library e DownloadManager reaproveitados. Nenhuma sincronização/upload/Auth/OCR/Reader novo.
 
 SOURCE CATALOG — PERSISTÊNCIA: implementada, testes controlados PASS. SourceCatalog contém identidade da fonte, nome/tipo, itens e lastUpdated; SourceCatalogView contém status/erro transitórios. SourceCatalogItem estende ScrapedLink com sourceId/remoteBookId/modifiedAt/availability. Continuação é interna ao adapter Drive; apenas coleção completa entra no snapshot. Import links em tabela/store independente usam sourceId + remoteBookId -> bookId, não títulos.

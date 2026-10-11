@@ -36,6 +36,8 @@ export default function Search() {
   const activeSources = useMemo(() => sources.filter((source) => source.enabled && source.status === "active"), [sources]);
   const [touched, setTouched] = useState(false);
   const [sourceFilter, setSourceFilter] = useState(useSearchStore.getState().selectedSource);
+  const externalSourceFilter = useSearchStore(state => state.selectedSource);
+  useEffect(() => { setSourceFilter(externalSourceFilter); }, [externalSourceFilter]);
   const [selectedBook, setSelectedBook] = useState<ScrapedLink | null>(null);
   const [acquisitionMessage, setAcquisitionMessage] = useState<string | null>(null);
   const [acquiring, setAcquiring] = useState(false);

@@ -8,12 +8,18 @@ interface BookCardProps {
   book: Book;
   onPress: (book: Book) => void;
   themeMode?: 'light' | 'dark' | 'sepia';
+  showProgress?: boolean;
+  statusLabel?: string;
+  layout?: "grid" | "list";
 }
 
 export const BookCard: React.FC<BookCardProps> = ({
   book,
   onPress,
   themeMode = 'light',
+  showProgress = true,
+  statusLabel,
+  layout = "grid",
 }) => {
   const theme = THEMES[themeMode];
   const coverSource = getBookCover(book);
@@ -24,10 +30,10 @@ export const BookCard: React.FC<BookCardProps> = ({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Abrir ${book.title}, de ${book.author}`}
-      style={[styles.card, { backgroundColor: theme.uiBackground, borderColor: theme.border }]}
+      style={[styles.card, layout === "list" && styles.listCard, { backgroundColor: theme.uiBackground, borderColor: theme.border }]}
       onPress={() => onPress(book)}
     >
-      <View style={[styles.cover, { backgroundColor: theme.accent }]}>
+      <View style={[styles.cover, layout === "list" && styles.listCover, { backgroundColor: theme.accent }]}>
         <Image
           source={getDefaultBookCover()}
           style={styles.coverImage}
@@ -43,7 +49,7 @@ export const BookCard: React.FC<BookCardProps> = ({
           accessibilityIgnoresInvertColors
         />
       </View>
-      <View style={styles.infoContainer}>
+      <View style={[styles.infoContainer, layout === "list" && { flex: 1 }]}>
         <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
           {book.title}
         </Text>
@@ -53,15 +59,18 @@ export const BookCard: React.FC<BookCardProps> = ({
         <View style={styles.formatBadge}>
           <Text style={styles.formatText}>{book.format.toUpperCase()}</Text>
         </View>
-        <View style={styles.progressTrack}>
+        {statusLabel ? <Text style={{ color: theme.uiText, fontSize: 11 }} numberOfLines={1}>{statusLabel}</Text> : null}
+        {showProgress ? <View style={styles.progressTrack}>
           <View style={[styles.progressValue, { width: `${Math.round(progress * 100)}%`, backgroundColor: theme.accent }]} />
-        </View>
+        </View> : null}
       </View>
     </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
+  listCard: { flexDirection: "row", alignItems: "center", minHeight: 108 },
+  listCover: { width: 72, height: 108 },
   card: {
     flex: 1,
     minWidth: 0,

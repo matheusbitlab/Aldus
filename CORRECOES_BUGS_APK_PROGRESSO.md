@@ -2,6 +2,8 @@
 
 ## SOURCE LIBRARY — AUDITORIA / PERSISTÊNCIA, 11/10/2026
 
+SOURCE LIBRARY — UI: Fontes e biblioteca permanente com FlatList/BookCard compartilhado, grade/lista/local search/ordenadores/status. typecheck PASS. Visual/ações PENDENTES neste checkpoint; nenhuma mudança de código nativo.
+
 SQLite v3/IndexedDB v4 e serviço de snapshots completo/atômico, gerações/fila de writes/remoção segura implementados. typecheck/source-catalog/ranking PASS controlado, incluindo reabertura SQLite e 1000 metadados. UI/visual/ponte Expo física PENDENTES. Não alterados Reader/Auth/OCR/módulos nativos. Drive real/Android físico NÃO TESTADOS. Roteiro SOURCE_LIBRARY_IMPLEMENTATION.md.
 
 ## DRIVE — AUDITORIA / SEARCH, 11/10/2026

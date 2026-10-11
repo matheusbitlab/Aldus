@@ -72,6 +72,8 @@ function AppShell() {
               <Stack.Screen name="legal/version" />
               <Stack.Protected guard={appReady}>
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="sources/index" />
+                <Stack.Screen name="sources/[sourceId]" />
                 <Stack.Screen name="reader/[bookId]" />
                 <Stack.Screen name="reader/web" />
                 <Stack.Screen name="study/[deckId]" />

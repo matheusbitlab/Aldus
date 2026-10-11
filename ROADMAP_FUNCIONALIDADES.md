@@ -2,6 +2,8 @@
 
 ## Item 5 — biblioteca permanente por fonte, quarta etapa em andamento
 
+SOURCE LIBRARY — UI implementada: /sources/[sourceId], overview, BookCard compartilhado grade/lista sem progresso fictício, busca/ranking local/ordenação/estados. typecheck PASS; aquisição/remoção/visual Web em andamento. Não iniciada sincronização.
+
 SOURCE LIBRARY — AUDITORIA e SOURCE CATALOG — PERSISTÊNCIA: implementados, SQLite real controlado/reabertura/1000 itens/concorrência/preservação da Library PASS. Drive e JSON estático têm capability de catálogo; search endpoints não fingem coleção completa. UI/ações/IndexedDB real/visual PENDENTES. SOURCE_LIBRARY_IMPLEMENTATION.md registra arquitetura/evidência. Próxima etapa é biblioteca vinculada à conta/sync, não iniciada.
 
 ## Google Drive / Fontes — terceira etapa implementada, validação externa pendente
