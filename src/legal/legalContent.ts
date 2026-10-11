@@ -65,6 +65,7 @@ export const privacyDocument: LegalDocument = {
       heading: "3. Biblioteca e leitura no dispositivo",
       paragraphs: [
         "Livros importados, arquivos EPUB/PDF, capas, capítulos extraídos, cache de reflow, metadados, progresso, posição, histórico de pesquisa e preferências ficam no armazenamento local do dispositivo ou navegador nesta versão. Não há sincronização da biblioteca nem envio automático desses arquivos a um armazenamento em nuvem do Aldus.",
+        "Quando a pessoa escolhe reconhecer o texto de um PDF no Android, as páginas necessárias são renderizadas e processadas no próprio aparelho pelo ML Kit Text Recognition com modelo latino incluído no aplicativo. O arquivo, as imagens das páginas e o texto reconhecido não são enviados pelo Aldus nem pelo ML Kit a servidores para executar o OCR.",
       ],
       bullets: [
         "Título, autoria, nome, tipo, tamanho e hash do arquivo, datas e contagens técnicas.",
@@ -84,6 +85,7 @@ export const privacyDocument: LegalDocument = {
       heading: "5. Sensores, diagnósticos e permissões",
       paragraphs: [
         "Se o recurso anti-enjoo for ativado em Android compatível, amostras de movimento são usadas em memória para posicionar indicadores visuais. O código auditado não persiste nem envia essas amostras; apenas a preferência de ativação é salva localmente.",
+        "O SDK do ML Kit pode contatar serviços do Google para correções, informações de compatibilidade de aceleradores e métricas de desempenho e uso. O modelo de OCR desta versão é empacotado no aplicativo e não precisa ser baixado para reconhecer texto; o conteúdo e o resultado do OCR permanecem no dispositivo. As divulgações de segurança de dados e os termos do fornecedor devem ser revistos antes da publicação.",
         "Há diagnósticos técnicos opcionais, desativados por padrão, que escrevem no console campos previamente permitidos sobre autenticação, busca, leitura, reflow e sensores. Não foram encontrados SDKs próprios de publicidade, analytics ou crash reporting. Logs do sistema operacional, da hospedagem e dos provedores externos devem ser avaliados separadamente.",
       ],
     },
@@ -194,9 +196,9 @@ export const dataDocument: LegalDocument = {
   title: "Privacidade e Dados",
   subtitle: "Resumo prático dos lugares por onde seus dados passam.",
   sections: [
-    { heading: "Fica no dispositivo", bullets: ["Arquivos e biblioteca de livros.", "Progresso, posições, cache e preferências de leitura.", "Marcadores, notas, grifos e histórico de pesquisa.", "Preferência do recurso anti-enjoo."], paragraphs: ["Esses dados não são sincronizados pelo Aldus nesta versão. Backups exportados passam a ficar sob sua responsabilidade."] },
+    { heading: "Fica no dispositivo", bullets: ["Arquivos e biblioteca de livros.", "Progresso, posições, cache e preferências de leitura.", "Texto reconhecido por OCR no Android, quando você escolhe executar o recurso.", "Marcadores, notas, grifos e histórico de pesquisa.", "Preferência do recurso anti-enjoo."], paragraphs: ["Esses dados não são sincronizados pelo Aldus nesta versão. Backups exportados passam a ficar sob sua responsabilidade."] },
     { heading: "Vai para o Supabase", bullets: ["Dados necessários à conta, autenticação e perfil.", "Sessão técnica administrada pelo SDK."], paragraphs: ["A configuração remota e as regras de acesso ainda devem ser conferidas antes do uso em produção."] },
-    { heading: "Vai para Google e fontes escolhidas", bullets: ["Google recebe o fluxo de login quando você escolhe essa opção.", "Catálogos recebem a sua consulta e dados normais de conexão.", "BibliON e MEC recebem as interações feitas dentro de suas páginas.", "A origem do livro recebe o pedido de download." ] },
+    { heading: "Vai para Google e fontes escolhidas", bullets: ["Google recebe o fluxo de login quando você escolhe essa opção.", "O ML Kit pode enviar ao Google métricas técnicas de desempenho e uso do SDK; o conteúdo e o resultado do OCR não são enviados para processar o reconhecimento.", "Catálogos recebem a sua consulta e dados normais de conexão.", "BibliON e MEC recebem as interações feitas dentro de suas páginas.", "A origem do livro recebe o pedido de download." ] },
     { heading: "Sensores e diagnósticos", paragraphs: ["Movimento é processado em memória no Android quando o recurso anti-enjoo está ligado. Diagnósticos opcionais vão apenas para o console no código auditado e vêm desligados por padrão. A política completa explica as ressalvas sobre logs de plataforma e provedores."] },
     { heading: "Seus controles atuais", bullets: ["Escolher se usa Google, sensores e fontes personalizadas.", "Editar dados de perfil disponíveis.", "Remover itens locais pelos fluxos existentes ou limpar o armazenamento pelo sistema.", "Exportar determinados dados de organização e grifos."], paragraphs: ["Ainda não existe exclusão de conta dentro do aplicativo nem prazo formal único de retenção remota. Consulte a Política de Privacidade para o estado completo e os pontos pendentes."] },
     identitySection,

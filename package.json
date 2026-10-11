@@ -18,6 +18,7 @@
     "test:legal": "node scripts/test-legal.cjs",
     "test:legal:browser": "node scripts/test-legal-browser.cjs",
     "test:import": "node scripts/test-book-import.cjs && node scripts/test-download-import.cjs",
+    "test:ocr": "node scripts/test-pdf-ocr.cjs",
     "audit:supabase:public": "node scripts/audit-supabase-public.cjs",
     "export:web": "expo export --platform web && node scripts/copy-books-to-dist.mjs"
   },

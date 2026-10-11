@@ -1,5 +1,19 @@
 # PROJECT CONTEXT
 
+## Itens novos — OCR local de PDF, 11/10/2026
+
+**AUDITORIA A–E:** baseline classificado como **E**, com comportamento **A** visível: havia somente detecção de texto corrompido/insuficiente e fallback ao PDF Original; não havia engine, provider, módulo, cache OCR nem OCR funcional oculto. A pipeline preexistente de PDF Original, extração PDF.js, builder Reflow, validação conservadora, posições e cache foi preservada.
+
+**IMPLEMENTADO:** Android usa módulo Expo local `aldus-pdf-ocr`, `PdfRenderer` e ML Kit Text Recognition v2 latino empacotado (`com.google.mlkit:text-recognition:16.0.1`). A detecção é por página e também considera insuficiência global; PDF misto envia somente páginas necessárias. Estados semânticos: `TEXT_VALID`, `OCR_REQUIRED`, `OCR_PROCESSING`, `OCR_VALID`, `OCR_INSUFFICIENT`, `PROCESSING_ERROR`. Antes da tarefa pesada a UI pergunta **Reconhecer texto** ou **Continuar no PDF Original**. OCR ocorre página a página, com bitmap limitado, normalização NFC, limites convertidos ao sistema PDF e validação mínima de caracteres/letras/palavras; resultado ruim retorna ao Original. A Web declara indisponibilidade do OCR local e oferece o Original.
+
+**CACHE/LIFECYCLE:** processador v12; documentos derivados carregam proveniência (`text-extraction`, `ocr` ou `hybrid`), páginas OCR, engine/versão e validação v1. Cache antigo/parcial/inconsistente é rejeitado. A operação existente conserva geração/AbortSignal/terminal único; cancelar impede novas páginas e callbacks tardios. A tarefa corrente do ML Kit não é cancelável pela API, mas o resultado é descartado e recursos são liberados ao completar. Nenhum conteúdo foi enviado a servidor.
+
+**UX:** corrigido banner superior estreito; mensagem encolhe/quebra e o botão **Fechar** preserva largura e área de toque.
+
+**DEPENDÊNCIA/PRIVACIDADE:** nova dependência nativa Gradle inevitável; modelo latino empacotado funciona sem download inicial, acrescenta aproximadamente 4 MB por script e suporta português. ML Kit declara processamento de entrada/saída no dispositivo, mas pode enviar métricas técnicas e consultar correções/compatibilidade; documentos públicos 0.2 e notas legais registram a distinção. Auditoria de transitivos/Data safety/termos permanece antes de publicação.
+
+**EVIDÊNCIA:** testes controlados de policy, qualidade, acentos, cache/proveniência, progresso, consentimento, fallback Web, cancelamento/scheduling, ReaderScreen e navegação PASS. PDFs reais: Sociedade/Manifesto `OCR_REQUIRED`; Ócio/Banquete/República Reflow normal. Autolinking PASS. Kotlin/APK e aparelho real permanecem **NÃO TESTADOS** porque o SDK local não tem Platform 36/Build Tools 35 licenciados; não declarar OCR físico concluído.
+
 ## Etapa 3 — Auth, Supabase, RLS e controle de acesso, 10/10/2026
 
 **ESTADO REMOTO — PARCIALMENTE OBSERVÁVEL / INVENTÁRIO ADMINISTRATIVO BLOQUEADO:** a fonte de verdade continua sendo o projeto Supabase remoto, mas este ambiente possui somente URL e chave pública do app. Não há sessão do Dashboard, credencial Postgres, projeto linkado, `psql` ou Docker; `npx supabase` não conseguiu instalar o binário `win32-x64`. Nenhum SQL foi executado. `auth.users`, PK/FK/defaults/checks/índices, histórico de migrations, triggers, grants, flags reais de RLS, policies e Security Advisor permanecem **INCONCLUSIVOS** até execução de `supabase/audit/01_inventory.sql` por operador autorizado.

@@ -1,8 +1,8 @@
 # Aldus Reader — notas da implementação legal inicial
 
-Data da auditoria: 10/10/2026
+Data da auditoria: 11/10/2026
 
-Versão dos documentos públicos: 0.1
+Versão dos documentos públicos: 0.2
 
 Estado: **implementação jurídica inicial; revisão profissional e validação operacional pendentes**.
 
@@ -15,6 +15,7 @@ Este arquivo registra o que foi observado no código e por que os textos públic
 | Conta e sessão | email, UUID, provedor, tokens de sessão, username, nome de exibição, avatar, papel, status e overrides | Supabase; sessão/cache também no armazenamento local | Login com email/username e Google. Tokens são administrados pelo SDK. |
 | Biblioteca | EPUB/PDF, Blob/caminho, capa, título, autor, hash, MIME, tamanho, capítulos e datas | SQLite no Native; IndexedDB no Web | Não foi encontrada sincronização da biblioteca nem upload automático para nuvem. |
 | Leitura | capítulo, CFI/âncora, percentual, página, cache de reflow, tema, fonte, margens, brilho e modo PDF | SQLite/IndexedDB/AsyncStorage local | Alguns registros usam chaves legadas `kindle-*`; elas foram preservadas por compatibilidade. |
+| OCR de PDF | imagem renderizada das páginas necessárias, texto reconhecido, limites geométricos e proveniência do motor | processamento local no Android; resultado validado no cache Reflow local | ML Kit Text Recognition v2 latino `16.0.1`, modelo empacotado; conteúdo e resultado não são enviados para executar OCR. O SDK pode transmitir métricas técnicas de uso/desempenho e consultar informações de correção/compatibilidade conforme os termos do fornecedor. |
 | Organização | favorito, coleções, tags, série, volume, status, metadados editados e capa | AsyncStorage local | Exportação/importação de backup transfere responsabilidade ao arquivo exportado. |
 | Estudo | marcadores, notas, grifos, trecho, comentário, posição e exportações | SQLite/IndexedDB local | Comentário do grifo fica codificado no payload da localização. |
 | Flashcards locais | decks, cartões, imagens/desenhos, origem, respostas, revisões, pontuação e sessões | SQLite Native / IndexedDB Web; migração local legada | Estudo individual não envia cartões ao Supabase. |
@@ -33,6 +34,7 @@ Este arquivo registra o que foi observado no código e por que os textos públic
 - Fontes personalizadas HTTP/HTTPS: JSON, OPDS ou HTML cadastrados pelo usuário.
 - BibliON e MEC Livros: navegação por WebView.
 - Sistema operacional/plataforma: armazenamento isolado, permissões, console e entrega do aplicativo.
+- Google ML Kit: motor de OCR executado no aparelho; modelo latino empacotado. O conteúdo e o resultado não são enviados ao Google para reconhecimento, mas o SDK pode contatar serviços do fornecedor para correções, compatibilidade e métricas técnicas.
 
 Não foi encontrada integração funcional com Google Drive, publicidade comportamental, analytics ou crash reporting. Isso descreve o repositório auditado, não prova a inexistência de logs na hospedagem, lojas, sistema operacional ou painéis externos.
 
@@ -76,6 +78,8 @@ TODO antes de publicação comercial:
 
 O inventário atual inclui 37 dependências diretas de runtime. Dependências de desenvolvimento não aparecem na tela. Dependências transitivas, código embarcado em artefatos Android/iOS, fontes, ícones e obrigações específicas de distribuição ainda precisam de auditoria antes de publicar binários. Use `npm run legal:notices:check` no CI para detectar divergência.
 
+O módulo local `aldus-pdf-ocr` adiciona diretamente o artefato Android `com.google.mlkit:text-recognition:16.0.1`; por não ser dependência npm, ele não entra automaticamente no gerador acima. Seu uso está sujeito aos Termos do ML Kit e aos Termos das APIs do Google. A cadeia transitiva, avisos/licenças do artefato, declaração de Data safety da Play Store e obrigações de distribuição precisam ser conferidos antes de publicar o APK/AAB. A escolha empacotada acrescenta aproximadamente 4 MB por script ao aplicativo e evita o download inicial do modelo.
+
 ## 6. Referências consultadas
 
 - Lei nº 13.709/2018 (LGPD), texto compilado: <https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709compilado.htm>
@@ -84,6 +88,10 @@ O inventário atual inclui 37 dependências diretas de runtime. Dependências de
 - Biblioteca Casanatense, edições aldinas: <https://casanatense.cultura.gov.it/en/activities/editorials/the-aldine-editions-of-the-casanatense/>
 - Biblioteca Nazionale Marciana, exposição Aldus Manutius: <https://bibliotecanazionalemarciana.cultura.gov.it/en/library/digital-library/aldo-manutius-ten-interludes/>
 - Museo Correr, história da impressão em Veneza: <https://archivio-correr.visitmuve.it/en/mostre-en/archivio-mostre-en/words-and-images-moments-in-the-history-of-printing-and-print-making-from-the-museo-correr-collection/2006/06/4940/progetto-71/>
+- ML Kit, reconhecimento de texto no Android: <https://developers.google.com/ml-kit/vision/text-recognition/v2/android>
+- ML Kit, idiomas compatíveis: <https://developers.google.com/ml-kit/vision/text-recognition/v2/languages>
+- ML Kit, termos e privacidade: <https://developers.google.com/ml-kit/terms>
+- ML Kit, divulgação de dados no Google Play: <https://developers.google.com/ml-kit/android-data-disclosure>
 
 ## 7. Verificações desta etapa
 

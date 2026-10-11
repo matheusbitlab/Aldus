@@ -1,5 +1,20 @@
 # Roadmap funcional — atualizado em 2026-10-11
 
+## OCR local de PDF — item 4
+
+Estado: **🟡 IMPLEMENTADO NO CÓDIGO / ✅ GATES CONTROLADOS / 🧪 ANDROID REAL PENDENTE**.
+
+- ✅ Auditoria global: baseline E/A, sem OCR oculto ou provider parcial.
+- ✅ Android: `PdfRenderer` + ML Kit latino empacotado `16.0.1`; português; processamento página a página e local.
+- ✅ Consentimento inequívoco antes da tarefa pesada; Original permanece disponível; Web informa indisponibilidade do OCR local.
+- ✅ PDF misto preserva texto válido e reconhece apenas páginas necessárias; OCR insuficiente não vira Reflow.
+- ✅ Estados semânticos, progresso por página, cancelamento por geração, descarte de callbacks tardios e cleanup.
+- ✅ Cache v12 diferencia extração/OCR/híbrido, motor, versão, páginas e validação; não salva parcial.
+- ✅ Banner Android estreito preserva o botão **Fechar**.
+- ✅ Política/Resumo de Privacidade 0.2 e notas legais atualizados para conteúdo local e métricas técnicas possíveis do SDK.
+- ✅ Testes controlados e cinco PDFs reais aprovados na classificação; Sociedade/Manifesto exigem OCR, os três PDFs textuais continuam sem OCR.
+- 🧪 Pendente: compilar APK quando SDK 36/Build Tools 35 estiverem disponíveis/licenciados; validar OCR visual em Android real, offline, cancelamento durante tarefa, pouca memória, rotação e cache após relançamento.
+
 ## IMPORTAÇÃO — itens 2 e 6
 
 Estado: **✅ IMPLEMENTADA / ✅ VALIDADA AUTOMATICAMENTE / ✅ BUILD WEB / 🧪 ANDROID FÍSICO PENDENTE**.
@@ -121,7 +136,7 @@ Estados: **implementado** = caminho conectado no código; **aprovado** = teste i
 | 5. Biblioteca e backup | ✅ Organização Web, metadados, favoritos, coleções/tags, série/volume, Interrompido e restore idempotente. 🟡 Backup | Backup completo de arquivos/progresso/estudo/configurações e offline real ainda pendentes |
 | 6. Sincronização | ⬜ Ausente; ⚠️ servidor/credenciais não configurados | Preparar fila/versionamento e protocolo; troca externa depende de infraestrutura |
 | 7. Vocabulário e TTS | ⬜ Não iniciado | Âncoras/seleção; fonte licenciada de dicionário; motor TTS por plataforma |
-| 8. PDF híbrido e OCR | 🟡 Original/Reflow/cache/qualidade existentes; correspondência fina e OCR ausentes | Mapeamento de blocos; testes por livro; dependência OCR compatível/licenciada |
+| 8. PDF híbrido e OCR | 🟡 OCR local Android e cache/proveniência implementados; gates controlados PASS; aparelho pendente | Validar APK/aparelho, qualidade visual por livro, offline, memória, rotação e obrigações do SDK |
 | 9. Estatísticas/metas | ⬜ Não iniciado | Sessões reais, foreground/inatividade e distinção escuta/leitura |
 | 10. Reparos/camadas/paralelo | ⬜ Não iniciado | Âncoras e mapeamento; perfis declarativos validados |
 | 11. Retomada local | ⬜ Não iniciado | Progresso durável, trechos reais e limites de consulta |

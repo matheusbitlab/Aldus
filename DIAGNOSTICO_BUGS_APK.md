@@ -1,5 +1,11 @@
 # DIAGNÓSTICO DE BUGS DO APK
 
+## Adendo — OCR local de PDF, 11/10/2026
+
+O diagnóstico específico do item 4 confirmou ausência total de motor OCR no baseline (**E**, com fallback **A**): as mensagens “requer OCR” apenas explicavam a rejeição conservadora da extração PDF.js. A causa de Sociedade/Manifesto já estava comprovada antes do builder: mapas de caracteres entregavam muitos controles. A solução atual não tenta reparar encoding nem inventar caracteres; renderiza localmente somente páginas marcadas, usa ML Kit latino empacotado no Android, valida o texto reconhecido e só então monta Reflow. Resultado ausente/ruim retorna ao PDF Original. Web não simula suporte.
+
+Risco residual: OCR é probabilístico, a tarefa ML Kit corrente não expõe cancelamento e a validação física não ocorreu. O lifecycle descarta retorno tardio e não inicia nova página após cancelamento. Compilação Kotlin/APK está bloqueada neste ambiente pela ausência/licença de Android Platform 36 e Build Tools 35, não por erro já observado no módulo. Consulte o checkpoint `OCR — AUDITORIA` em `CORRECOES_BUGS_APK_PROGRESSO.md` para matriz e limites atuais.
+
 Data: 07/10/2026 — America/Sao_Paulo.
 
 Escopo: nove problemas relatados no APK do Kindle Reader. Auditoria de código, artefato, extração PDF e consultas de rede; nenhuma correção, refatoração, migration, mudança de configuração externa ou instrumentação da aplicação foi executada.
