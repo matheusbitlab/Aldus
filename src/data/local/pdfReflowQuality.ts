@@ -1,6 +1,7 @@
 import type { PdfReflowDocument, PdfReflowPageData, PdfReflowQuality } from "@/src/domain/types/pdfReader";
 
 export const PDF_REFLOW_QUALITY_VERSION = 1;
+export const PDF_OCR_VALIDATION_VERSION = 1;
 export const CORRUPT_PDF_TEXT = "A extração de texto deste PDF está corrompida. O PDF Original continua disponível.";
 
 export function assessTextExtractionQuality(items: Iterable<{ text: string }>): PdfReflowQuality {
@@ -51,7 +52,16 @@ export function* validateReflowPagesSteps(pages: PdfReflowPageData[], count: num
 export function isValidatedReflowDocument(document: PdfReflowDocument | null | undefined): document is PdfReflowDocument {
   try {
     const q = document?.extractionQuality;
+    const derivation = document?.derivation;
     if (!q || q.version !== PDF_REFLOW_QUALITY_VERSION || !Number.isInteger(document?.pageCount) || document.pageCount < 1) return false;
+    if (!derivation || derivation.version !== 1 || derivation.validationVersion !== PDF_OCR_VALIDATION_VERSION) return false;
+    if (!Number.isInteger(derivation.ocrPageCount) || derivation.ocrPageCount < 0 || derivation.ocrPageCount !== derivation.ocrPages.length) return false;
+    if (!['text-extraction','ocr','hybrid'].includes(derivation.source)) return false;
+    if (new Set(derivation.ocrPages).size !== derivation.ocrPages.length || derivation.ocrPages.some(page => !Number.isInteger(page) || page < 1 || page > document.pageCount)) return false;
+    if (derivation.source === "text-extraction" && derivation.ocrPageCount !== 0) return false;
+    if (derivation.source === "ocr" && derivation.ocrPageCount !== document.pageCount) return false;
+    if (derivation.source === "hybrid" && (derivation.ocrPageCount < 1 || derivation.ocrPageCount >= document.pageCount)) return false;
+    if (derivation.source !== "text-extraction" && (!derivation.ocrEngine || !derivation.ocrEngineVersion || derivation.ocrPageCount < 1)) return false;
     if (![q.totalChars, q.controlChars, q.letterChars, q.replacementChars].every(n => Number.isFinite(n) && n >= 0) || isClearlyCorruptedTextExtraction(q)) return false;
     // Recheck the actual derivative too: matching version/metadata cannot bless bad text.
     const derived = assessTextExtractionQuality((function* () { for (const chapter of document.chapters) for (const block of chapter.blocks) if (block.text) yield { text: block.text }; })());

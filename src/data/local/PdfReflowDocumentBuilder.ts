@@ -2,6 +2,7 @@ import {
   PdfReflowBlock,
   PdfReflowChapter,
   PdfReflowDocument,
+  PdfReflowDerivation,
   PdfReflowImage,
   PdfReflowPageData,
   PdfReflowTextItem,
@@ -32,16 +33,17 @@ interface FlowParagraph {
 
 export function buildPdfReflowDocument(
   pages: PdfReflowPageData[],
-  pageCount: number
+  pageCount: number,
+  derivation?: PdfReflowDerivation
 ): PdfReflowDocument {
-  const steps = buildReflowSteps(pages, pageCount);
+  const steps = buildReflowSteps(pages, pageCount, derivation);
   let result = steps.next();
   while (!result.done) result = steps.next();
   return result.value;
 }
 
-export async function buildPdfReflowDocumentAsync(pages: PdfReflowPageData[], pageCount: number, signal: AbortSignal): Promise<PdfReflowDocument> {
-  const steps = buildReflowSteps(pages, pageCount);
+export async function buildPdfReflowDocumentAsync(pages: PdfReflowPageData[], pageCount: number, signal: AbortSignal, derivation?: PdfReflowDerivation): Promise<PdfReflowDocument> {
+  const steps = buildReflowSteps(pages, pageCount, derivation);
   for (;;) {
     if (signal.aborted) { steps.return(undefined as never); throw new Error("Processamento cancelado."); }
     const result = steps.next();
@@ -75,7 +77,7 @@ function yieldReflowWork(signal: AbortSignal): Promise<void> {
   });
 }
 
-function* buildReflowSteps(pages: PdfReflowPageData[], pageCount: number): Generator<void, PdfReflowDocument> {
+function* buildReflowSteps(pages: PdfReflowPageData[], pageCount: number, derivation?: PdfReflowDerivation): Generator<void, PdfReflowDocument> {
   const extractionQuality = yield* validateReflowPagesSteps(pages, pageCount);
   const chapters: PdfReflowChapter[] = [{ id: "chapter-0", title: "Início", blocks: [] }];
   const pageLines: Array<{ page: PdfReflowPageData; lines: VisualLine[] }> = [];
@@ -211,6 +213,13 @@ function* buildReflowSteps(pages: PdfReflowPageData[], pageCount: number): Gener
 
   return {
     extractionQuality,
+    derivation: derivation ?? {
+      version: 1,
+      source: "text-extraction",
+      validationVersion: 1,
+      ocrPageCount: 0,
+      ocrPages: [],
+    },
     classification,
     pageCount,
     textPageCount: textPages.size,

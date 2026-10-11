@@ -1009,8 +1009,8 @@ export function ReaderScreen({ bookId }: Props) {
               },
             ]}
           >
-            <Text accessibilityLiveRegion="polite" style={{ color: activePalette.text }}>{reflowFeedback}</Text>
-            <Pressable accessibilityRole="button" onPress={() => setReflowFeedback(null)}>
+            <Text accessibilityLiveRegion="polite" style={[styles.reflowFeedbackText, { color: activePalette.text }]}>{reflowFeedback}</Text>
+            <Pressable accessibilityRole="button" onPress={() => setReflowFeedback(null)} style={styles.reflowFeedbackClose}>
               <Text style={{ color: activePalette.accent, fontWeight: "600" }}>Fechar</Text>
             </Pressable>
           </View>
@@ -1089,5 +1089,16 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderRadius: 6,
+  },
+  reflowFeedbackText: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  reflowFeedbackClose: {
+    flexShrink: 0,
+    alignSelf: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 2,
   },
 });

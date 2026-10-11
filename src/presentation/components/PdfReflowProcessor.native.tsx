@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import * as FileSystem from "expo-file-system/legacy";
-import { PdfReflowPageData } from "@/src/domain/types/pdfReader";
+import { PdfReflowPageData, PdfTextProcessingState } from "@/src/domain/types/pdfReader";
 import { buildPdfReflowDocumentAsync } from "@/src/data/local/PdfReflowDocumentBuilder";
 import { isValidatedReflowDocument, CORRUPT_PDF_TEXT } from "@/src/data/local/pdfReflowQuality";
+import { createPdfOcrPlan, createReflowDerivation, isSufficientOcrText, PdfOcrPlan, replacePageWithOcr } from "@/src/data/local/pdfOcrPolicy";
+import { beginPdfOcr, cancelPdfOcr, recognizePdfPage } from "@/src/data/local/pdfOcr.native";
 import { PdfReflowProgress, PdfReflowProcessorProps, reflowProgressLabel } from "@/src/presentation/components/PdfReflowProcessorProps";
 import { createReflowOperation } from "./reflowOperation";
 import { reflowDiagnostic } from "@/src/utils/reflowDiagnostics";
@@ -16,10 +18,13 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
   const operation = useRef<ReturnType<typeof createReflowOperation> | null>(null);
   const started = useRef(false);
   const assembling = useRef(false);
+  const temporaryOcrUri = useRef<string | null>(null);
   const callbacks = useRef({ onComplete, onError, onProgress, onCancel });
   callbacks.current = { onComplete, onError, onProgress, onCancel };
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [progress, setProgress] = useState<PdfReflowProgress>({ currentPage: 0, totalPages: 0 });
+  const [ocrPlan, setOcrPlan] = useState<PdfOcrPlan | null>(null);
+  const [processingState, setProcessingState] = useState<PdfTextProcessingState>("TEXT_VALID");
   const source = useMemo(() => ({ html: getProcessorHtml(), baseUrl: "https://aldus-reader.local/" }), []);
 
   useEffect(() => {
@@ -30,6 +35,9 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
     started.current = false;
     assembling.current = false;
     pages.current = [];
+    temporaryOcrUri.current = null;
+    setOcrPlan(null);
+    setProcessingState("TEXT_VALID");
     setProgress({ currentPage: 0, totalPages: 0 });
     setPdfBase64(null);
 
@@ -49,14 +57,18 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
 
     return () => {
       run.finish();
+      void cancelPdfOcr(generation.current);
       webView.current?.injectJavaScript("window.cancelPdf && window.cancelPdf(); true;");
       pages.current = [];
+      if (temporaryOcrUri.current) void FileSystem.deleteAsync(temporaryOcrUri.current, { idempotent: true }).catch(() => undefined);
     };
   }, [uri]);
 
   const fail = (message: string) => {
     if (operation.current?.finish()) {
+      setProcessingState(message.includes("OCR não encontrou") ? "OCR_INSUFFICIENT" : "PROCESSING_ERROR");
       reflowDiagnostic("ERROR", { operationId: generation.current });
+      void cancelPdfOcr(generation.current);
       webView.current?.injectJavaScript("window.cancelPdf && window.cancelPdf(); true;");
       pages.current = [];
       callbacks.current.onError(message);
@@ -66,8 +78,65 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
     if (operation.current?.finish()) {
       reflowDiagnostic("CANCEL", { operationId: generation.current });
       webView.current?.injectJavaScript("window.cancelPdf && window.cancelPdf(); true;");
+      void cancelPdfOcr(generation.current);
       pages.current = [];
       callbacks.current.onCancel();
+    }
+  };
+
+  const buildAndFinish = async (extracted: PdfReflowPageData[], totalPages: number, ocrPages: number[]) => {
+    const run = operation.current;
+    if (!run?.active) return;
+    update({ stage: "building", currentPage: totalPages, totalPages });
+    const document = await buildPdfReflowDocumentAsync(
+      extracted,
+      totalPages,
+      run.signal,
+      createReflowDerivation(totalPages, ocrPages)
+    );
+    if (!run.active) return;
+    update({ stage: "validating", currentPage: document.pageCount, totalPages: document.pageCount });
+    if (!isValidatedReflowDocument(document) || document.classification === "image-based") {
+      throw new Error(ocrPages.length > 0 ? "OCR não encontrou texto legível suficiente neste PDF." : CORRUPT_PDF_TEXT);
+    }
+    update({ stage: "finalizing", currentPage: document.pageCount, totalPages: document.pageCount });
+    pages.current = [];
+    setProcessingState(ocrPages.length > 0 ? "OCR_VALID" : "TEXT_VALID");
+    if (run.finish()) {
+      reflowDiagnostic("SUCCESS", { operationId: generation.current, phase: ocrPages.length > 0 ? "ocr" : "extraction" });
+      callbacks.current.onComplete(document);
+    }
+  };
+
+  const startOcr = async () => {
+    const plan = ocrPlan;
+    const run = operation.current;
+    if (!plan || !run?.active) return;
+    setOcrPlan(null);
+    setProcessingState("OCR_PROCESSING");
+    try {
+      await beginPdfOcr(generation.current);
+      if (!run.active) return;
+      const localUri = await ensureLocalOcrUri(uri, pdfBase64, generation.current);
+      if (localUri !== uri) temporaryOcrUri.current = localUri;
+      const pageMap = new Map(pages.current.map(page => [page.pageNumber, page]));
+      for (let index = 0; index < plan.pageNumbers.length; index += 1) {
+        if (!run.active) return;
+        const pageNumber = plan.pageNumbers[index];
+        const page = pageMap.get(pageNumber);
+        if (!page) throw new Error("A página solicitada para OCR não está disponível.");
+        update({ stage: "ocr", currentPage: index, totalPages: plan.pageNumbers.length });
+        const textItems = await recognizePdfPage(localUri, page, generation.current);
+        if (!run.active) return;
+        if (!isSufficientOcrText(textItems)) throw new Error(`OCR não encontrou texto legível suficiente na página ${pageNumber}.`);
+        pageMap.set(pageNumber, replacePageWithOcr(page, textItems));
+        update({ stage: "ocr", currentPage: index + 1, totalPages: plan.pageNumbers.length });
+      }
+      const recognized = pages.current.map(page => pageMap.get(page.pageNumber) ?? page);
+      pages.current = recognized;
+      await buildAndFinish(recognized, plan.totalPages, plan.pageNumbers);
+    } catch (failure) {
+      if (run.active) fail(failure instanceof Error ? failure.message : "Falha no reconhecimento local de texto.");
     }
   };
   const update = (next: PdfReflowProgress) => {
@@ -117,16 +186,21 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
         update({ ...nextProgress, stage: "extracting" });
       } else if (message.type === "complete" && message.totalPages) {
         assembling.current = true;
-        update({ stage: "building", currentPage: message.totalPages, totalPages: message.totalPages });
         const extracted = pages.current;
-        pages.current = [];
-        void buildPdfReflowDocumentAsync(extracted, message.totalPages, run.signal).then(document => {
-          if (!run.active) return;
-          update({ stage: "validating", currentPage: document.pageCount, totalPages: document.pageCount });
-          if (!isValidatedReflowDocument(document)) throw new Error(CORRUPT_PDF_TEXT);
-          update({ stage: "finalizing", currentPage: document.pageCount, totalPages: document.pageCount });
-          if (run.finish()) { reflowDiagnostic("SUCCESS", { operationId: generation.current }); callbacks.current.onComplete(document); }
-        }).catch(error => { if (run.active) fail(error instanceof Error ? error.message : "Falha ao montar o documento PDF."); });
+        const plan = createPdfOcrPlan(extracted);
+        setProcessingState(plan.state);
+        if (plan.state === "OCR_REQUIRED") {
+          const required = new Set(plan.pageNumbers);
+          pages.current = extracted.map(page => required.has(page.pageNumber)
+            ? replacePageWithOcr(page, page.textItems)
+            : page);
+          setOcrPlan(plan);
+          update({ stage: "awaiting-ocr", currentPage: 0, totalPages: plan.pageNumbers.length });
+        } else {
+          void buildAndFinish(extracted, message.totalPages, []).catch(error => {
+            if (run.active) fail(error instanceof Error ? error.message : "Falha ao montar o documento PDF.");
+          });
+        }
       } else if (message.type === "error") {
         fail("Não foi possível extrair o conteúdo deste PDF. O PDF Original continua disponível.");
       }
@@ -154,17 +228,40 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
         />
       ) : null}
       <View style={styles.panel}>
-        <ActivityIndicator size="large" color="#B65F42" />
-        <Text style={styles.title}>Preparando leitura livre</Text>
-        <Text style={styles.description}>
-          {reflowProgressLabel(progress)}
-        </Text>
-        <Pressable accessibilityRole="button" onPress={cancel} style={styles.cancel}>
-          <Text style={styles.cancelText}>Cancelar</Text>
-        </Pressable>
+        {ocrPlan ? (
+          <>
+            <Text accessibilityRole="header" style={styles.title}>Este PDF precisa de OCR</Text>
+            <Text style={styles.description}>
+              {ocrPlan.pageNumbers.length === 1 ? "1 página precisa" : `${ocrPlan.pageNumbers.length} páginas precisam`} de reconhecimento local de texto. O processo ocorre neste aparelho e pode demorar.
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => void startOcr()} style={styles.primaryAction}>
+              <Text style={styles.primaryActionText}>Reconhecer texto</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={cancel} style={styles.cancel}>
+              <Text style={styles.cancelText}>Continuar no PDF Original</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <ActivityIndicator size="large" color="#B65F42" />
+            <Text style={styles.title}>{processingState === "OCR_PROCESSING" ? "Reconhecendo texto" : "Preparando leitura livre"}</Text>
+            <Text style={styles.description}>{reflowProgressLabel(progress)}</Text>
+            <Pressable accessibilityRole="button" onPress={cancel} style={styles.cancel}>
+              <Text style={styles.cancelText}>Cancelar</Text>
+            </Pressable>
+          </>
+        )}
       </View>
     </View>
   );
+}
+
+async function ensureLocalOcrUri(uri: string, base64: string | null, operationId: number): Promise<string> {
+  if (uri.startsWith("file://") || uri.startsWith("content://") || !uri.includes("://")) return uri;
+  if (!base64 || !FileSystem.cacheDirectory) throw new Error("O OCR requer uma cópia local deste PDF.");
+  const target = `${FileSystem.cacheDirectory}aldus-ocr-${operationId}.pdf`;
+  await FileSystem.writeAsStringAsync(target, base64, { encoding: "base64" } as never);
+  return target;
 }
 
 async function readRemotePdf(uri: string, signal: AbortSignal): Promise<string> {
@@ -293,4 +390,6 @@ const styles = StyleSheet.create({
   description: { color: "#D4C5A9", fontSize: 14, textAlign: "center" },
   cancel: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 18 },
   cancelText: { color: "#F3E5C8", fontSize: 14, fontWeight: "600" },
+  primaryAction: { marginTop: 10, borderRadius: 8, backgroundColor: "#B65F42", paddingVertical: 12, paddingHorizontal: 20 },
+  primaryActionText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
 });

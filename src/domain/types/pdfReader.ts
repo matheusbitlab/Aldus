@@ -57,6 +57,7 @@ export interface PdfReflowPageData {
 
 export interface PdfReflowDocument {
   extractionQuality?: PdfReflowQuality;
+  derivation?: PdfReflowDerivation;
   classification: PdfClassification;
   pageCount: number;
   textPageCount: number;
@@ -64,6 +65,24 @@ export interface PdfReflowDocument {
   characterCount: number;
   chapters: PdfReflowChapter[];
   toc: PdfReflowTocEntry[];
+}
+
+export type PdfTextProcessingState =
+  | "TEXT_VALID"
+  | "OCR_REQUIRED"
+  | "OCR_PROCESSING"
+  | "OCR_VALID"
+  | "OCR_INSUFFICIENT"
+  | "PROCESSING_ERROR";
+
+export interface PdfReflowDerivation {
+  version: number;
+  source: "text-extraction" | "ocr" | "hybrid";
+  validationVersion: number;
+  ocrEngine?: string;
+  ocrEngineVersion?: string;
+  ocrPageCount: number;
+  ocrPages: number[];
 }
 
 export interface PdfReflowQuality {
@@ -100,7 +119,7 @@ export interface PdfReaderSettings {
   reflowProgress: number | null;
 }
 
-export const PDF_REFLOW_PROCESSOR_VERSION = 11;
+export const PDF_REFLOW_PROCESSOR_VERSION = 12;
 
 export const defaultPdfReaderSettings: PdfReaderSettings = {
   mode: "original",

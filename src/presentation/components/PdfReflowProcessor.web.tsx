@@ -4,6 +4,7 @@ import { getDocument, GlobalWorkerOptions, ImageKind, OPS, type PDFPageProxy } f
 import { PdfReflowImage, PdfReflowPageData } from "@/src/domain/types/pdfReader";
 import { buildPdfReflowDocumentAsync } from "@/src/data/local/PdfReflowDocumentBuilder";
 import { assessTextExtractionQuality, isClearlyCorruptedTextExtraction, CORRUPT_PDF_TEXT, isValidatedReflowDocument } from "@/src/data/local/pdfReflowQuality";
+import { createPdfOcrPlan, createReflowDerivation } from "@/src/data/local/pdfOcrPolicy";
 import { PdfReflowProgress, PdfReflowProcessorProps, reflowProgressLabel } from "@/src/presentation/components/PdfReflowProcessorProps";
 import { createReflowOperation } from "./reflowOperation";
 
@@ -19,6 +20,7 @@ interface PdfTextItem {
 
 export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCancel }: PdfReflowProcessorProps) {
   const [progress, setProgress] = useState<PdfReflowProgress>({ currentPage: 0, totalPages: 0 });
+  const [ocrRequiredPages, setOcrRequiredPages] = useState(0);
   const cancel = useRef<() => void>(() => {});
   const callbacks = useRef({ onComplete, onError, onProgress, onCancel });
   callbacks.current = { onComplete, onError, onProgress, onCancel };
@@ -86,8 +88,15 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
           } finally { page.cleanup(); }
         }
         if (operation.active) {
+          const ocrPlan = createPdfOcrPlan(pages);
+          if (ocrPlan.state === "OCR_REQUIRED") {
+            setOcrRequiredPages(ocrPlan.pageNumbers.length);
+            update({ stage: "awaiting-ocr", currentPage: 0, totalPages: ocrPlan.pageNumbers.length });
+            release();
+            return;
+          }
           update({ stage: "building", currentPage: pdf.numPages, totalPages: pdf.numPages });
-          const document = await buildPdfReflowDocumentAsync(pages, pdf.numPages, operation.signal);
+          const document = await buildPdfReflowDocumentAsync(pages, pdf.numPages, operation.signal, createReflowDerivation(pdf.numPages, []));
           update({ stage: "validating", currentPage: pdf.numPages, totalPages: pdf.numPages });
           if (!isValidatedReflowDocument(document)) throw new Error(CORRUPT_PDF_TEXT);
           update({ stage: "finalizing", currentPage: pdf.numPages, totalPages: pdf.numPages });
@@ -107,14 +116,26 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
   return (
     <View style={styles.overlay}>
       <View style={styles.panel}>
-        <ActivityIndicator size="large" color="#B65F42" />
-        <Text style={styles.title}>Preparando leitura livre</Text>
-        <Text style={styles.description}>
-          {reflowProgressLabel(progress)}
-        </Text>
-        <Pressable accessibilityRole="button" onPress={() => cancel.current()} style={styles.cancel}>
-          <Text style={styles.cancelText}>Cancelar</Text>
-        </Pressable>
+        {ocrRequiredPages > 0 ? (
+          <>
+            <Text accessibilityRole="header" style={styles.title}>Este PDF precisa de OCR</Text>
+            <Text style={styles.description}>
+              {ocrRequiredPages === 1 ? "1 página precisa" : `${ocrRequiredPages} páginas precisam`} de reconhecimento de texto. O OCR local está disponível no aplicativo Android, mas não nesta versão Web.
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => cancel.current()} style={styles.cancel}>
+              <Text style={styles.cancelText}>Continuar no PDF Original</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <ActivityIndicator size="large" color="#B65F42" />
+            <Text style={styles.title}>Preparando leitura livre</Text>
+            <Text style={styles.description}>{reflowProgressLabel(progress)}</Text>
+            <Pressable accessibilityRole="button" onPress={() => cancel.current()} style={styles.cancel}>
+              <Text style={styles.cancelText}>Cancelar</Text>
+            </Pressable>
+          </>
+        )}
       </View>
     </View>
   );

@@ -1,7 +1,7 @@
 import { PdfReflowDocument } from "@/src/domain/types/pdfReader";
 
 export interface PdfReflowProgress {
-  stage?: "opening" | "extracting" | "building" | "validating" | "finalizing";
+  stage?: "opening" | "extracting" | "awaiting-ocr" | "ocr" | "building" | "validating" | "finalizing";
   currentPage: number;
   totalPages: number;
   imageCount?: number;
@@ -16,6 +16,9 @@ export interface PdfReflowProcessorProps {
 }
 
 export function reflowProgressLabel(progress: PdfReflowProgress) {
+  if (progress.stage === "ocr") return progress.totalPages > 0
+    ? `Reconhecendo texto: página ${progress.currentPage} de ${progress.totalPages} (${Math.floor(progress.currentPage / progress.totalPages * 100)}%)`
+    : "Iniciando reconhecimento de texto...";
   if (progress.stage === "building") return "Montando documento...";
   if (progress.stage === "validating") return "Validando texto extraído...";
   if (progress.stage === "finalizing") return "Finalizando leitura livre...";
