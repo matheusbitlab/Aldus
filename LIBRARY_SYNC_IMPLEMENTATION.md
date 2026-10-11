@@ -1,6 +1,6 @@
 # Biblioteca vinculada à conta — 11/10/2026
 
-Este checkpoint prevalece sobre afirmações históricas de ausência de ownership/sync. Retomar pelo próximo bloco incompleto; não repetir toda a auditoria. Baseline: `73f6dfe`, master; arquivos versionados limpos, somente caches Gradle não rastreados. Nenhum trabalho anterior descartado.
+Este checkpoint prevalece sobre afirmações históricas de ausência de ownership/sync. Retomar pelo próximo bloco incompleto; não repetir toda a auditoria. Baseline: `73f6dfe`, main; arquivos versionados limpos, somente caches Gradle não rastreados. Nenhum trabalho anterior descartado.
 
 ## Auditoria e mapa anterior
 
@@ -45,3 +45,17 @@ Estado pré-commit: build inicial falhou por SDK location not found; repetição
 8. Textos de privacidade, documentos e validação final.
 
 Gates finais bloco1 PASS: typecheck (após guardas Blob/PDF settings), test-library-account, test:import (após UUID/cancelamento de conta), test-library-organization, test-study-storage, export:web (2362 módulos) e diff check. Web exportado; UI e IndexedDB por esta matriz nova ainda NÃO TESTADOS. APK pós-commit registrado no ledger local.
+
+## Bloco 2 — schema privado/RLS/Storage
+
+IMPLEMENTADO: migration nova 202610110001_private_account_library.sql. user_library_items usa ownership auth.users, PK composta conta/kind/id, entidades independentes book/progress/bookmark/highlight/organization/pdf_position, revision por sequência servidor, updated_at servidor e deleted_at. Outbox usará RPC library_apply com CAS e recibo idempotente por operation UUID; cliente não tem escrita direta/sequence/recibos. Tombstone é permanente para a mesma identidade; novo import gera novo UUID. Payload máximo256KiB; arrays de grifos não são substituídos. Inventário read-only 02_library_sync_inventory.sql preparado.
+
+Bucket aldus-private-library PRIVADO, limite preparado512MiB (plano remoto pode limitar mais), MIME EPUB/PDF, caminhos conta/livro/SHA256.ext, objetos imutáveis sem UPDATE/upsert. Policies próprias + fences RESTRICTIVE restringem policies permissivas preexistentes para este bucket. SELECT exige arquivo publicado em livro ativo; anon negado. INSERT exige livro ativo próprio; delete só prefixo próprio. Função de policy security definer com search_path vazio faz somente teste booleano próprio, permitindo negar anon sem exigir SELECT na tabela privada. Sem URL pública/service_role cliente/compartilhamento.
+
+VALIDADO CONTROLADO: PostgreSQL real WASM PGlite executou migration inteira e RLS A→B/B→A/anon, Storage policies de listar/insert/update/delete, inclusive com policies permissivas preexistentes simuladas; CAS/retry/recibo alterado/relitura .9→.1/tombstone/filho após delete PASS. Não simula nem prova serviço HTTP Storage. Ferramenta instalada isoladamente em .expo/library-db-test, sem dependência do app/lockfile: npm install --ignore-scripts --package-lock=false --no-save --prefix .expo/library-db-test @electric-sql/pglite.
+
+MIGRATION CRIADA — NÃO APLICADA REMOTAMENTE. Sonda pública atual: Auth200, OpenAPI401, tabelas antigas401/42501, username-login404. Somente configuração pública; sem acesso Postgres/admin/sessão de teste. RLS REMOTO PENDENTE; STORAGE REMOTO PENDENTE. Inventário remoto/schema/grants INCONCLUSIVOS. Aplicar somente após executar inventários e comparar migrations reais; não reaplicar históricas.
+
+Bloco1 commit3be78c6 — feat: scope local library by account. APK pós-commit FAIL,0bytes/nenhum APK criado; log artifacts/apk/build-3be78c6.log: APK BLOQUEADO POR AMBIENTE (Platform36/BuildTools35/licenças). Download do SDK Manager oficial ainda em andamento; nenhum artefato antigo renomeado. Ledger durável artifacts/apk/checkpoint.jsonl.
+
+PENDENTE: blocos3–8; Android físico/Supabase/Storage real NÃO TESTADOS. Bloco2 APK será executado imediatamente após commit e registrado no mesmo ledger.
