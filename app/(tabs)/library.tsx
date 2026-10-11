@@ -25,6 +25,7 @@ import { Book, MOCK_BOOKS } from "@/src/constants/mockBooks";
 import { markEpubLibraryReady, startEpubOpenTrace } from "@/src/utils/epubOpenMetrics";
 import { useBookImport } from "@/src/presentation/hooks/useBookImport";
 import { BookImportModal } from "@/src/presentation/components/BookImportModal";
+import { BookCloudControls } from '@/src/presentation/components/LibrarySyncControls';
 
 type BookFilter = "all" | "reading" | "completed" | "unread" | "interrupted" | "favorites";
 type BookSort = "recent" | "title" | "author" | "progress" | "series";
@@ -344,6 +345,7 @@ export default function Library() {
               }}
             />
             <Text numberOfLines={1} style={{ color: palette.secondaryText, fontSize: 12 }}>{organization[item.id]?.favorite ? "★ · " : ""}{readingStatusLabels[inferredReadingStatus(item, organization[item.id])]}{organization[item.id]?.series ? ` · ${organization[item.id].series}${organization[item.id].volume ? ` ${organization[item.id].volume}` : ""}` : ""}</Text>
+            <BookCloudControls book={item}/>
             <Pressable accessibilityRole="button" accessibilityLabel={`Organizar ${toCardBook(item, Boolean(organization[item.id])).title}`} disabled={Boolean(organizationError)} onPress={() => { const displayed = toCardBook(item, Boolean(organization[item.id])); setOrganizing({ ...item, title: displayed.title, author: displayed.author }); }} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text, textAlign: "center" }}>Organizar</Text></Pressable>
             </View>
           )}

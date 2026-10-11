@@ -89,17 +89,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (!supabase) { setError("Supabase não configurado."); setLoading(false); return; }
     let alive = true;
     const client = supabase;
+    let authEventRevision=0;
     const { data: listener } = client.auth.onAuthStateChange((event, next) => {
+      const ticket=++authEventRevision;
+      revision.current++;
       libraryAccountScope.set(next?.user.id ?? null);
+      if(alive && activeUserId.current!==(next?.user.id??null)) { setSession(next);setProfile(null);setOverrides({});setLoading(!!next); }
       authDiagnostic("AUTH_EVENT", { operationId: correlatedAuthDiagnostic(next?.user.id), correlation: "candidate", authEvent: event, uuid: next?.user.id, session: !!next });
-      if (alive) setTimeout(() => { if (alive) void resolve(next); }, 0);
+      if (alive) setTimeout(() => { if (alive && ticket===authEventRevision) void resolve(next); }, 0);
     });
-    void client.auth.getSession().then(({ data }) => { if (alive) void resolve(data.session); })
-      .catch(() => { if (alive) { setError("Não foi possível recuperar a sessão."); setLoading(false); } });
+    const initialTicket=authEventRevision;
+    void client.auth.getSession().then(({ data }) => { if (alive && initialTicket===authEventRevision) void resolve(data.session); })
+      .catch(() => { if (alive && initialTicket===authEventRevision) { setError("Não foi possível recuperar a sessão."); setLoading(false); } });
     return () => { alive = false; revision.current++; listener.subscription.unsubscribe(); };
   }, [resolve]);
 
-  const refreshProfile = useCallback(async () => { if (session) await resolve(session); }, [resolve, session]);
+  const refreshProfile = useCallback(async () => { if (session && session.user.id===libraryAccountScope.userId) await resolve(session); }, [resolve, session]);
   const signOut = useCallback(async () => {
     if (!supabase) return;
     const formerUserId = session?.user.id;
@@ -109,7 +114,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (localResult.error) throw new Error("Não foi possível sair. Tente novamente.");
     }
     if (formerUserId) await AsyncStorage.removeItem(cacheKey(formerUserId)).catch(() => undefined);
-    await resolve(null);
+    if(libraryAccountScope.userId===null)await resolve(null);
   }, [resolve, session?.user.id]);
   const canUse = useCallback((feature: FeatureKey) => canUseFeature(profile, overrides, feature), [profile, overrides]);
   const value = useMemo<AuthState>(() => ({ loading, session, user: session?.user ?? null, profile, overrides, error, refreshProfile, signOut, canUse }), [loading, session, profile, overrides, error, refreshProfile, signOut, canUse]);

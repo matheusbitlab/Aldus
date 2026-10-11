@@ -31,7 +31,8 @@ async function device(remote){
  const org=instantiate('src/data/library/AccountOrganizationRepository.ts','AccountOrganizationRepository',journal.journalOrganization(organization,sync,scope),books);
  return {db,scope,books,raw,chapters,progress:guarded(progress,'progress'),marks:guarded(marks,'bookmark'),highlights:guarded(highlights,'highlight'),org,pdf:guarded(pdf,'pdf_position'),sync,replica,persistence,load,synchronize:async()=>{await replica.seed(sync);await sync.sync();}};
 }
-(async()=>{
+module.exports={backend,device};
+if(require.main===module)(async()=>{
  const remote=backend(),a=await device(remote),b=await device(remote);
  const book={ownerUserId:A,id:'book-x',title:'X',author:'Writer',fileName:'x.epub',filePath:'file:///local/x.epub',fileHash:null,mimeType:'application/epub+zip',fileSize:12,coverImagePath:null,totalChapters:1,totalWords:8,addedDate:1,lastOpenedDate:null,isDeleted:false,progress:0,importComplete:false};
  await a.books.save(book);assert.equal(a.sync.status.pending,0);assert.equal((await a.books.listActive()).length,0,'incomplete import hidden');

@@ -146,7 +146,8 @@ export class LibrarySyncService {
   }
   async resolveConflict(key: string, choice: 'local'|'remote') {
     const run=this.scope.capture();if(!run.userId)return;
-    const entry=(await this.persistence.read(run.userId)).entries[key];run.check();if(!entry?.conflict)return;
+    const state=await this.persistence.read(run.userId),entry=state.entries[key];run.check();if(!entry?.conflict)return;
+    if(choice==='local' && (entry.shadow?.deleted_at || state.entries[syncKey('book',entry.bookId)]?.shadow?.deleted_at))throw new Error('Livro removido da conta. Importe novamente para criar uma nova identidade.');
     if(choice==='local') { const local=entry.conflict;await this.change(entry.kind,entry.id,entry.bookId,local.payload,local.deleted,()=>this.applyLocal(run.userId!,{...entry,payload:local.payload,deleted:local.deleted})); }
     else await this.persistence.mutate(run.userId,s=>{delete s.entries[key].conflict;});
     await this.refreshStatus();

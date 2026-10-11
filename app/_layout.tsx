@@ -1,7 +1,9 @@
 import { Stack } from "expo-router";
 import Head from "expo-router/head";
 import { useEffect } from "react";
-import { ActivityIndicator, DimensionValue, Platform, StatusBar, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, AppState, DimensionValue, Platform, StatusBar, StyleSheet, useWindowDimensions, View } from "react-native";
+import { addNetworkStateListener } from 'expo-network';
+import { appDependencies } from '@/src/presentation/services/dependencies';
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -40,6 +42,13 @@ function AppShell() {
   const { loading, session, profile } = useAuth();
   const usePhoneFrame = Platform.OS === "web" && width > 480;
   const appReady = !loading && !!session && !!profile?.username && profile.account_status === "active";
+  useEffect(()=>{
+    if(!appReady)return;
+    const sync=appDependencies.librarySync;sync.start();
+    const foreground=AppState.addEventListener('change',state=>{if(state==='active')sync.schedule(0);});
+    const network=addNetworkStateListener(state=>{if(state.isConnected && state.isInternetReachable!==false)sync.schedule();});
+    return()=>{foreground.remove();network.remove();sync.stop();};
+  },[appReady,session?.user.id]);
   useEffect(() => {
     authDiagnostic("AUTH_GUARD_DECISION", { operationId: correlatedAuthDiagnostic(session?.user.id), correlation: "candidate", guard: "shell", decision: appReady ? "allowed" : "blocked",
       uuid: session?.user.id, session: !!session, profile: !!profile, username: !!profile?.username, accountStatus: profile?.account_status, loading, appReady });

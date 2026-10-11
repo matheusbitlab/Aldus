@@ -9,6 +9,7 @@ import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { AppThemeMode } from "@/src/theme/tokens";
 import { useAuth } from "@/src/presentation/contexts/AuthContext";
 import { getAppMetadata } from "@/src/legal/appMetadata";
+import { LibrarySyncControls } from '@/src/presentation/components/LibrarySyncControls';
 
 const themeOptions: Array<{ value: AppThemeMode; label: string }> = [
   { value: "system", label: "Sistema" },
@@ -33,6 +34,7 @@ export default function Settings() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.pageTitle, { color: palette.text }]}>Ajustes</Text>
+        <Section title="BIBLIOTECA DA CONTA" color={palette.secondaryText}><View style={[styles.group,{backgroundColor:palette.surface,borderColor:palette.border}]}><LibrarySyncControls/></View></Section>
 
         <Section title="APARÊNCIA" color={palette.secondaryText}>
           <View style={[styles.group, { backgroundColor: palette.surface, borderColor: palette.border }]}>

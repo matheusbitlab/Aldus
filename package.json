@@ -29,7 +29,8 @@
     "build:apk:archive": "node scripts/archive-commit-apk.mjs",
     "test:library:sync": "node scripts/test-library-sync.cjs",
     "test:library:files": "node scripts/test-library-files.cjs",
-    "test:library:reading": "node scripts/test-library-reading-sync.cjs"
+    "test:library:reading": "node scripts/test-library-reading-sync.cjs",
+    "test:library:coordinator": "node scripts/test-library-coordinator.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

@@ -205,12 +205,13 @@ export function ReaderScreen({ bookId }: Props) {
 
   useEffect(() => {
     let active = true;
+    const downloadController=new AbortController();
     let objectUrl: string | null = null;
     setBookStatus("loading");
     setBookError(null);
 
     const initialReadStartedAt = markEpubOpenSpanStart("initial_book_and_chapter_read");
-    void appDependencies.openBook.execute(bookId)
+    void appDependencies.openBook.execute(bookId,downloadController.signal)
       .then(async (result) => {
         markEpubOpenSpanEnd("initial_book_and_chapter_read", initialReadStartedAt, {
           found: Boolean(result),
@@ -363,6 +364,7 @@ export function ReaderScreen({ bookId }: Props) {
 
     return () => {
       active = false;
+      downloadController.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [bookId, setProgress]);
