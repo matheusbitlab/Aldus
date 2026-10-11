@@ -11,7 +11,7 @@ import { PdfFileImporter } from '@/src/data/local/PdfFileImporter';
 import { ImportEpubUseCase } from '@/src/domain/usecases/ImportEpubUseCase';
 import { throwIfAborted, withAbort } from '@/src/core/utils/cancellation';
 import { newLibraryId } from '@/src/domain/entities/libraryId';
-import { hashBookFile, MAX_PRIVATE_BOOK_SIZE } from './BookFileIntegrity';
+import { hashBookFile, MAX_PRIVATE_BOOK_SIZE, privateBookPath } from './BookFileIntegrity';
 import { BookFileDriver, BookFileReference } from './PrivateBookFileService';
 
 const BUCKET = 'aldus-private-library';
@@ -137,7 +137,7 @@ export class SupabaseBookFileDriver implements BookFileDriver {
   async removeLocal(book: LibraryBook) {
     if (Platform.OS === 'web') { await this.files.delete(book.id); return; }
     if (!book.filePath) return;
-    if (!FileSystem.documentDirectory || !book.filePath.startsWith(`${FileSystem.documentDirectory}books/imported/`)) throw new Error('A cópia está fora do diretório controlado pelo Aldus.');
+    if (!FileSystem.documentDirectory || !book.filePath.startsWith(`${FileSystem.documentDirectory}books/imported/`) || book.filePath.split('/').some(part=>part==='..'||part==='.') || /%2e|%2f|%5c|\\/i.test(book.filePath)) throw new Error('A cópia está fora do diretório controlado pelo Aldus.');
     await FileSystem.deleteAsync(book.filePath, { idempotent: true });
   }
   async removeRemote(owner: string, path: string, signal: AbortSignal) {
@@ -151,5 +151,17 @@ export class SupabaseBookFileDriver implements BookFileDriver {
     if (status >= 200 && status < 300) return;
     throw new Error(status === 401 ? 'Entre novamente para transferir arquivos.' : status === 413 ? 'O limite de arquivo do servidor foi excedido.'
       : status === 404 ? 'O armazenamento privado ainda não está disponível no servidor.' : 'Falha na transferência privada. Tente novamente.');
+  }
+  async listBookObjects(owner:string,bookId:string,signal:AbortSignal):Promise<string[]>{
+    privateBookPath(owner,bookId,'0'.repeat(64),'epub');
+    const paths:string[]=[],headers={...await this.headers(owner),'Content-Type':'application/json'};
+    for(let page=0;page<20;page++){
+      throwIfAborted(signal);
+      const response=await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/list/${BUCKET}`,{method:'POST',headers,signal,body:JSON.stringify({prefix:`${owner}/${bookId}`,limit:100,offset:page*100,sortBy:{column:'name',order:'asc'}})});
+      this.checkStatus(response.status);const entries=await response.json();if(!Array.isArray(entries))throw new Error('Resposta privada inválida.');
+      for(const entry of entries){if(typeof entry.name!=='string'||!/^[a-f0-9]{64}\.(epub|pdf)$/.test(entry.name))throw new Error('Referência privada inválida.');paths.push(`${owner}/${bookId}/${entry.name}`);}
+      if(entries.length<100)return paths;
+    }
+    throw new Error('Exclusão de arquivos privados precisa de outra tentativa.');
   }
 }

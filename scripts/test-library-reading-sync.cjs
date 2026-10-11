@@ -9,8 +9,8 @@ function backend(){let revision=0;const rows=new Map(),receipts=new Map();let of
    if(e.kind!=='book')assert.ok(rows.get(owner+'book:'+e.bookId)&&!rows.get(owner+'book:'+e.bookId).deleted_at);
    const row={user_id:owner,kind:e.kind,id:e.id,book_id:e.bookId,payload:clone(e.payload),revision:++revision,updated_at:new Date().toISOString(),deleted_at:e.deleted?new Date().toISOString():null};rows.set(key,row);const result={accepted:true,row};receipts.set(owner+e.operationId,clone(result));return result;
  }}};}
-async function device(remote){
- const db=new DatabaseSync(':memory:'),kv=new Map(),storage={getItem:async k=>kv.get(k)||null,setItem:async(k,v)=>kv.set(k,v)};
+async function device(remote,options={}){
+ const db=new DatabaseSync(options.path??':memory:'),kv=options.kv??new Map(),storage={getItem:async k=>kv.get(k)||null,setItem:async(k,v)=>kv.set(k,v)};
  const load=loader({'react-native':{Platform:{OS:'android'}},'@react-native-async-storage/async-storage':storage,'@/src/data/database/connection/database':{getDatabase:async()=>sqliteAdapter(db)}});
  await load('src/data/database/migrations/MigrationRunner.ts').runMigrations(sqliteAdapter(db));db.exec('PRAGMA foreign_keys=ON');
  const scope=new(load('src/data/library/LibraryAccountScope.ts').LibraryAccountScope)();scope.set(A);

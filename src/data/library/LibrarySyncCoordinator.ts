@@ -34,7 +34,7 @@ export class LibrarySyncCoordinator {
   stop(){this.enabled=false;if(this.timer)clearTimeout(this.timer);this.timer=null;this.engine.cancel();this.files.cancel();}
   schedule(delay=2500){if(!this.enabled||!this.scope.userId)return;if(this.timer)clearTimeout(this.timer);this.timer=setTimeout(()=>{this.timer=null;void this.syncNow().catch(()=>undefined);},delay);}
   private needsFile(book:LibraryBook){return !book.isDeleted && book.importComplete!==false && !book.remotePath && !!book.filePath && !(book.bundledAssetId && findBundledAsset(book.bundledAssetId)?.hash===book.fileHash);}
-  async refresh(){const run=this.scope.capture();const [state,books]=await Promise.all([this.engine.snapshot(),this.books.listOwned()]);run.check();this.state=state;this.status={...this.status,pendingFiles:books.filter(book=>this.needsFile(book)).length};await this.engine.refreshStatus();run.check();this.emit();}
+  async refresh(){const run=this.scope.capture();const [state,books]=await Promise.all([this.engine.snapshot(),this.books.listOwned()]);run.check();this.state=state;this.status={...this.status,pendingFiles:books.filter(book=>this.needsFile(book)||(book.isDeleted&&!book.remoteCleanupDone)).length};await this.engine.refreshStatus();run.check();this.emit();}
   availability(book:LibraryBook):LibraryAvailability {
     const transfer=this.files.states.get(book.id);if(transfer)return transfer.state;
     const entries=Object.values(this.state?.entries??{}).filter(e=>e.bookId===book.id);

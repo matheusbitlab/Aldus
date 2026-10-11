@@ -29,7 +29,12 @@ export function equalSyncPayload(a: Record<string, any>, b: Record<string, any>)
 }
 export function emptySyncState(owner: string): LibrarySyncState { return { id: owner, entries: {}, lastSync: null }; }
 export function validateRemoteRow(row: RemoteLibraryRow, owner: string): void {
-  if (!row || row.user_id !== owner || !libraryEntityKinds.includes(row.kind) || !row.id || !row.book_id
+  const validId=(value:unknown)=>typeof value==='string' && value.length>0 && value.length<=200 && !/[\\/\u0000-\u001f]/.test(value) && !['.','..','__proto__','constructor','prototype'].includes(value);
+  if (!row || row.user_id !== owner || !libraryEntityKinds.includes(row.kind) || !validId(row.id) || !validId(row.book_id)
     || !Number.isSafeInteger(row.revision) || row.revision < 1 || !row.payload || typeof row.payload !== 'object'
-    || Array.isArray(row.payload) || (row.kind === 'book' && row.id !== row.book_id)) throw new Error('Resposta de sincronização inválida.');
+    || Array.isArray(row.payload) || (row.kind === 'book' && row.id !== row.book_id)
+    || typeof row.updated_at!=='string' || !Number.isFinite(Date.parse(row.updated_at))
+    || (row.deleted_at!==null && (typeof row.deleted_at!=='string' || !Number.isFinite(Date.parse(row.deleted_at))))) throw new Error('Resposta de sincronização inválida.');
+  const inspect=(value:any,depth=0):void=>{if(depth>20)throw new Error('Resposta de sincronização inválida.');if(value && typeof value==='object')for(const key of Object.keys(value)){if(['__proto__','constructor','prototype'].includes(key))throw new Error('Resposta de sincronização inválida.');inspect(value[key],depth+1);}};
+  if(JSON.stringify(row.payload).length>256*1024)throw new Error('Resposta de sincronização inválida.');inspect(row.payload);
 }

@@ -90,6 +90,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let alive = true;
     const client = supabase;
     let authEventRevision=0;
+    const initialTicket=authEventRevision;
     const { data: listener } = client.auth.onAuthStateChange((event, next) => {
       const ticket=++authEventRevision;
       revision.current++;
@@ -98,7 +99,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       authDiagnostic("AUTH_EVENT", { operationId: correlatedAuthDiagnostic(next?.user.id), correlation: "candidate", authEvent: event, uuid: next?.user.id, session: !!next });
       if (alive) setTimeout(() => { if (alive && ticket===authEventRevision) void resolve(next); }, 0);
     });
-    const initialTicket=authEventRevision;
     void client.auth.getSession().then(({ data }) => { if (alive && initialTicket===authEventRevision) void resolve(data.session); })
       .catch(() => { if (alive && initialTicket===authEventRevision) { setError("Não foi possível recuperar a sessão."); setLoading(false); } });
     return () => { alive = false; revision.current++; listener.subscription.unsubscribe(); };

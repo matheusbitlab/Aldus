@@ -17,7 +17,7 @@ function server() {
   pull:async(owner,signal)=>{if(offline)throw Error('offline');if(delay)await delay; if(signal.aborted)throw Error('aborted');return clone([...records.values()].filter(r=>r.user_id===owner));},
   apply:async(owner,e,signal)=>{if(offline)throw Error('offline');if(signal.aborted)throw Error('aborted');const receipt=receipts.get(owner+'/'+e.operationId);if(receipt)return clone(receipt);
    const previous=records.get(key(owner,e));if(previous&&(previous.revision!==e.baseRevision||previous.deleted_at))return {accepted:false,row:clone(previous)};
-   const row={user_id:owner,kind:e.kind,id:e.id,book_id:e.bookId,payload:clone(e.payload),revision:++revision,updated_at:'server-order-'+revision,deleted_at:e.deleted?'deleted':null};records.set(key(owner,e),row);
+   const row={user_id:owner,kind:e.kind,id:e.id,book_id:e.bookId,payload:clone(e.payload),revision:++revision,updated_at:new Date(1700000000000+revision).toISOString(),deleted_at:e.deleted?new Date(1700000000000+revision).toISOString():null};records.set(key(owner,e),row);
    const result={accepted:true,row};receipts.set(owner+'/'+e.operationId,clone(result));if(loseResponse){loseResponse=false;throw Error('lost response');}return clone(result);
   }
  };return {adapter,records,offline:v=>offline=v,lose:()=>loseResponse=true,delay:v=>delay=v};

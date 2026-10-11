@@ -34,13 +34,15 @@ const clone=x=>structuredClone(x);
    return {books,values,files,chapters,driver,service,fail:v=>failSave=v};
  }
  const book=(id,format='pdf')=>({ownerUserId:A,id,title:'X',author:'Author',fileName:`x.${format}`,filePath:`web-${format}://${id}`,fileHash:null,mimeType:format==='pdf'?'application/pdf':'application/epub+zip',fileSize:0,coverImagePath:null,totalChapters:1,totalWords:0,addedDate:1,lastOpenedDate:null,isDeleted:false,progress:.42,importComplete:true});
- const a=device(),b=device();const pdf=new Blob(['%PDF-1.7\ncontrolled valid header\n%%EOF'],{type:'application/pdf'});
+ const document=await require('pdf-lib').PDFDocument.create();document.addPage([300,400]).drawText('Real PDF fixture for private sync');
+ const a=device(),b=device();const pdf=new Blob([await document.save()],{type:'application/pdf'});
  await a.books.save(book('x'));a.files.set('x',pdf);
  offline=true;await assert.rejects(a.service.upload('x'),/offline/);assert.equal((await a.books.findById('x')).filePath,'web-pdf://x');assert.equal(a.service.states.get('x').state,'ERROR');
  offline=false;lost=true;await assert.rejects(a.service.upload('x'),/lost response/);await a.service.upload('x');assert.equal(objects.size,1,'lost upload response retry does not duplicate files');
  const published=await a.books.findById('x');assert.equal(published.fileSize,pdf.size);assert.match(published.fileHash,/^[a-f0-9]{64}$/);
  await b.books.save({...published,filePath:'',coverImagePath:null});assert.equal(b.files.size,0,'metadata only does not download a book');
- const local=await b.service.ensureLocal('x');assert.equal(local.filePath,'web-pdf://x');assert.equal(local.progress,.42);assert.equal(b.chapters.get('x').length,1);assert.equal(await b.files.get('x').text(),await pdf.text());
+ b.fail(true);await assert.rejects(b.service.ensureLocal('x'),/disk full/);assert.equal((await b.books.findById('x')).filePath,'','failed publication must not expose an incomplete local book');b.fail(false);
+ const local=await b.service.ensureLocal('x');assert.equal(local.filePath,'web-pdf://x');assert.equal(local.progress,.42);assert.equal(b.chapters.get('x').length,1);assert.equal(await b.files.get('x').text(),await pdf.text());assert.equal((await require('pdf-lib').PDFDocument.load(await b.files.get('x').arrayBuffer())).getPageCount(),1);
  await b.service.removeDeviceCopy('x');assert.equal((await b.books.findById('x')).filePath,'');assert.equal(b.files.size,0);assert.equal(objects.size,1);await b.service.ensureLocal('x');assert.equal(b.files.size,1);
  await b.service.removeDeviceCopy('x');corrupt=true;await assert.rejects(b.service.ensureLocal('x'),/incompleto|integridade/);assert.equal((await b.books.findById('x')).filePath,'');assert.equal(b.files.size,0);corrupt=false;
  let release;hold=new Promise(r=>release=r);const late=b.service.ensureLocal('x');await new Promise(r=>setTimeout(r,5));scope.set(B);user=B;release();await assert.rejects(late,/conta mudou|cancel/i);assert.equal(await b.books.findById('x'),null);assert.equal(b.files.size,0);hold=null;scope.set(A);user=A;

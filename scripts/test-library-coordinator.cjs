@@ -12,6 +12,7 @@ const owner='11111111-1111-4111-8111-111111111111';
   validate:async(file,book)=>({book,chapters:[{id:'chapter',bookId:book.id,chapterIndex:0,title:'Chapter',html:'<p>Reading</p>',characterCount:7,startCfi:null,endCfi:null}]}),
   promote:async(file,book)=>{const uri='local-'+book.id;local.set(uri,file.bytes);return uri;},dispose:async()=>{},removeLocal:async book=>local.delete(book.filePath),
   removeRemote:async(user,path)=>{assert.equal(user,owner);assert.ok(remote.rows.get(owner+'book:cloud-book').deleted_at,'remote delete requires acknowledged tombstone');deletes++;objects.delete(path);},
+  listBookObjects:async(user,bookId)=>{assert.equal(user,owner);return [...objects.keys()].filter(path=>path.startsWith(user+'/'+bookId+'/'));},
  };
  const Files=d.load('src/data/library/PrivateBookFileService.ts').PrivateBookFileService,Coordinator=d.load('src/data/library/LibrarySyncCoordinator.ts').LibrarySyncCoordinator;
  const files=new Files(d.books,d.chapters,driver,d.scope),sync=new Coordinator(d.books,d.replica,d.sync,files,d.scope);return{local,files,sync};}
@@ -22,7 +23,8 @@ const owner='11111111-1111-4111-8111-111111111111';
  const Open=b.load('src/domain/usecases/OpenBookUseCase.ts').OpenBookUseCase;const open=new Open(b.books,b.chapters,b.progress,b.org,(id,signal)=>y.files.ensureLocal(id,signal));
  const opened=await open.execute(book.id);assert.ok(opened.book.filePath);assert.equal(opened.chapters.length,1);await y.sync.syncNow();assert.equal(y.sync.availability(opened.book),'SYNCED');
  await y.sync.removeDeviceCopy(book.id);cloud=await b.books.findById(book.id);assert.equal(cloud.filePath,'');assert.equal(y.sync.availability(cloud),'CLOUD_ONLY');await open.execute(book.id);assert.equal(deletes,0);
- await a.books.softDelete(book.id);await x.sync.syncNow();assert.equal(deletes,1);await y.sync.syncNow();assert.equal(await b.books.findById(book.id),null);assert.equal((await b.books.listActive()).length,0);
+ objects.set(owner+'/'+book.id+'/'+'0'.repeat(64)+'.pdf',Buffer.from('lost upload response orphan'));
+ await a.books.softDelete(book.id);await x.sync.syncNow();assert.equal(deletes,2,'cleanup also finds unacknowledged private objects');await y.sync.syncNow();assert.equal(await b.books.findById(book.id),null);assert.equal((await b.books.listActive()).length,0);
  x.sync.stop();y.sync.stop();a.scope.set(null);await x.sync.refresh();assert.equal(x.sync.status.pendingFiles,0);a.scope.set('22222222-2222-4222-8222-222222222222');assert.equal((await a.books.listActive()).length,0);assert.equal(x.sync.engine.status.pending,0);
  a.db.close();b.db.close();console.log('PASS coordinator with actual SQLite: offline import, publish-before-upload, publish-after-upload, no eager download, OpenBook on-demand, verified device-only eviction/reopen, acknowledged remote cleanup/tombstones and account revocation.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

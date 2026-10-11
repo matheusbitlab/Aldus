@@ -17,11 +17,13 @@ export interface BookFileDriver {
   dispose(file: BookFileReference): Promise<void>;
   removeLocal(book: LibraryBook): Promise<void>;
   removeRemote(owner: string, path: string, signal: AbortSignal): Promise<void>;
+  listBookObjects?(owner:string,bookId:string,signal:AbortSignal):Promise<string[]>;
 }
 export type BookTransferState = 'UPLOADING' | 'DOWNLOADING' | 'ERROR';
 export class PrivateBookFileService {
   readonly states = new Map<string, { state: BookTransferState; error?: string }>();
   private jobs = new Map<string, { controller: AbortController; promise: Promise<LibraryBook>; generation: number }>();
+  private evictions=new Map<string,number>();
   private listeners = new Set<() => void>();
   constructor(private books: AccountBookRepository, private chapters: ChapterRepository, private readonly driver: BookFileDriver,
     private scope: LibraryAccountScope = libraryAccountScope) {
@@ -54,6 +56,7 @@ export class PrivateBookFileService {
     this.jobs.set(id, { controller, promise, generation: this.scope.generation }); return promise;
   }
   upload(id: string) {
+    if(this.evictions.get(id)===this.scope.generation)return Promise.reject(new Error('Aguarde a remoção da cópia local.'));
     return this.job(id, 'UPLOADING', async (signal, check, owner) => {
       const book = await this.books.findById(id); check();
       if (!book || book.importComplete === false) throw new Error('A importação local precisa terminar primeiro.');
@@ -82,10 +85,11 @@ export class PrivateBookFileService {
     });
   }
   async ensureLocal(id: string, signal?: AbortSignal): Promise<LibraryBook> {
+    if(this.evictions.get(id)===this.scope.generation)throw new Error('Aguarde a remoção da cópia local.');
     const run = this.scope.capture();
     const book = await this.books.findById(id); run.check(); throwIfAborted(signal);
     if (!book || book.importComplete===false) throw new Error('Livro não disponível ou importação incompleta nesta conta.');
-    if (book.filePath.startsWith('bundled-') || await this.driver.local(book)) { run.check(); return book; }
+    if (book.filePath.startsWith('bundled-') || (book.filePath && await this.driver.local(book))) { run.check(); return book; }
     return this.job(id, 'DOWNLOADING', async (abort, check, owner) => {
       if (!book.remotePath || !book.fileHash) throw new Error('O arquivo ainda não terminou de sincronizar no outro dispositivo.');
       const expected = privateBookPath(owner, id, book.fileHash, book.mimeType === 'application/pdf' ? 'pdf' : 'epub');
@@ -113,16 +117,20 @@ export class PrivateBookFileService {
   }
   /** Preserve the local pointer until a remote copy was independently verified. */
   async removeDeviceCopy(id: string) {
-    if(this.jobs.has(id))throw new Error('Aguarde a transferência deste livro terminar.');
+    if(this.jobs.get(id)?.generation===this.scope.generation || this.evictions.get(id)===this.scope.generation)throw new Error('Aguarde a transferência deste livro terminar.');
     const run = this.scope.capture(); if (!run.userId) throw new Error('Entre na sua conta.');
+    const generation=this.scope.generation;this.evictions.set(id,generation);
+    try{await this.evictDeviceCopy(id,run);}finally{if(this.evictions.get(id)===generation)this.evictions.delete(id);}
+  }
+  private async evictDeviceCopy(id:string,run:ReturnType<LibraryAccountScope['capture']>){
     const book = await this.books.findById(id); run.check();
     if (!book?.remotePath || !book.fileHash || book.bundledAssetId) throw new Error('Sincronize e confirme o arquivo privado antes de remover a cópia local.');
     const controller = new AbortController(), unsubscribe = this.scope.subscribe(() => controller.abort());
     let copy: BookFileReference | undefined;
     try {
-      const expected = privateBookPath(run.userId, id, book.fileHash, book.mimeType === 'application/pdf' ? 'pdf' : 'epub');
+      const expected = privateBookPath(run.userId!, id, book.fileHash, book.mimeType === 'application/pdf' ? 'pdf' : 'epub');
       if (expected !== book.remotePath) throw new Error('Referência privada inválida.');
-      copy = await this.driver.download(run.userId, expected, controller.signal);
+      copy = await this.driver.download(run.userId!, expected, controller.signal);
       await this.verify(copy, book.fileSize, book.fileHash, controller.signal); run.check();
       const current = await this.books.findById(id); run.check(); if (!current || current.remotePath !== expected) throw new Error('Livro alterado.');
       await this.books.save({ ...current, filePath: '', localEvictionPath: current.filePath }); run.check();
@@ -140,7 +148,9 @@ export class PrivateBookFileService {
     const run=this.scope.capture();if(!run.userId||book.ownerUserId!==run.userId||!book.isDeleted)throw new Error('Exclusão privada inválida.');
     const controller=new AbortController(),unsubscribe=this.scope.subscribe(()=>controller.abort());
     try {
-      if(path){const hash=path.split('/').pop()?.split('.')[0];if(!hash||privateBookPath(run.userId,book.id,hash,book.mimeType==='application/pdf'?'pdf':'epub')!==path)throw new Error('Referência privada inválida.');await this.driver.removeRemote(run.userId,path,controller.signal);run.check();}
+      const paths=new Set(path?[path]:[]);
+      if(this.driver.listBookObjects)for(const orphan of await this.driver.listBookObjects(run.userId,book.id,controller.signal)){run.check();paths.add(orphan);}
+      for(const candidate of paths){const hash=candidate.split('/').pop()?.split('.')[0];if(!hash||privateBookPath(run.userId,book.id,hash,book.mimeType==='application/pdf'?'pdf':'epub')!==candidate)throw new Error('Referência privada inválida.');await this.driver.removeRemote(run.userId,candidate,controller.signal);run.check();}
       const current=(await this.books.listOwned()).find(b=>b.id===book.id);run.check();
       if(current?.isDeleted)await this.books.save({...current,remoteCleanupDone:true});
     }finally{unsubscribe();}

@@ -24,8 +24,8 @@ function harness(options = {}) {
   let currentSession = options.initialSession ?? null, callback, state;
   const client = {
     auth: {
-      getSession: async () => ({ data: { session: currentSession }, error: null }),
-      onAuthStateChange: fn => { callback = fn; return { data: { subscription: { unsubscribe() { callback = null; } } } }; },
+      getSession: async () => options.restoreGate ? options.restoreGate.promise : ({ data: { session: currentSession }, error: null }),
+      onAuthStateChange: fn => { callback = fn;if(options.initialEvent)fn('INITIAL_SESSION',options.initialEvent);return { data: { subscription: { unsubscribe() { callback = null; } } } }; },
       signInWithPassword: async () => {
         events.push('signIn');
         if (options.invalid) return { data: { session: null, user: null }, error: { code: 'invalid_credentials', status: 400 } };
@@ -39,8 +39,8 @@ function harness(options = {}) {
       },
       signOut: async () => { currentSession = null; callback?.('SIGNED_OUT', null); return { error: null }; },
     },
-    from: table => ({ select: () => ({ eq: () => table === 'profiles'
-      ? { single: async () => options.profileGate ? options.profileGate.promise : options.profileError
+    from: table => ({ select: () => ({ eq: (_column,id) => table === 'profiles'
+      ? { single: async () => options.profileById ? options.profileById(id) : options.profileGate ? options.profileGate.promise : options.profileError
         ? { data: null, error: { code: '42501', status: 403 } }
         : { data: options.profile ?? account, error: null } }
       : Promise.resolve({ data: [], error: null }) }) }),
@@ -98,6 +98,7 @@ function harness(options = {}) {
     async input(label, value) { await act(async () => { tree.root.findAllByType('AuthInput').find(n => n.props.label === label).props.onChangeText(value); }); },
     async press(title) { await act(async () => { tree.root.findAllByType('AuthButton').find(n => n.props.title === title).props.onPress(); await Promise.resolve(); }); },
     async logout() { await act(async () => { await state.signOut(); await pause(); }); },
+    async emitSessions(sessions){await act(async()=>{for(const next of sessions){currentSession=next;callback?.(next?'SIGNED_IN':'SIGNED_OUT',next);}await pause();});},
     error: () => tree.root.findAllByType('AuthError').map(n => n.props.message).filter(Boolean).join('|'),
     allowed: () => tree.root.findAllByType('AuthorizedApp').length > 0,
     redirects: () => tree.root.findAllByType('Redirect').map(n => n.props.href),
@@ -239,6 +240,13 @@ async function run() {
     assert.ok(!JSON.stringify(signupLogs).includes(marker));
     console.log('PASS diagnostics: opt-in timeline, strict serialization, no raw input/error/session fields');
 
+    const secondUuid='22222222-2222-4222-8222-222222222222',secondSession={user:{id:secondUuid}},profileFor=id=>({data:{...account,id},error:null});
+    const restore=deferred();h=harness({restoreGate:restore,profileById:profileFor});await h.mount();await h.emitSessions([session,secondSession]);
+    assert.equal(h.load('src/data/library/LibraryAccountScope.ts').libraryAccountScope.userId,secondUuid);assert.equal(h.state().profile.id,secondUuid);
+    restore.resolve({data:{session},error:null});await h.settle();assert.equal(h.state().session.user.id,secondUuid,'late getSession cannot restore A');await h.unmount();
+    const oldProfile=deferred();h=harness({initialSession:session,profileById:id=>id===uuid?oldProfile.promise:profileFor(id)});await h.mount();await h.emitSessions([secondSession]);oldProfile.resolve(profileFor(uuid));await h.settle();assert.equal(h.state().profile.id,secondUuid,'late A profile cannot replace B');await h.unmount();
+    h=harness({initialEvent:secondSession,initialSession:session,profileById:profileFor});await h.mount();await h.settle();assert.equal(h.state().session.user.id,secondUuid,'synchronous INITIAL_SESSION invalidates stale restore');await h.emitSessions([session,secondSession,session]);assert.equal(h.state().session.user.id,uuid);assert.equal(h.state().profile.id,uuid);await h.unmount();
+    console.log('PASS account races: queued A/B/ABA events, stale getSession/profile, synchronous INITIAL_SESSION cannot restore a revoked account');
     const migration=fs.readFileSync('supabase/migrations/202610060001_profiles_and_features.sql','utf8');
     assert.match(migration,/references auth\.users\(id\)/);
     assert.match(migration,/grant update \(username, display_name, avatar_url\) on public\.profiles to authenticated/);
