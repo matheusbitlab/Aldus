@@ -2,6 +2,8 @@
 
 ## DRIVE — AUDITORIA / SEARCH, 11/10/2026
 
+DRIVE — DOWNLOAD/IMPORT / FINAL: IMPLEMENTADO, mocks EPUB/PDF/8 MiB/headers/HTTP/401/cancel/preparação/transferência/cleanup tardio Native PASS. Importadores existentes não alterados; extensão mínima DownloadManager para PDF e auth, checagem HTTP e cleanup necessário. Gates typecheck/ranking/Drive/Sources/pipeline/catalogs/import/legal/notices/Web export2345/diff check PASS. Autolinking Android PASS, compileDebugKotlin/manifest BLOQUEADOS por SDK 36/Build Tools 35/licenças, nenhum APK novo nem teste físico. Google real NÃO TESTADO. Legal público0.3, configuração/limites/fixtures em GOOGLE_DRIVE_IMPLEMENTATION.md. Checkpoints anteriores de download pendente superados; Reader/OCR/Auth geral congelados.
+
 DRIVE — AUTH/CONEXÃO / LISTAGEM: Android separado do Supabase/GIS Web, tokens memória/fontes estáveis. Parsing/paginação/TTL/refresh/erros/abort/late validados com mocks; store source-specific Drive e regressões JSON/OPDS/HTML/parciais/stale PASS. Build Android/Drive real NÃO TESTADOS neste checkpoint. Configuração/scopes/limites em GOOGLE_DRIVE_IMPLEMENTATION.md.
 
 Contrato Sources/Search e aquisição auditados; Google Supabase não concede Drive. Ranking existente consolidado, sem reabrir campanha Reader/Auth/OCR. Extensões e diacríticos Unicode removidos somente da representação de pesquisa; maioria de tokens que admitia termo alheio removida. Matriz de títulos/autor/typos/ordem/curtas ampliada em test-catalog-ranking. Auth Drive e download PDF ainda PENDENTES; nenhuma conta real conectada.

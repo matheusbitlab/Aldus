@@ -6,6 +6,8 @@ Versão dos documentos públicos: 0.3
 
 Estado: **implementação jurídica inicial; revisão profissional e validação operacional pendentes**.
 
+Checkpoint Drive final: download explícito entrega EPUB/PDF ao importador existente, sem upload; metadata índice memória, config local, credenciais app memória/header transitório, API Google direta. GIS script só carregado no modal quando Drive é escolhido ou há fonte Drive já cadastrada, preparando o gesto de reconexão. Revogação Web GIS/Native POST, best effort; importados preservados. Gates legal/typecheck/notices/export PASS, sem conta real. Play Services Auth depende também de termos/licenças/transitivos nativos, ainda em revisão antes de produção. Não há alegação de conformidade definitiva.
+
 Este arquivo registra o que foi observado no código e por que os textos públicos foram redigidos dessa forma. Ele não é parecer jurídico, certificação de conformidade nem substituto para validar o ambiente remoto, contratos com fornecedores e práticas reais de operação.
 
 ## 1. Inventário técnico auditado

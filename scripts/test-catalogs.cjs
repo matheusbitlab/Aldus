@@ -5,6 +5,7 @@ const ts = require('typescript');
 const cache = new Map();
 const storage = new Map();
 const mocks = {
+  'expo-modules-core': { requireOptionalNativeModule: () => null },
   'react-native': { Platform: { OS: 'web' } },
   'expo-file-system/legacy': {},
   'expo-network': {},

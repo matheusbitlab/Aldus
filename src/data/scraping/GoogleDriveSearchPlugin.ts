@@ -7,6 +7,6 @@ export class GoogleDriveSearchPlugin implements SearchPlugin {
   readonly skipLinkValidation = true;
   constructor(private readonly source: UserSource) { this.name = source.name; }
   async search(query: string, signal?: AbortSignal) { return rankCatalogBooks(await googleDrive.list(this.source, signal), query); }
-  getSearchEndpoint() { throw new Error("Drive usa o adapter autenticado, não uma URL pública de pesquisa."); return ""; }
+  getSearchEndpoint(): string { throw new Error("Drive usa o adapter autenticado, não uma URL pública de pesquisa."); }
   parseResults() { return []; }
 }

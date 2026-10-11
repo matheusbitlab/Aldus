@@ -1,6 +1,8 @@
 # PROJECT CONTEXT
 
-## Itens novos — Google Drive, 11/10/2026 (em andamento)
+## Itens novos — Google Drive, 11/10/2026 (implementado; validação externa pendente)
+
+DRIVE — DOWNLOAD/IMPORT / CHECKPOINT FINAL: IMPLEMENTADO e VALIDADO COM MOCKS. DownloadManager estendido de forma restrita com headers transitórios/resolver de fonte persistida/EPUB+PdfFileImporter existentes, sem tokens em job. Aquisição única explícita; HTTP/401 antes do parser; bytes reais/indeterminado/operationId/AbortSignal/terminal guard. Native temp/move/cleanup após erro/cancel/escrita tardia testado, Web streaming Blob/timeout por inatividade 60 s. Não reescritos importadores, Reader/OCR/Reflow/Auth geral. Fonte removida preserva livros. Todos gates typecheck/ranking/Drive metadata+auth+download/Sources/catalogs/import/legal/notices/Web export (2345 módulos)/diff check PASS. Android autolinking PASS; Kotlin/manifest/APK BLOQUEADOS por Platform 36/Build Tools 35/licenças SDK, físico NÃO TESTADO. Google real NÃO TESTADO; API/consentimento/client/origins/SHA externamente PENDENTES. Textos públicos 0.3 e notas atualizados. Roteiro/arquivos/limites em GOOGLE_DRIVE_IMPLEMENTATION.md. Registro anterior de download PENDENTE abaixo é histórico, superado por este checkpoint. Próxima etapa BIBLIOTECA PERMANENTE POR FONTE.
 
 DRIVE — AUTH/CONEXÃO / LISTAGEM: IMPLEMENTADO e VALIDADO COM MOCKS. Android AuthorizationClient/GIS Web, drive.readonly amplo somente leitura, tokens memória/expiração/clearToken/401/reconnect explícito/revogação best effort. Fonte estável folderId/resourceKey; plugin assíncrono no use case existente. Parsing seguro, raiz validada, paginação completa metadados EPUB/PDF/shared drive, TTL 5 min memória/refresh, geração/abort sem cache parcial. Atalhos/subpastas/Docs excluídos; nenhum download de conteúdo/autoria inventada. Configuração externa em GOOGLE_DRIVE_IMPLEMENTATION.md. Conta real/Android físico NÃO TESTADOS; DownloadManager ainda PENDENTE.
 

@@ -10,7 +10,7 @@ Scope único: `https://www.googleapis.com/auth/drive.readonly`, restrito, **leit
 
 Tokens app só memória por sourceId; Web expires_in, Android 45 min conservadores (API sem expires_in, cache SDK pode vencer antes, sempre tratar 401). Google Play Services mantém cache próprio; clearToken em invalidação/desconexão. Sem refresh token/offline access. Reload perde tokens/índice, não fonte. Conectar/Atualizar é ação explícita; busca não abre popup espontâneo. Autorização limitada 120 s, metadata 20 s, revogação 10 s. Erros sanitizados, sem resposta/token em logs.
 
-Disconnect limpa sessão/índice e tenta POST de revogação. Offline/sem token: revogação remota NÃO confirmada; UI orienta myaccount.google.com/connections. Remover apaga configuração/conexão/índice, não livros importados. Revogar pode afetar grants/fontes da mesma conta/projeto; preferir projeto Google dedicado ao Drive, separado do Google Supabase. Não prometer revogação isolada por pasta.
+Disconnect limpa sessão/índice e tenta GIS revoke na Web/POST nativo de revogação. Offline/sem token: revogação remota NÃO confirmada; UI orienta myaccount.google.com/connections. Remover apaga configuração/conexão/índice, não livros importados. Revogar pode afetar grants/fontes da mesma conta/projeto; preferir projeto Google dedicado ao Drive, separado do Google Supabase. Não prometer revogação isolada por pasta.
 
 ## Configuração externa exata — PENDENTE, nenhum painel alterado
 
@@ -34,9 +34,29 @@ DRIVE — SEARCH: NFKD/diacríticos Unicode/caixa/pontuação/separadores/espaç
 
 ## Aquisição e evidência
 
-DRIVE — DOWNLOAD/IMPORT: PENDENTE neste checkpoint; downloadRequest já valida pertencimento ao índice, existência/permissão atual e retorna alt=media+headers transitórios, nunca no store.
+DRIVE — DOWNLOAD/IMPORT: IMPLEMENTADO / VALIDADO COM MOCKS. DownloadJob guarda format/sourceId/fileId, nunca token/header. DriveDownloadResolver verifica fonte ativa/persistida e chama downloadRequest para confirmar pertença ao índice/permissão atual; headers só na variável transitória do DownloadManager. EPUB usa EpubFileImporter existente; PDF usa PdfFileImporter existente (sem parser/persistência paralelos). Biblioteca recarrega após sucesso. HTTP falho é rejeitado antes de mover/importar; 401 invalida grant/índice, não vira arquivo corrompido. Resposta de token antigo não invalida conexão nova.
 
-VALIDADO COM MOCKS: test-google-drive, test-catalog-ranking, test-search-pipeline, test-source-integrations e typecheck/test:legal. Parsing/metadata/paginação/cache/update/formato/HTTP/rede/abort/late/desconexão/permissão/source-specific/ranking. Export Web PASS (2344 módulos). Android autolinking PASS; tentativa `:aldus-drive-auth:compileDebugKotlin :app:processDebugMainManifest` BLOQUEADA antes da compilação por SDK Platform 36/Build Tools 35 ausentes e licenças não aceitas em C:/Android/sdk. Não aceitar licenças automaticamente pelo usuário; instalar/aceitar pelo SDK Manager e repetir. Kotlin/APK/Android físico NÃO TESTADOS. **NÃO TESTADO COM CONTA REAL**: mocks não validam console/consentimento/token/SHA/origens/download real.
+Native baixa em books/temp, verifica HTTP/tamanho, move para books/imported e passa URI ao importer; falha/cancel limpa temp e arquivo movido, incluindo escrita nativa tardia. Web faz streaming em Blob e passa ao importer, sem refetch não autenticado. Bytes/total reais dão percentual; total ausente é indeterminado. operationId/AbortSignal/terminal/stale guards preservados. Ajustes estritamente dependentes: checagem HTTP nativa, cleanup tardio demonstrado em teste, timeout Web por inatividade 60 s (não duração inteira para arquivo grande), cancelamento até persistência existente. Não alterados os importadores/lifecycle local. Web continua necessitando memória proporcional ao arquivo (chunks+Blob); não há streaming direto para disco/resume. Native usa downloader Expo existente, sem novo timeout/resume automático.
+
+## Gates finais — 11/10/2026
+
+PASS: npm run typecheck; node scripts/test-catalog-ranking.cjs; npm run test:drive (metadata/auth wrapper/repositório/resolver + download EPUB/PDF/8 MiB/cancel/erros/cleanup Native mocks); node scripts/test-source-integrations.cjs; node scripts/test-search-pipeline.cjs; node scripts/test-catalogs.cjs; npm run test:import; npm run test:legal; npm run legal:notices:check; npm run export:web (2345 módulos); git diff --check. Fronteiras OAuth/SKD/HTTP/FS são controladas nos testes, não conta real. scripts Sources receberam mocks da nova fronteira Native para não tentar executar código RN em Node.
+
+| Consulta testada | Primeiro resultado da fixture |
+| --- | --- |
+| Memórias Póstumas de Brás Cubas; memorias postumas de bras cubas; bras cubas; memorias bras | Memórias Póstumas de Brás Cubas.epub |
+| Dom Casmuro; casmurro dom | Dom Casmurro |
+| revoluçao dos bichos; revolucao bichos | A Revolução dos Bichos.pdf |
+| sociedade espetaculo | A Sociedade do Espetáculo |
+| Machdo Assis | Memórias Póstumas de Brás Cubas.epub (autor real na fixture; também encontra Dom Casmurro) |
+| CAPITAL; O Banquete | O Capital; O Banquete, respectivamente |
+| vazio; a; x; @@!; casxxxmurro; memorias bras astronauta | sem resultado |
+
+VALIDAÇÃO REAL PENDENTE: após configurar Cloud e build, cadastrar pasta pequena real com EPUB/PDF/arquivos outros; verificar metadata sem alt=media durante busca; testar pasta vazia e >1000 filhos; importar EPUB/PDF pequeno/grande; cancelar antes/durante download; conferir biblioteca e reabrir livros; expirar/revogar autorização e receber reconectar; 403/404 de pasta inacessível; desconectar/remover preservando importados; testar Web popup bloqueado/negado e Android retorno/certificado. Não executar no Drive de usuário sem autorização; nenhuma conta real foi conectada nesta tarefa.
+
+Arquivos: src/data/drive/{DriveAuthorization,DriveErrors,driveFolder,drivePlatformAuth,GoogleDriveService,driveDependencies,DriveDownloadResolver}.ts; src/data/scraping/{GoogleDriveSearchPlugin,catalogPlugins}.ts; src/domain/search/catalogRanking.ts; src/domain/types/{sources,search,download}.ts; src/domain/usecases/SearchBooksUseCase.ts; src/data/downloads/DownloadManager.ts; src/presentation/{components/SourceManagerModal.tsx,stores/sourceStore.ts,services/dependencies.ts}; app/(tabs)/search.tsx; modules/aldus-drive-auth/{expo-module.config.json,android/build.gradle,android/src/main/AndroidManifest.xml,android/src/main/java/expo/modules/aldusdriveauth/AldusDriveAuthModule.kt}; scripts/test-{catalog-ranking,catalogs,search-pipeline,google-drive,drive-download}.cjs; package.json; src/legal/{legalConfig,legalContent}.ts; este documento e PROJECT_CONTEXT/ROADMAP_FUNCIONALIDADES/CORRECOES_BUGS_APK_PROGRESSO/LEGAL_IMPLEMENTATION_NOTES/AUTH_IMPLEMENTATION. Nenhum .env/token/secret/APK/keystore/artifact incluído.
+
+Android autolinking PASS; tentativa `:aldus-drive-auth:compileDebugKotlin :app:processDebugMainManifest` BLOQUEADA antes da compilação por SDK Platform 36/Build Tools 35 ausentes e licenças não aceitas em C:/Android/sdk. Não aceitar licenças automaticamente pelo usuário; instalar/aceitar pelo SDK Manager e repetir. Kotlin/APK/Android físico NÃO TESTADOS. **NÃO TESTADO COM CONTA REAL**: mocks não validam console/consentimento/token/SHA/origens/download real.
 
 Próxima etapa: BIBLIOTECA PERMANENTE POR FONTE, não implementada agora.
 

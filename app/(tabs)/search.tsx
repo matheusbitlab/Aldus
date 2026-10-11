@@ -76,11 +76,14 @@ export default function Search() {
     book = await appDependencies.searchBooks.resolveAcquisition(book, controller.signal);
     if (controller.signal.aborted) return;
     setSelectedBook(book);
-    const fileName = `${safeFileBase(book.title)}.epub`;
+    const format = book.format === "pdf" ? "pdf" : "epub";
+    const fileName = `${safeFileBase(book.title.replace(/\.(?:epub|pdf)$/i, ""))}.${format}`;
     await enqueue({
       id: book.url,
       url: book.url,
       fileName,
+      format,
+      drive: book.drive && book.sourceId ? { sourceId: book.sourceId, fileId: book.drive.fileId } : undefined,
       status: "queued",
       progress: 0,
       localUri: null,
@@ -91,7 +94,7 @@ export default function Search() {
     const job = useDownloadStore.getState().jobs[book.url];
     if (job?.status === "completed") {
       await useLibraryStore.getState().load();
-      setAcquisitionMessage("EPUB baixado e adicionado à Biblioteca.");
+      setAcquisitionMessage("Livro baixado e adicionado à Biblioteca.");
     } else if (job?.error) {
       setAcquisitionMessage(job.error);
     }
@@ -338,7 +341,7 @@ function BookDetailsModal({
                 <Text style={styles.acquireText}>{active ? "Importação em andamento…" : job?.status === "failed" || job?.status === "cancelled" ? "Tentar novamente" : "Baixar e adicionar"}</Text>
               </Pressable>
             ) : null}
-            {Platform.OS === "web" && job?.status === "failed" && book ? (
+            {Platform.OS === "web" && job?.status === "failed" && book && !book.drive ? (
               <>
                 <Text style={{ color: palette.secondaryText, fontSize: 12 }}>O servidor pode bloquear o download dentro do app por CORS. Salve o EPUB pelo navegador e use Importar na Biblioteca.</Text>
                 <Pressable accessibilityRole="button" onPress={() => void Linking.openURL(book.url)} style={styles.closeButton}>
@@ -370,11 +373,11 @@ function remoteProgressText(job: ReturnType<typeof useDownloadStore.getState>["j
   switch (job.phase) {
     case "preparing": return "Preparando download…";
     case "downloading": return job.progressKnown ? `Baixando ${Math.round(job.progress * 100)}%` : "Baixando…";
-    case "validating": return "Validando EPUB…";
+    case "validating": return "Validando arquivo…";
     case "reading_metadata": return "Lendo título e capítulos…";
     case "persisting": return "Salvando na Biblioteca…";
     case "finalizing": return "Atualizando Biblioteca…";
-    default: return job.status === "queued" ? "Preparando download…" : "Importando EPUB…";
+    default: return job.status === "queued" ? "Preparando download…" : "Importando livro…";
   }
 }
 

@@ -71,4 +71,38 @@ const response = data => new Response(JSON.stringify(data),{headers:{'Content-Ty
   const store=storeLoad('src/presentation/stores/searchStore.ts').useSearchStore;
   store.getState().setQuery('bras cubas');await store.getState().search(source.name);assert.equal(store.getState().results[0].sourceId,source.id);assert.equal(store.getState().sourceStatuses.length,1);
   console.log('PASS source-specific Drive selection runs only its adapter');
+  // Use the real source store/repository with only AsyncStorage and network mocked.
+  let saved=null;
+  const persistent=loader({'@react-native-async-storage/async-storage':{getItem:async()=>saved,setItem:async(_k,v)=>{saved=v;}},'@/src/data/drive/driveDependencies':{googleDrive:service}});
+  const sourceStore=persistent('src/presentation/stores/sourceStore.ts').useSourceStore;
+  await sourceStore.getState().add(source);assert.equal(sourceStore.getState().sources[0].id,source.id,'Probe ID must survive persistence');assert.equal(sourceStore.getState().sources[0].folderId,source.folderId);assert.doesNotMatch(saved,/accessToken|fixture-token|Bearer/);
+  await sourceStore.getState().remove(source.id);assert.deepEqual(JSON.parse(saved),[]);assert.throws(()=>auth.token(source.id));
+  console.log('PASS real source repository stable ID/configuration persistence and removal/connection cleanup without library deletion');
+  let nextToken='token-a';const rotating=new DriveAuthorization({...provider,authorize:async()=>({accessToken:nextToken,expiresAt:Date.now()+3600000})});await rotating.connect(source.id);
+  const rotatingService=new GoogleDriveService(rotating);nextToken='token-b';await rotating.connect(source.id);assert.throws(()=>rotatingService.checkDownloadStatus(source.id,401,'token-a'),e=>e.code==='disconnected');assert.equal(rotating.token(source.id),'token-b','An old HTTP response must not invalidate a newer grant');
+  console.log('PASS old credential HTTP response cannot invalidate newly connected Drive session');
+  await auth.connect(source.id);
+  const resolver=loader({'@/src/data/drive/driveDependencies':{googleDrive:service},'@/src/data/sources/UserSourceRepository':{UserSourceRepository:class{async list(){return [source];}}}})('src/data/drive/DriveDownloadResolver.ts').driveDownloadResolver;
+  const resolved=await resolver.resolve({url:books[0].url,drive:{sourceId:source.id,fileId:'epub1'}},new AbortController().signal);assert.match(resolved.url,/alt=media/);assert.equal(resolved.headers.Authorization,'Bearer fixture-token');
+  await assert.rejects(resolver.resolve({drive:{sourceId:'removed-source',fileId:'epub1'}},new AbortController().signal),e=>e.code==='disconnected');
+  assert.deepEqual(await resolver.resolve({url:'https://public.example/book.epub'},new AbortController().signal),{url:'https://public.example/book.epub',headers:{}});
+  console.log('PASS actual Drive resolver source membership/current authorization/public fallback, transient headers only');
+  // Platform wrappers use real code; OAuth/SKD boundary is controlled, not a real account.
+  const originalWindow=global.window, originalClient=process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID;
+  try {
+    process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID='public-fixture.apps.googleusercontent.com';
+    let callback,mode='success';
+    global.window={google:{accounts:{oauth2:{initTokenClient:options=>{assert.equal(options.include_granted_scopes,false);assert.equal(options.scope,'https://www.googleapis.com/auth/drive.readonly');callback=options.callback;return {requestAccessToken:()=>{if(mode==='success')callback({access_token:'fixture-web-token',expires_in:3600,scope:options.scope});if(mode==='denied')callback({access_token:'fixture',expires_in:3600,scope:'openid'});if(mode==='closed')options.error_callback();}};}}}}};
+    const webAuth=loader({'react-native':{Platform:{OS:'web'}},'expo-modules-core':{requireOptionalNativeModule:()=>{throw Error('No native lookup on Web');}}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;
+    await webAuth.prepare();assert.equal((await webAuth.authorize()).accessToken,'fixture-web-token');
+    let webRevoked=false;global.window.google.accounts.oauth2.revoke=(token,callback)=>{assert.equal(token,'fixture-web-token');webRevoked=true;callback({successful:true});};await webAuth.revoke('fixture-web-token');assert.equal(webRevoked,true);
+    mode='denied';await assert.rejects(webAuth.authorize(),e=>e.code==='permission');mode='closed';await assert.rejects(webAuth.authorize(),e=>e.code==='disconnected');
+    mode='late';const abort=new AbortController(),lateWeb=webAuth.authorize(abort.signal);abort.abort();await assert.rejects(lateWeb,e=>e.name==='AbortError');callback({access_token:'late',expires_in:3600,scope:'https://www.googleapis.com/auth/drive.readonly'});
+    delete process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID;await assert.rejects(webAuth.prepare(),e=>e.code==='configuration');
+    const gate=deferred();let cancels=0;
+    const nativeAuth=loader({'react-native':{Platform:{OS:'android'}},'expo-modules-core':{requireOptionalNativeModule:()=>({authorize:()=>gate.promise,cancelAuthorization:async()=>{cancels++;},clearToken:async()=>{}})}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;
+    const nativeAbort=new AbortController(),nativePending=nativeAuth.authorize(nativeAbort.signal);nativeAbort.abort();await assert.rejects(nativePending,e=>e.name==='AbortError');assert.equal(cancels,1);gate.resolve({accessToken:'late-native',expiresAt:Date.now()+3600000});await tick();
+    const unsupported=loader({'react-native':{Platform:{OS:'ios'}},'expo-modules-core':{requireOptionalNativeModule:()=>null}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;await assert.rejects(unsupported.authorize(),e=>e.code==='configuration');
+    console.log('PASS Web GIS gesture/scope/denial/close/late/config and Android wrapper cancel/late/iOS unavailable (controlled boundaries)');
+  } finally {global.window=originalWindow;if(originalClient===undefined)delete process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID;else process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID=originalClient;}
 })().catch(e=>{console.error(e);process.exitCode=1;});

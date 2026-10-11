@@ -61,7 +61,7 @@ export class GoogleDriveService {
       if (page.incompleteSearch || !Array.isArray(page.files)) throw new DriveError("api");
       for (const file of page.files) {
         // Explicit limitation: no shortcut resolution, recursion, Docs export or unsupported files.
-        if (!file.id || !/^[\w-]+$/.test(file.id) || typeof file.name !== "string" || file.mimeType.startsWith("application/vnd.google-apps.")) continue;
+        if (!file.id || !/^[\w-]+$/.test(file.id) || typeof file.name !== "string" || typeof file.mimeType !== "string" || file.mimeType.startsWith("application/vnd.google-apps.")) continue;
         const format = file.mimeType === "application/pdf" ? "pdf" : file.mimeType === "application/epub+zip" || file.mimeType === "application/epub" ? "epub" : /\.pdf$/i.test(file.name) ? "pdf" : /\.epub$/i.test(file.name) ? "epub" : null;
         if (!format) continue;
         const size = Number(file.size);
@@ -92,7 +92,8 @@ export class GoogleDriveService {
     if (current.capabilities?.canDownload === false) throw new DriveError("permission");
     return { url: book.url, headers: { ...headers, Authorization: `Bearer ${this.authorization.token(source.id)}` } };
   }
-  checkDownloadStatus(sourceId: string, status: number): void {
+  checkDownloadStatus(sourceId: string, status: number, expectedToken?: string): void {
+    if (expectedToken && this.authorization.token(sourceId) !== expectedToken) throw new DriveError("disconnected");
     if (status === 401) { this.authorization.invalidate(sourceId); this.clearIndex(sourceId); }
     assertDriveResponse(status);
   }
@@ -105,7 +106,7 @@ export class GoogleDriveService {
     try {
       throwIfAborted(signal);
       const response = await withAbort(this.request(url, { headers: { ...headers, Authorization: `Bearer ${token}`, Accept: "application/json" }, signal: controller.signal }), controller.signal);
-      this.checkDownloadStatus(sourceId, response.status);
+      this.checkDownloadStatus(sourceId, response.status, token);
       try { return await withAbort(response.json(), controller.signal) as T; } catch { throw new DriveError("api"); }
     } catch (error) {
       throwIfAborted(signal);

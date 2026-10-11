@@ -69,13 +69,25 @@ export const drivePlatformAuth: DriveAuthorizationProvider = {
   },
   clearToken: async token => {
     if (Platform.OS !== "android") return;
-    await requireOptionalNativeModule<{ clearToken(token: string): Promise<void> }>("AldusDriveAuth")?.clearToken(token);
+    const native = requireOptionalNativeModule<{ clearToken(token: string): Promise<void> }>("AldusDriveAuth");
+    if (!native) return;
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(), 10000);
+    try { await withAbort(native.clearToken(token), deadline.signal); } finally { clearTimeout(timer); }
   },
   revoke: async token => {
     // Revocation is best effort, bounded; local disconnection succeeds offline.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10000);
     try {
+      if (Platform.OS === "web") {
+        const api = oauth();
+        if (!api) throw new DriveError("configuration");
+        await withAbort(new Promise<void>((resolve, reject) => {
+          api.revoke(token, result => result.successful ? resolve() : reject(new DriveError("network")));
+        }), controller.signal);
+        return;
+      }
       const response = await withAbort(fetch("https://oauth2.googleapis.com/revoke", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: `token=${encodeURIComponent(token)}`, signal: controller.signal,

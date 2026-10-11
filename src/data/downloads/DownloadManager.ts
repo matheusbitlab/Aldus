@@ -7,6 +7,14 @@ import { EpubFileImporter } from "@/src/data/epub/EpubFileImporter";
 import { assertStorageAvailable } from "@/src/data/downloads/StorageValidator";
 import { NetworkStatusService } from "@/src/data/downloads/NetworkStatusService";
 import { importDiagnostic } from "@/src/utils/importDiagnostics";
+import type { PdfFileImporter } from "@/src/data/local/PdfFileImporter";
+import { DriveError } from "@/src/data/drive/DriveErrors";
+
+interface DownloadRequest { url: string; headers: Record<string, string>; }
+export interface DownloadRequestResolver {
+  resolve(job: DownloadJob, signal: AbortSignal): Promise<DownloadRequest>;
+  checkStatus(job: DownloadJob, status: number, headers?: Record<string, string>): void;
+}
 
 interface ActiveDownload {
   operationId: string;
@@ -18,7 +26,7 @@ interface ActiveDownload {
 export class DownloadManager {
   private readonly active = new Map<string, ActiveDownload>();
 
-  constructor(private readonly epubImporter: EpubFileImporter, private readonly network = new NetworkStatusService()) {}
+  constructor(private readonly epubImporter: EpubFileImporter, private readonly network = new NetworkStatusService(), private readonly pdfImporter?: PdfFileImporter, private readonly requestResolver?: DownloadRequestResolver) {}
 
   async download(job: DownloadJob, onUpdate: (job: DownloadJob) => void): Promise<DownloadJob> {
     const operationId = job.operationId ?? `download-${Date.now().toString(36)}`;
@@ -50,7 +58,7 @@ export class DownloadManager {
         importDiagnostic({
           operationId,
           source: "remote",
-          format: "epub",
+          format: job.format ?? "epub",
           phase,
           event: terminalPhase === "success" ? "success" : terminalPhase === "error" ? "error" : terminalPhase === "cancelled" ? "cancel" : phase === "preparing" ? "start" : "phase",
           startedAt,
@@ -61,9 +69,12 @@ export class DownloadManager {
     this.publish(initial, publishUpdate);
 
     try {
+      const request = this.requestResolver ? await withAbort(this.requestResolver.resolve(initial, controller.signal), controller.signal) : { url: initial.url, headers: {} };
+      if (job.drive && !this.requestResolver) throw new DriveError("configuration");
+      throwIfAborted(controller.signal);
       return Platform.OS === "web"
-        ? await this.downloadWeb(initial, publishUpdate, controller.signal)
-        : await this.downloadNative(initial, publishUpdate, controller.signal, active);
+        ? await this.downloadWeb(initial, publishUpdate, controller.signal, request)
+        : await this.downloadNative(initial, publishUpdate, controller.signal, active, request);
     } catch (error) {
       const cancelled = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
       const terminal: DownloadJob = {
@@ -88,19 +99,21 @@ export class DownloadManager {
     return true;
   }
 
-  private async downloadWeb(job: DownloadJob, onUpdate: (job: DownloadJob) => void, signal: AbortSignal): Promise<DownloadJob> {
+  private async downloadWeb(job: DownloadJob, onUpdate: (job: DownloadJob) => void, signal: AbortSignal, request: DownloadRequest): Promise<DownloadJob> {
     const requestController = new AbortController();
     const forwardAbort = () => requestController.abort();
     signal.addEventListener("abort", forwardAbort, { once: true });
-    const timeout = setTimeout(() => requestController.abort(), 60000);
+    let timeout = setTimeout(() => requestController.abort(), 60000);
+    const resetTimeout = () => { clearTimeout(timeout); timeout = setTimeout(() => requestController.abort(), 60000); };
     let current = this.phase(job, "downloading", true, onUpdate, { status: "downloading", attempts: job.attempts + 1 });
 
     try {
-      const response = await fetch(job.url, {
+      const response = await withAbort(fetch(request.url, {
         signal: requestController.signal,
-        headers: { Accept: "application/epub+zip,application/octet-stream" },
-      });
+        headers: { Accept: "application/epub+zip,application/pdf,application/octet-stream", ...request.headers },
+      }), requestController.signal);
       throwIfAborted(signal);
+      this.requestResolver?.checkStatus(job, response.status, request.headers);
       if (!response.ok) throw new DownloadError(`Download falhou (HTTP ${response.status}).`);
 
       const totalBytes = Number(response.headers.get("content-length")) || 0;
@@ -109,24 +122,26 @@ export class DownloadManager {
       const reader = response.body?.getReader();
       if (reader) {
         while (true) {
-          const { done, value } = await withAbort(reader.read(), signal);
+          const { done, value } = await withAbort(reader.read(), requestController.signal);
           if (done) break;
           if (!value) continue;
           chunks.push(value);
           receivedBytes += value.byteLength;
+          resetTimeout();
           if (totalBytes > 0) {
             current = { ...current, progress: Math.min(1, receivedBytes / totalBytes), progressKnown: true };
             this.publish(current, onUpdate);
           }
         }
       } else {
-        chunks.push(new Uint8Array(await withAbort(response.arrayBuffer(), signal)));
+        chunks.push(new Uint8Array(await withAbort(response.arrayBuffer(), requestController.signal)));
       }
-      const file = new Blob(chunks.map(chunk => Uint8Array.from(chunk).buffer), { type: "application/epub+zip" });
+      clearTimeout(timeout);
+      const file = new Blob(chunks.map(chunk => Uint8Array.from(chunk).buffer), { type: job.format === "pdf" ? "application/pdf" : "application/epub+zip" });
       if (!file.size) throw new DownloadError("Arquivo baixado vazio.");
       const fileName = safeFileName(job.fileName);
       current = this.phase(current, "validating", true, onUpdate, { progressKnown: false });
-      const imported = await this.epubImporter.importFromUri(job.url, fileName, file, job.operationId, {
+      const imported = await this.importFile(job, job.url, fileName, file, {
         signal,
         onPhase: update => {
           const phase = remotePhase(update.phase);
@@ -147,7 +162,7 @@ export class DownloadManager {
     }
   }
 
-  private async downloadNative(job: DownloadJob, onUpdate: (job: DownloadJob) => void, signal: AbortSignal, active: ActiveDownload): Promise<DownloadJob> {
+  private async downloadNative(job: DownloadJob, onUpdate: (job: DownloadJob) => void, signal: AbortSignal, active: ActiveDownload, request: DownloadRequest): Promise<DownloadJob> {
     const root = FileSystem.documentDirectory;
     if (!root) throw new DownloadError("Diretório local indisponível.");
     await withAbort(this.network.assertConnected(), signal);
@@ -165,7 +180,7 @@ export class DownloadManager {
     let current = this.phase(job, "downloading", true, onUpdate, { status: "downloading", attempts: job.attempts + 1, localUri: tempUri });
 
     try {
-      const task = FileSystem.createDownloadResumable(job.url, tempUri, {}, data => {
+      const task = FileSystem.createDownloadResumable(request.url, tempUri, { headers: request.headers }, data => {
         if (signal.aborted) return;
         const known = data.totalBytesExpectedToWrite > 0;
         current = {
@@ -176,8 +191,18 @@ export class DownloadManager {
         this.publish(current, onUpdate);
       });
       active.nativeTask = task;
-      const result = await withAbort(task.downloadAsync(), signal);
+      const abortNative = () => { void task.cancelAsync().catch(() => undefined); };
+      signal.addEventListener("abort", abortNative, { once: true });
+      const pending = task.downloadAsync();
+      let result: FileSystem.FileSystemDownloadResult | undefined;
+      try { result = await withAbort(pending, signal); }
+      catch (error) {
+        if (signal.aborted) void pending.then(() => this.cleanupNativeFiles(tempUri, importedUri)).catch(() => this.cleanupNativeFiles(tempUri, importedUri));
+        throw error;
+      } finally { signal.removeEventListener("abort", abortNative); }
       if (!result) throw new DownloadError("Download cancelado.");
+      this.requestResolver?.checkStatus(job, result.status, request.headers);
+      if (result.status !== undefined && (result.status < 200 || result.status >= 300)) throw new DownloadError(`Download falhou (HTTP ${result.status}).`);
       const info = await withAbort(FileSystem.getInfoAsync(result.uri), signal);
       if (!info.exists || !info.size) throw new DownloadError("Arquivo baixado vazio.");
       throwIfAborted(signal);
@@ -189,7 +214,7 @@ export class DownloadManager {
         throw error;
       }
       current = this.phase(current, "validating", true, onUpdate, { progressKnown: false, localUri: importedUri });
-      const imported = await this.epubImporter.importFromUri(importedUri, safeName, undefined, job.operationId, {
+      const imported = await this.importFile(job, importedUri, safeName, undefined, {
         signal,
         onPhase: update => {
           const phase = remotePhase(update.phase);
@@ -202,11 +227,19 @@ export class DownloadManager {
       this.publish(completed, onUpdate);
       return completed;
     } catch (error) {
-      void this.cleanupNativeFiles(tempUri, importedUri);
+      await this.cleanupNativeFiles(tempUri, importedUri);
       throw error;
     } finally {
       active.nativeTask = null;
     }
+  }
+
+  private importFile(job: DownloadJob, uri: string, name: string, blob: Blob | undefined, options: { signal: AbortSignal; onPhase: (update: { phase: string; cancellable: boolean }) => void }) {
+    if (job.format === "pdf") {
+      if (!this.pdfImporter) throw new DownloadError("Importador PDF indisponível.");
+      return this.pdfImporter.importFromUri(uri, name, undefined, blob, options);
+    }
+    return this.epubImporter.importFromUri(uri, name, blob, job.operationId, options);
   }
 
   private async cleanupNativeFiles(tempUri: string, importedUri?: string): Promise<void> {
@@ -238,12 +271,13 @@ function remotePhase(phase: string): DownloadPhase {
 }
 
 function friendlyDownloadError(error: unknown): string {
-  if (!(error instanceof Error) || !error.message) return "Não foi possível baixar e importar o EPUB.";
+  if (error instanceof DriveError) return error.message;
+  if (!(error instanceof Error) || !error.message) return "Não foi possível baixar e importar o livro.";
   if (/HTTP|download|tempo de resposta|rede|conex/i.test(error.message)) return `Erro de download: ${error.message}`;
   if (/não (é|possui).*válid|inválid|corrompid|ZIP EPUB|META-INF|OPF|capítulos legíveis/i.test(error.message)) return `Arquivo inválido: ${error.message}`;
   if (/armazenamento|biblioteca local|SQLite|IndexedDB|quota|espaço/i.test(error.message)) return `Erro de armazenamento: ${error.message}`;
   if (/não encontrado|não foi possível ler|identificar|acess/i.test(error.message)) return `Arquivo inacessível: ${error.message}`;
-  return "Não foi possível importar o EPUB baixado.";
+  return "Não foi possível importar o livro baixado.";
 }
 
 function safeFileName(fileName: string): string {

@@ -36,10 +36,14 @@ export function SourceManagerModal({ visible, onClose }: Props) {
   useEffect(() => {
     if (visible) {
       void load();
-      void googleDrive.authorization.prepare().then(() => setDriveReady(true)).catch(() => setDriveReady(false));
     }
     return () => { operation.current?.abort(); operation.current = null; setBusyId(null); };
   }, [visible, load]);
+
+  useEffect(() => {
+    // A saved Drive source also needs GIS ready for the row's reconnect gesture.
+    if (visible && (kind === "google-drive" || sources.some(source => source.kind === "google-drive"))) void googleDrive.authorization.prepare().then(() => setDriveReady(true)).catch(() => setDriveReady(false));
+  }, [visible, kind, sources]);
 
   const probe = async (source: UserSource, signal: AbortSignal): Promise<ProbeResult> => {
     setBusyId(source.id);
