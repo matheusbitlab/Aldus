@@ -1,4 +1,19 @@
-# Roadmap funcional — atualizado em 2026-10-10
+# Roadmap funcional — atualizado em 2026-10-11
+
+## IMPORTAÇÃO — itens 2 e 6
+
+Estado: **✅ IMPLEMENTADA / ✅ VALIDADA AUTOMATICAMENTE / ✅ BUILD WEB / 🧪 ANDROID FÍSICO PENDENTE**.
+
+- ✅ EPUB e PDF locais têm lifecycle por `operationId`, fases explícitas, terminal único, UI de progresso/erro/sucesso e ações Abrir livro/Ir para Biblioteca.
+- ✅ BUG — loading infinito: eliminado o estado booleano sem geração; operações antigas não sobrescrevem a atual, cancelamento não espera Promise nativa travada e aquisição remota cancelada não entra novamente por retry.
+- ✅ Native trata `content://` e `file://` como origem: copia para `books/temp`, move para caminho próprio em `books/imported` e nunca apaga o original do usuário.
+- ✅ Erro/cancelamento limpam temp/destino e registros/Blobs parciais; persistência de capítulos falha com rollback/soft-delete, sem livro fantasma conhecido.
+- ✅ Download mostra percentual apenas com total de bytes confiável. Picker, cópia, validação, parser, metadados e persistência permanecem indeterminados com nome da etapa.
+- ✅ Cancelamento disponível até a persistência; persistência/finalização são intencionalmente não canceláveis para não interromper commit no meio. Callback tardio é descartado por geração.
+- ✅ Duplicidade deliberada permanece permitida; cada operação local/remota usa ID e caminho únicos, sem deduplicação agressiva nem sobrescrita acidental entre importações.
+- ✅ Matriz automatizada de importação, regressão catálogo/download, typecheck e export Web passaram. Build Web validado; interface em navegador real não foi exercitada nesta rodada.
+- 🧪 Android/emulador/aparelho físico, seletor SAF real, arquivo grande real, pouco espaço e encerramento do processo continuam pendentes. A chamada exata que ficou pendente nos celulares originais permanece inconclusiva sem captura física, embora o escape de estado terminal tenha sido corrigido.
+- ↔️ Reader/Reflow, OCR, Auth, Sources/Search, Drive/Sync, Flashcards e Legal não foram alterados, salvo a tela de aquisição já existente como dependência direta do download/importação.
 
 ## AUTH / CONTA / SEGURANÇA — Etapa 3
 

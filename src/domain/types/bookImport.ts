@@ -4,6 +4,7 @@ export type BookImportPhase =
   | "idle"
   | "selecting"
   | "preparing"
+  | "downloading"
   | "copying"
   | "reading"
   | "validating"
@@ -67,6 +68,7 @@ export function bookImportPhaseLabel(phase: BookImportPhase): string {
     idle: "Pronto para importar",
     selecting: "Escolhendo arquivo…",
     preparing: "Preparando importação…",
+    downloading: "Baixando arquivo…",
     copying: "Copiando para a biblioteca…",
     reading: "Lendo arquivo…",
     validating: "Validando arquivo…",

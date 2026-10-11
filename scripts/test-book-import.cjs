@@ -119,9 +119,10 @@ function book(id, fileName, filePath, mimeType) {
   const cancelMid = new AbortController();
   const midPromise = service.import({uri:'content://held',name:'held.epub',mimeType:'application/epub+zip'}, {operationId:'cancel-mid',signal:cancelMid.signal,onPhase:()=>{}});
   await new Promise(resolve => setImmediate(resolve));
-  cancelMid.abort(); heldCopy();
+  cancelMid.abort();
   await assert.rejects(midPromise, error => error.name === 'AbortError');
   assert.ok(deleted.some(uri => uri.includes('cancel-mid')), 'cancelled temp file must be removed');
+  heldCopy();
 
   const duplicateA = await run({uri:'file://small.epub',name:'same.epub',mimeType:'application/epub+zip'}, 'duplicate-a');
   const duplicateB = await run({uri:'file://small.epub',name:'same.epub',mimeType:'application/epub+zip'}, 'duplicate-b');

@@ -63,7 +63,6 @@ export class LocalBookImportService {
     const uniqueName = `local-${options.operationId}-${safeName}`;
     const tempUri = `${tempDirectory}${uniqueName}`;
     const importedUri = `${importedDirectory}${uniqueName}`;
-    let moved = false;
 
     await withAbort(Promise.all([
       this.files.makeDirectoryAsync(tempDirectory, { intermediates: true }),
@@ -76,12 +75,17 @@ export class LocalBookImportService {
       try {
         await withAbort(copy, options.signal);
       } catch (error) {
-        await copy.catch(() => undefined);
+        if (options.signal.aborted) void copy.then(() => this.cleanupStagedFiles(tempUri, importedUri)).catch(() => undefined);
         throw error;
       }
       throwIfAborted(options.signal);
-      await this.files.moveAsync({ from: tempUri, to: importedUri });
-      moved = true;
+      const move = this.files.moveAsync({ from: tempUri, to: importedUri });
+      try {
+        await withAbort(move, options.signal);
+      } catch (error) {
+        if (options.signal.aborted) void move.then(() => this.cleanupStagedFiles(tempUri, importedUri)).catch(() => undefined);
+        throw error;
+      }
       throwIfAborted(options.signal);
 
       return format === "pdf"
@@ -94,9 +98,16 @@ export class LocalBookImportService {
             onPhase: update => options.onPhase({ ...update, format, fileSize: update.fileSize ?? size }),
           });
     } catch (error) {
-      await this.files.deleteAsync(moved ? importedUri : tempUri, { idempotent: true }).catch(() => undefined);
+      void this.cleanupStagedFiles(tempUri, importedUri);
       throw error;
     }
+  }
+
+  private async cleanupStagedFiles(tempUri: string, importedUri: string): Promise<void> {
+    await Promise.all([
+      this.files.deleteAsync(tempUri, { idempotent: true }).catch(() => undefined),
+      this.files.deleteAsync(importedUri, { idempotent: true }).catch(() => undefined),
+    ]);
   }
 
   private async detectFormat(file: PickedBookFile, signal: AbortSignal): Promise<BookImportFormat> {

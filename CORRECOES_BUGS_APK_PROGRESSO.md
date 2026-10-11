@@ -6,6 +6,21 @@
 
 **IMPORTAÇÃO — CAUSA CONFIRMADA / LIFECYCLE LOCAL IMPLEMENTADO.** Primeira divergência: `library.tsx` ligava `importing=true` antes do DocumentPicker e mantinha um único `await` até picker→leitura→parser/thumbnail→persistência→reload; qualquer Promise pendente impedia o `finally`, sem operationId, cancelamento ou fase terminal. Native também persistia o URI do cache do picker; livro era salvo antes dos capítulos, podendo ficar parcial. Implementado lifecycle por operationId com eventos tardios ignorados; cancelamento cooperativo antes da persistência; persistência declaradamente não cancelável; cópia Native `content://`/`file://` para `books/temp` e move a caminho único em `books/imported`; cleanup em erro/cancel; rollback/soft-delete se capítulos falharem; Blob Web removido em falha; modal com fase, erro, sucesso e ações. Percentual local não é inventado: fases sem medida permanecem indeterminadas. `test:import`, typecheck e regressão de catálogos PASS; Android físico ainda **NÃO TESTADO**. Download remoto ainda será consolidado no próximo bloco.
 
+**IMPORTAÇÃO — IMPLEMENTADA / VALIDADA AUTOMATICAMENTE / BUILD WEB VALIDADO / ANDROID FÍSICO NÃO TESTADO (11/10/2026).** Download/importação remota agora usa uma única geração por operação, AbortController compartilhado até o importador, terminal único (`completed`, `failed` ou `cancelled`) e rejeita callbacks tardios. O retry automático foi removido do caminho de cancelamento: cancelar não inicia nova tentativa. A UI de aquisição mostra `preparing`, download, validação, metadados, persistência e finalização; só exibe porcentagem quando `bytes recebidos / total` existe. Cancelamento é real antes da persistência e é recusado durante persistência/finalização. Native usa temp e destino importado únicos por operationId; erro/cancel inicia cleanup imediato e compensatório caso cópia/move conclua tarde. Erros são categorizados sem stack. Reimportação deliberada continua permitida, agora sem colisão silenciosa de arquivo/ID entre operações.
+
+Diagrama técnico consolidado:
+
+```text
+EPUB local: picker → URI/Blob → detectar → Native temp→imported | Web Blob → ler → validar ZIP/OPF → metadados/capítulos → persistir livro+capítulos → Biblioteca
+PDF local:  picker → URI/Blob → detectar/%PDF → Native temp→imported | Web Blob → validar → metadados/thumbnail opcional → persistir livro+capítulo → Biblioteca
+EPUB remoto: resolver URL → baixar bytes (percentual só com total) → Native temp→imported | Web Blob → validar → metadados/capítulos → persistir → Biblioteca
+Outras entradas: livros empacotados são registrados/importados sob demanda na abertura; fluxo não alterado nesta etapa.
+```
+
+Causa e confiança: **alta** para a falha arquitetural que permitia UI sem terminal (cadeia única aguardada sem geração/cancelamento e, no remoto, cancelamento tratado pelo retry); **inconclusiva** para qual chamada específica (`DocumentPicker`, cópia `content://`, leitura/parser ou storage) ficou pendente em cada celular relatado, pois não houve captura física. Não foi introduzido delay, debounce ou retry como correção. PDF Reflow continua separado e não é executado durante a importação.
+
+Gates até este checkpoint: `npm run test:import` PASS (EPUB/PDF pequeno/grande, `file://`/`content://`, inválido, extensão incorreta, cancelamento inicial/no meio inclusive cópia que não resolve, duplicado, nova operação após erro/cancel, rollback, progresso remoto real/indeterminado, stale generation e cleanup Native); `npm run typecheck` PASS; `node scripts/test-catalogs.cjs` PASS; `npm run export:web` PASS (2336 módulos); `git diff --check` PASS somente com avisos LF/CRLF. Navegador interativo, Android/emulador e aparelho físico **NÃO TESTADOS** neste delta.
+
 ## Etapa 3 — fechamento Auth/RLS, checkpoint 10/10/2026
 
 Auditoria remota administrativa **BLOQUEADA**: somente configuração pública disponível; CLI `npx` sem binário Windows, sem Dashboard/DB/SQL Editor autenticado. Nenhum SQL, migration, usuário ou configuração externa foi alterado. A sonda pública confirmou Auth 200/GoTrue v2.197.0, email/Google ativos, signup permitido e confirmação exigida; oito endpoints REST recusaram `anon` com 401/42501 e `username-login` retornou 404. Recusa pública não foi promovida a prova de RLS/policies/schema.

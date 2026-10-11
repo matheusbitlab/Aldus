@@ -31,7 +31,7 @@ export default function Search() {
     cancel,
     selectSource,
   } = useSearchStore();
-  const { jobs, enqueue } = useDownloadStore();
+  const { jobs, enqueue, cancel: cancelDownload } = useDownloadStore();
   const sources = useSourceStore((state) => state.sources);
   const activeSources = useMemo(() => sources.filter((source) => source.enabled && source.status === "active"), [sources]);
   const [touched, setTouched] = useState(false);
@@ -100,6 +100,14 @@ export default function Search() {
     } finally {
       if (acquisitionController.current === controller) { acquisitionController.current = null; setAcquiring(false); }
     }
+  };
+
+  const cancelAcquisition = async (book: ScrapedLink) => {
+    acquisitionController.current?.abort();
+    acquisitionController.current = null;
+    setAcquiring(false);
+    await cancelDownload(book.url);
+    setAcquisitionMessage("Importação cancelada. Nenhum livro foi adicionado.");
   };
 
   const retrySearch = () => {
@@ -260,6 +268,7 @@ export default function Search() {
         palette={palette}
         onClose={() => { acquisitionController.current?.abort(); setSelectedBook(null); }}
         onAcquire={() => selectedBook ? void acquireBook(selectedBook) : undefined}
+        onCancel={() => selectedBook ? void cancelAcquisition(selectedBook) : undefined}
       />
     </View>
   );
@@ -273,6 +282,7 @@ function BookDetailsModal({
   palette,
   onClose,
   onAcquire,
+  onCancel,
 }: {
   book: ScrapedLink | null;
   job?: ReturnType<typeof useDownloadStore.getState>["jobs"][string];
@@ -281,7 +291,11 @@ function BookDetailsModal({
   palette: ReturnType<typeof useAppTheme>["palette"];
   onClose: () => void;
   onAcquire: () => void;
+  onCancel: () => void;
 }) {
+  const active = acquiring || job?.status === "queued" || job?.status === "downloading";
+  const canCancel = acquiring || Boolean(job?.cancellable && active);
+  const progressText = job ? remoteProgressText(job) : null;
   return (
     <Modal visible={Boolean(book)} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={[styles.modalBackdrop, { backgroundColor: palette.overlay }]} onPress={onClose}>
@@ -299,10 +313,10 @@ function BookDetailsModal({
             </View>
             {book?.description ? <Text style={[styles.description, { color: palette.text }]} numberOfLines={8}>{book.description}</Text> : null}
             {book?.subjects?.length ? <Text style={[styles.subjects, { color: palette.secondaryText }]}>{book.subjects.join(" · ")}</Text> : null}
-            {job?.status === "downloading" ? (
+            {active && progressText ? (
               <View style={styles.downloadProgress}>
                 <ActivityIndicator color={palette.accent} />
-                <Text style={{ color: palette.secondaryText }}>Baixando {Math.round(job.progress * 100)}%</Text>
+                <Text accessibilityLiveRegion="polite" style={{ color: palette.secondaryText }}>{progressText}</Text>
               </View>
             ) : null}
             {job?.status === "completed" ? (
@@ -312,10 +326,16 @@ function BookDetailsModal({
               </View>
             ) : null}
             {job?.error || message ? <Text accessibilityRole="alert" style={[styles.errorMessage, { color: palette.accent }]}>{message ?? job?.error}</Text> : null}
+            {job?.status === "cancelled" && !message ? <Text accessibilityLiveRegion="polite" style={[styles.errorMessage, { color: palette.secondaryText }]}>Importação cancelada. Nenhum livro foi adicionado.</Text> : null}
+            {canCancel ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Cancelar download e importação" onPress={onCancel} style={[styles.cancelButton, { borderColor: palette.separator }]}>
+                <Text style={{ color: palette.accent, fontWeight: "600" }}>Cancelar</Text>
+              </Pressable>
+            ) : null}
             {job?.status !== "completed" ? (
-              <Pressable accessibilityRole="button" disabled={acquiring || job?.status === "downloading" || job?.status === "queued"} onPress={onAcquire} style={[styles.acquireButton, { backgroundColor: palette.accent, opacity: acquiring || job?.status === "downloading" || job?.status === "queued" ? 0.6 : 1 }]}>
+              <Pressable accessibilityRole="button" disabled={active} onPress={onAcquire} style={[styles.acquireButton, { backgroundColor: palette.accent, opacity: active ? 0.6 : 1 }]}>
                 <Ionicons name="download-outline" size={19} color="#FFFFFF" />
-                <Text style={styles.acquireText}>{acquiring ? "Preparando aquisição…" : "Baixar e adicionar"}</Text>
+                <Text style={styles.acquireText}>{active ? "Importação em andamento…" : job?.status === "failed" || job?.status === "cancelled" ? "Tentar novamente" : "Baixar e adicionar"}</Text>
               </Pressable>
             ) : null}
             {Platform.OS === "web" && job?.status === "failed" && book ? (
@@ -344,6 +364,18 @@ function BookDetailsModal({
 function safeFileBase(title: string): string {
   const normalized = title.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   return normalized.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "livro";
+}
+
+function remoteProgressText(job: ReturnType<typeof useDownloadStore.getState>["jobs"][string]): string {
+  switch (job.phase) {
+    case "preparing": return "Preparando download…";
+    case "downloading": return job.progressKnown ? `Baixando ${Math.round(job.progress * 100)}%` : "Baixando…";
+    case "validating": return "Validando EPUB…";
+    case "reading_metadata": return "Lendo título e capítulos…";
+    case "persisting": return "Salvando na Biblioteca…";
+    case "finalizing": return "Atualizando Biblioteca…";
+    default: return job.status === "queued" ? "Preparando download…" : "Importando EPUB…";
+  }
 }
 
 const styles = StyleSheet.create({
@@ -397,5 +429,6 @@ const styles = StyleSheet.create({
   errorMessage: { fontSize: 12, lineHeight: 17, marginTop: 6 },
   acquireButton: { minHeight: 46, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, borderRadius: 7, marginTop: 10 },
   acquireText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  cancelButton: { minHeight: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 7, marginTop: 8 },
   closeButton: { minHeight: 40, alignItems: "center", justifyContent: "center", marginTop: 2 },
 });
