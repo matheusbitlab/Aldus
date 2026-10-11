@@ -73,7 +73,8 @@ const response = data => new Response(JSON.stringify(data),{headers:{'Content-Ty
   console.log('PASS source-specific Drive selection runs only its adapter');
   // Use the real source store/repository with only AsyncStorage and network mocked.
   let saved=null;
-  const persistent=loader({'@react-native-async-storage/async-storage':{getItem:async()=>saved,setItem:async(_k,v)=>{saved=v;}},'@/src/data/drive/driveDependencies':{googleDrive:service}});
+  // Durable catalog boundary is covered by test-source-catalog; do not execute Expo SQLite in Node.
+  const persistent=loader({'@react-native-async-storage/async-storage':{getItem:async()=>saved,setItem:async(_k,v)=>{saved=v;}},'@/src/data/drive/driveDependencies':{googleDrive:service},'@/src/data/sources/sourceCatalogDependencies':{sourceCatalogs:{load:async()=>{},refresh:async()=>{},remove:async()=>{},cancel:()=>{},reset:async()=>{}}}});
   const sourceStore=persistent('src/presentation/stores/sourceStore.ts').useSourceStore;
   await sourceStore.getState().add(source);assert.equal(sourceStore.getState().sources[0].id,source.id,'Probe ID must survive persistence');assert.equal(sourceStore.getState().sources[0].folderId,source.folderId);assert.doesNotMatch(saved,/accessToken|fixture-token|Bearer/);
   await sourceStore.getState().remove(source.id);assert.deepEqual(JSON.parse(saved),[]);assert.throws(()=>auth.token(source.id));

@@ -150,7 +150,7 @@ export class DownloadManager {
       });
       throwIfAborted(signal);
       current = this.phase(current, "finalizing", false, onUpdate, { progressKnown: false });
-      const completed: DownloadJob = { ...current, status: "completed", progress: 1, progressKnown: true, cancellable: false, localUri: imported.filePath, error: null };
+      const completed: DownloadJob = { ...current, status: "completed", progress: 1, progressKnown: true, cancellable: false, localUri: imported.filePath, importedBookId: imported.id, error: null };
       this.publish(completed, onUpdate);
       return completed;
     } catch (error) {
@@ -223,7 +223,7 @@ export class DownloadManager {
       });
       throwIfAborted(signal);
       current = this.phase(current, "finalizing", false, onUpdate, { progressKnown: false });
-      const completed: DownloadJob = { ...current, status: "completed", progress: 1, progressKnown: true, cancellable: false, localUri: imported.filePath, error: null };
+      const completed: DownloadJob = { ...current, status: "completed", progress: 1, progressKnown: true, cancellable: false, localUri: imported.filePath, importedBookId: imported.id, error: null };
       this.publish(completed, onUpdate);
       return completed;
     } catch (error) {

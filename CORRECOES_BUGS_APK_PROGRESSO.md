@@ -2,6 +2,8 @@
 
 ## SOURCE LIBRARY — AUDITORIA / PERSISTÊNCIA, 11/10/2026
 
+SOURCE LIBRARY — VALIDADA (controlado/Web): gates finais PASS typecheck, catálogo+ações, Search/ranking/catalogs/Sources, Drive metadata/download, import, SQLite/study regressões, legal/notices/export Web/diff check. Nova migration SQLite testada em banco real Node, ponte Expo simulada; IndexedDB real e UI do Web exportado em Chrome isolado com fixtures de identidade/HTTP. EPUB importado pelo pipeline real, vínculo/reload/Blob preservado após remoção; 1000 itens com 24 cards montados. Sem alteração Kotlin/Gradle/módulos; build/APK/Android físico não executados nesta quarta etapa. Google Drive real NÃO TESTADO. Checkpoints PENDENTES abaixo históricos; Auth/Reader/OCR intactos.
+
 SOURCE LIBRARY — UI: Fontes e biblioteca permanente com FlatList/BookCard compartilhado, grade/lista/local search/ordenadores/status. typecheck PASS. Visual/ações PENDENTES neste checkpoint; nenhuma mudança de código nativo.
 
 SQLite v3/IndexedDB v4 e serviço de snapshots completo/atômico, gerações/fila de writes/remoção segura implementados. typecheck/source-catalog/ranking PASS controlado, incluindo reabertura SQLite e 1000 metadados. UI/visual/ponte Expo física PENDENTES. Não alterados Reader/Auth/OCR/módulos nativos. Drive real/Android físico NÃO TESTADOS. Roteiro SOURCE_LIBRARY_IMPLEMENTATION.md.

@@ -2,7 +2,9 @@
 
 Data da auditoria: 11/10/2026
 
-Versão dos documentos públicos: 0.3
+Versão dos documentos públicos: 0.4
+
+Checkpoint SOURCE LIBRARY (quarta etapa): catálogo metadata local permanente SQLite v3 / IndexedDB v4, separado da Library. Pesquisa local/reabertura não requer token/rede; refresh completo é atômico. Indexação não baixa EPUB/PDF; capa remota gera somente pedido de imagem. Desconectar invalida autorização/índice memória mas preserva snapshot; remover elimina configuração/snapshot/vínculos, sem tocar livros/arquivos/progresso/notas/highlights/capas importados. Nenhum envio de catálogo ao Supabase/Cloud Sync/upload. Política pública e descrição do modal atualizadas. Notas antigas de índice somente temporário abaixo são históricas, superadas por este checkpoint.
 
 Estado: **implementação jurídica inicial; revisão profissional e validação operacional pendentes**.
 

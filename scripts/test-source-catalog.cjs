@@ -38,6 +38,8 @@ const book = (i, title = `Livro ${String(i).padStart(4, '0')}.epub`) => ({ sourc
   await service.refresh(source); assert.equal(service.view(source.id).catalog.items.length, 20);
   db.prepare('INSERT INTO books (id,title,author,file_name,file_path,mime_type,added_date) VALUES (?,?,?,?,?,?,?)').run('local-book', 'Livro 0', 'Autor', 'local.epub', '/private/local.epub', 'application/epub+zip', 1);
   db.prepare('INSERT INTO reading_progress (id,book_id,percentage,updated_at) VALUES (?,?,?,?)').run('progress', 'local-book', 65, 1);
+  db.prepare('INSERT INTO bookmarks (id,book_id,chapter_id,text_preview,note,created_at) VALUES (?,?,?,?,?,?)').run('bookmark','local-book','chapter','Trecho','Nota pessoal',1);
+  db.prepare('INSERT INTO highlights (id,book_id,chapter_id,start_cfi,end_cfi,highlighted_text,color_label,created_at) VALUES (?,?,?,?,?,?,?,?)').run('highlight','local-book','chapter','a','b','Grifo pessoal','yellow',1);
   await service.recordImport(source.id, 'file0', 'local-book');
   db.close(); db = new DatabaseSync(file); adapter = bridge(db); repo = new Repository();
   service = new SourceCatalogService(repo, remoteAdapter, async () => currentSource);
@@ -71,7 +73,9 @@ const book = (i, title = `Livro ${String(i).padStart(4, '0')}.epub`) => ({ sourc
   const pending = removing.refresh(source); currentSource = undefined; await removing.remove(source.id); late.resolve([book(300)]); await pending;
   assert.equal(await repo.get(source.id), null); assert.deepEqual(await repo.links(source.id), []);
   assert.equal(db.prepare('SELECT percentage FROM reading_progress').get().percentage, 65);
-  console.log('PASS network/disk generations, deletion during refresh, catalog/link purge, book/progress preserved');
+  assert.equal(db.prepare('SELECT note FROM bookmarks').get().note,'Nota pessoal');
+  assert.equal(db.prepare('SELECT highlighted_text FROM highlights').get().highlighted_text,'Grifo pessoal');
+  console.log('PASS network/disk generations, deletion during refresh, catalog/link purge, book/progress/bookmark/note/highlight preserved');
   currentSource = source; remote = Array.from({ length: 1000 }, (_, i) => book(i));
   const start = performance.now(); await service.refresh(source); const persisted = performance.now();
   snapshot = await new Repository().get(source.id); const listed = performance.now();
@@ -82,10 +86,17 @@ const book = (i, title = `Livro ${String(i).padStart(4, '0')}.epub`) => ({ sourc
   for (const [kind, url] of [['json', 'https://example.com?q={query}'], ['opds', 'https://example.com/opds'], ['html', 'https://example.com'], ['gutenberg', 'https://example.com'], ['webview', 'https://example.com']]) assert.equal(sourceCapabilities({ ...source, kind, url }).supportsCatalog, false);
   assert.throws(() => catalogItems(source, [{ ...book(0), url: 'https://example.com?access_token=secret' }]));
   assert.doesNotMatch(JSON.stringify(catalogItems(source, [{ ...book(0), accessToken: 'secret', headers: { Authorization: 'Bearer secret' } }])), /accessToken|Authorization|secret/);
+  assert.throws(() => catalogItems({...source,kind:'json',url:'https://example.com?access_token=secret'},[]));
+  db.exec("CREATE TRIGGER fail_remove BEFORE DELETE ON source_catalogs BEGIN SELECT RAISE(ABORT, 'remove failure'); END;");
+  await assert.rejects(service.remove(source.id)); assert.equal((await repo.get(source.id)).items.length,1000);
+  db.exec('DROP TRIGGER fail_remove'); await service.refresh(source); assert.equal(service.view(source.id).status,'ready','failed removal does not permanently disable refresh');
   db.exec("CREATE TRIGGER fail_catalog BEFORE UPDATE ON source_catalogs BEGIN SELECT RAISE(ABORT, 'disk full'); END;");
   remote = [book(400)]; await service.refresh(source); assert.equal((await repo.get(source.id)).items.length, 1000);
   console.log('PASS capabilities, credential allowlist, rejected signed/token URLs and SQLite rollback on disk failure');
-  db.close(); fs.rmSync(directory, { recursive: true });
+  db.close();
+  assert.equal(path.dirname(fs.realpathSync(directory)).toLowerCase(),fs.realpathSync(os.tmpdir()).toLowerCase());
+  assert.ok(path.basename(directory).startsWith('aldus-source-catalog-'));
+  fs.rmSync(directory, { recursive: true });
   const unavailable = loader()('src/data/sources/IndexedDbSourceCatalogRepository.ts');
   await assert.rejects(new unavailable.IndexedDbSourceCatalogRepository().get(source.id), /persistente indisponível/);
   console.log('PASS unavailable Web durable storage rejects instead of silently claiming memory persistence');

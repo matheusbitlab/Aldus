@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { UserSource } from "@/src/domain/types/sources";
 import { UserSourceRepository } from "@/src/data/sources/UserSourceRepository";
 import { googleDrive } from "@/src/data/drive/driveDependencies";
+import { sourceCatalogs } from "@/src/data/sources/sourceCatalogDependencies";
+import { sourceCapabilities, sourceIdentity } from "@/src/domain/types/sourceCatalog";
 
 const repository = new UserSourceRepository();
 type NewUserSource = Omit<UserSource, "id" | "createdAt"> & { id?: string };
@@ -26,14 +28,20 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     };
     await repository.save(item);
     await get().load();
+    if (sourceCapabilities(item).supportsCatalog) { await sourceCatalogs.load(item); if (item.enabled) await sourceCatalogs.refresh(item); }
   },
   update: async (id, patch) => {
     const source = get().sources.find((item) => item.id === id);
     if (!source) return;
-    await repository.save({ ...source, ...patch });
+    const next = { ...source, ...patch };
+    if (!next.enabled || sourceIdentity(next) !== sourceIdentity(source)) sourceCatalogs.cancel(id);
+    await repository.save(next);
+    if (sourceIdentity(next) !== sourceIdentity(source)) { googleDrive.clearIndex(id); await sourceCatalogs.reset(id); }
     await get().load();
+    if (sourceCapabilities(next).supportsCatalog) await sourceCatalogs.load(next);
   },
   remove: async (id) => {
+    await sourceCatalogs.remove(id);
     if (get().sources.find(source => source.id === id)?.kind === "google-drive") await googleDrive.disconnect(id);
     await repository.remove(id);
     await get().load();

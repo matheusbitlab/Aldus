@@ -4,6 +4,9 @@ export interface DownloadJob {
   format?: "epub" | "pdf";
   /** Stable references only: NEVER authorization headers or credentials. */
   drive?: { sourceId: string; fileId: string };
+  source?: { sourceId: string; remoteBookId: string; sourceIdentity?: string };
+  importedBookId?: string;
+  sourceLinkStatus?: "saved" | "failed";
   id: string;
   url: string;
   fileName: string;

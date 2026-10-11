@@ -1,5 +1,9 @@
 # Google Drive — terceira etapa, 11/10/2026
 
+## Evolução na quarta etapa — biblioteca permanente por fonte
+
+Agora há /sources/[sourceId], snapshot de metadados persistente SQLite/IndexedDB, busca local e refresh atômico via listagem paginada já existente. Reload perde apenas tokens/índice memória, não o catálogo local. Desconectar preserva snapshot; remover purga configuração/catalog/link mas preserva Library. Importação registra sourceId+fileId->bookId somente após sucesso, sem igualdade de títulos; estado remoto/importando/importado/indisponível separado de leitura. Detalhes/gates atuais em SOURCE_LIBRARY_IMPLEMENTATION.md. As afirmações abaixo de índice exclusivamente em memória e próxima etapa não implementada são históricas. GOOGLE DRIVE REAL — NÃO TESTADO; sem subpastas/atalhos/upload/sync.
+
 ## Arquitetura e estado
 
 IMPLEMENTADO: UserSourceRepository/AsyncStorage persistem `kind=google-drive`, `id` (sourceId estável), nome, URL, folderId/resourceKey não secretos. SearchPlugin ganhou método assíncrono opcional; GoogleDriveSearchPlugin → GoogleDriveService → ranking compartilhado. Seleção consulta adapter antes da busca; Todas/geração/abort/parciais preservados. Google Supabase é login PKCE, não autorização Drive: nenhum provider token reaproveitado. Reader/OCR/Reflow/Auth geral/flashcards não alterados.

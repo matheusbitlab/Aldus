@@ -2,6 +2,8 @@
 
 ## Item 5 — biblioteca permanente por fonte, quarta etapa em andamento
 
+SOURCE LIBRARY — VALIDADA: implementação concluída/gates controlados PASS e Web exportado validado em Chrome isolado (rotas/grade/lista/busca/importação EPUB real/IndexedDB real/rollback/reload/offline/estados/remover preservando livro+Blob/1000 metadados). Supabase e fontes HTTP usados como fixtures, NÃO conta real. Drive real/Android físico NÃO TESTADOS; nenhum novo APK/build nesta etapa. Política0.4 e documentação final SOURCE_LIBRARY_IMPLEMENTATION.md. Checkpoints de UI/ações pendentes abaixo foram superados. Item3 biblioteca vinculada à conta/sync é próximo e não foi iniciado.
+
 SOURCE LIBRARY — UI implementada: /sources/[sourceId], overview, BookCard compartilhado grade/lista sem progresso fictício, busca/ranking local/ordenação/estados. typecheck PASS; aquisição/remoção/visual Web em andamento. Não iniciada sincronização.
 
 SOURCE LIBRARY — AUDITORIA e SOURCE CATALOG — PERSISTÊNCIA: implementados, SQLite real controlado/reabertura/1000 itens/concorrência/preservação da Library PASS. Drive e JSON estático têm capability de catálogo; search endpoints não fingem coleção completa. UI/ações/IndexedDB real/visual PENDENTES. SOURCE_LIBRARY_IMPLEMENTATION.md registra arquitetura/evidência. Próxima etapa é biblioteca vinculada à conta/sync, não iniciada.

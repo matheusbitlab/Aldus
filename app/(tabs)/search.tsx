@@ -12,6 +12,7 @@ import { ScrapedLink } from "@/src/domain/types/search";
 import { BUILTIN_CATALOG_NAMES } from "@/src/data/scraping/catalogPlugins";
 import { BNDIGITAL_BLOCK_REASON } from "@/src/data/scraping/BNDigitalSearchPlugin";
 import { appDependencies } from "@/src/presentation/services/dependencies";
+import { sourceIdentity } from "@/src/domain/types/sourceCatalog";
 
 export default function Search() {
   const insets = useSafeAreaInsets();
@@ -86,6 +87,7 @@ export default function Search() {
       fileName,
       format,
       drive: book.drive && book.sourceId ? { sourceId: book.sourceId, fileId: book.drive.fileId } : undefined,
+      source: book.sourceId ? { sourceId: book.sourceId, remoteBookId: book.drive?.fileId ?? book.remoteBookId ?? book.url, sourceIdentity: sources.find(source => source.id === book.sourceId) ? sourceIdentity(sources.find(source => source.id === book.sourceId)!) : undefined } : undefined,
       status: "queued",
       progress: 0,
       localUri: null,

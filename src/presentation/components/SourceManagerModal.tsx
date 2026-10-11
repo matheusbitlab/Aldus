@@ -9,6 +9,9 @@ import { appDependencies } from "@/src/presentation/services/dependencies";
 import { useSourceStore } from "@/src/presentation/stores/sourceStore";
 import { googleDrive } from "@/src/data/drive/driveDependencies";
 import { parseDriveFolder } from "@/src/data/drive/driveFolder";
+import { router } from "expo-router";
+import { sourceCapabilities } from "@/src/domain/types/sourceCatalog";
+import { sourceCatalogs, sourceCatalogAdapter } from "@/src/data/sources/sourceCatalogDependencies";
 
 interface Props {
   visible: boolean;
@@ -31,6 +34,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [driveReady, setDriveReady] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
   const operation = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -121,7 +125,10 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       lastCheckedAt: Date.now(),
     };
 
-    if (editingId) await update(editingId, verified);
+    if (editingId) {
+      await update(editingId, verified);
+      if (verified.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
+    }
     else await add(verified);
     resetForm();
   };
@@ -153,6 +160,8 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       lastCheckedAt: Date.now(),
       enabled: result.status === "active" ? source.kind === "google-drive" || source.enabled : false,
     });
+    const verified = useSourceStore.getState().sources.find(item => item.id === source.id);
+    if (verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
   };
 
   const toggle = async (source: UserSource, enabled: boolean) => {
@@ -169,6 +178,8 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       lastError: result.error,
       lastCheckedAt: Date.now(),
     });
+    const verified = useSourceStore.getState().sources.find(item => item.id === source.id);
+    if (verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
   };
 
   const disconnect = async (source: UserSource) => {
@@ -228,7 +239,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
               ))}
             </View>
             {kind !== "google-drive" ? <Text style={[styles.helper, { color: palette.secondaryText }]}>{kind === "json" ? 'URL de catálogo com { "books": [{ "title": "Livro", "author": "Autor", "url": "https://…/livro.epub" }] }. A busca filtra título e autor. Na Web, o servidor precisa permitir CORS.' : 'O endereço será testado antes de ficar ativo. A URL pode usar {query}. Na Web, o servidor precisa permitir CORS.'}</Text> : null}
-            {kind === "google-drive" ? <Text style={[styles.helper, { color: palette.secondaryText }]}>Autorização separada do login: solicita drive.readonly, que permite ler e baixar arquivos de todo o Drive. O Aldus consulta somente a pasta cadastrada e baixa apenas o livro escolhido. Índice de metadados em memória por 5 minutos; Atualizar reconecta e refaz o índice. Sem subpastas/atalhos. Tokens não são salvos pelo app. Revogar pode afetar outras fontes da mesma conta/projeto Google. {driveReady ? "" : "Autorização Web ainda não pronta ou configuração ausente; consulte GOOGLE_DRIVE_IMPLEMENTATION.md."}</Text> : null}
+            {kind === "google-drive" ? <Text style={[styles.helper, { color: palette.secondaryText }]}>Autorização separada do login: solicita drive.readonly, que permite ler e baixar arquivos de todo o Drive. O Aldus consulta somente a pasta cadastrada e baixa apenas o livro escolhido. O catálogo de metadados permanece localmente entre sessões; remover a fonte elimina seu índice, não os livros importados. Sem subpastas/atalhos. Tokens não são salvos pelo app. Revogar pode afetar outras fontes da mesma conta/projeto Google. {driveReady ? "" : "Autorização Web ainda não pronta ou configuração ausente; consulte GOOGLE_DRIVE_IMPLEMENTATION.md."}</Text> : null}
             {formError ? <Text accessibilityRole="alert" style={[styles.error, { color: palette.accent }]}>{formError}</Text> : null}
             <View style={styles.formActions}>
               {editingId ? (
@@ -245,13 +256,13 @@ export function SourceManagerModal({ visible, onClose }: Props) {
             {sources.length === 0 ? (
               <Text style={[styles.empty, { color: palette.secondaryText }]}>Nenhuma fonte adicionada.</Text>
             ) : sources.map((source) => {
-              const status = source.status === "error" ? "Erro" : !source.enabled ? "Desativada" : "Ativa";
-              const statusColor = status === "Erro" ? palette.accent : status === "Ativa" ? "#39836B" : palette.secondaryText;
+              const status = sourceCapabilities(source).requiresAuthorization && sourceCatalogAdapter.authorizationRequired(source) ? "Reconectar" : source.status === "error" ? "Erro" : !source.enabled ? "Desativada" : "Ativa";
+              const statusColor = status === "Erro" || status === "Reconectar" ? palette.accent : status === "Ativa" ? "#39836B" : palette.secondaryText;
               return (
                 <View key={source.id} style={[styles.sourceRow, { borderBottomColor: palette.separator }]}>
                   <View style={styles.sourceDetails}>
                     <View style={styles.nameRow}>
-                      <Text numberOfLines={1} style={[styles.sourceName, { color: palette.text }]}>{source.name}</Text>
+                      <Pressable style={{ flex: 1 }} accessibilityRole="button" disabled={!sourceCapabilities(source).supportsCatalog} onPress={() => { onClose(); router.push({ pathname: "/sources/[sourceId]", params: { sourceId: source.id } } as never); }}><Text numberOfLines={1} style={[styles.sourceName, { color: palette.text }]}>{source.name}{sourceCapabilities(source).supportsCatalog ? " → Biblioteca" : " · Somente pesquisa"}</Text></Pressable>
                       <Text style={[styles.status, { color: statusColor }]}>{status}</Text>
                     </View>
                     <Text numberOfLines={1} style={[styles.sourceUrl, { color: palette.secondaryText }]}>{source.url}</Text>
@@ -260,8 +271,9 @@ export function SourceManagerModal({ visible, onClose }: Props) {
                       <TextAction label="Editar" color={palette.accent} disabled={busyId !== null} onPress={() => edit(source)} />
                       <TextAction label={busyId === source.id ? "Testando…" : source.kind === "google-drive" ? "Conectar / Atualizar" : "Atualizar"} color={palette.accent} disabled={busyId !== null} onPress={() => void refresh(source).catch(reportFailure)} />
                       {source.kind === "google-drive" ? <TextAction label="Desconectar" color={palette.accent} disabled={busyId !== null} onPress={() => void disconnect(source).catch(reportFailure)} /> : null}
-                      <TextAction label="Remover" color={palette.secondaryText} disabled={busyId !== null} onPress={() => void remove(source.id).catch(reportFailure)} />
+                      <TextAction label="Remover" color={palette.secondaryText} disabled={busyId !== null} onPress={() => setRemoving(source.id)} />
                     </View>
+                    {removing === source.id ? <View style={{ gap: 10, marginTop: 12 }}><Text style={{ color: palette.text, fontSize: 12 }}>Remover esta fonte não excluirá os livros já importados. Seu catálogo local e configuração serão removidos.</Text><View style={styles.actions}><TextAction label="Confirmar remoção da fonte" color={palette.accent} disabled={busyId !== null} onPress={() => { setBusyId(source.id); void remove(source.id).then(() => setRemoving(null)).catch(reportFailure).finally(() => setBusyId(null)); }} /><TextAction label="Cancelar remoção" color={palette.secondaryText} onPress={() => setRemoving(null)} /></View></View> : null}
                   </View>
                   <Switch
                     accessibilityLabel={`${source.enabled ? "Desativar" : "Ativar"} ${source.name}`}

@@ -16,6 +16,7 @@ export class SourceCatalogService {
   private controllers = new Map<string, AbortController>();
   private writes = new Map<string, Promise<unknown>>();
   private listeners = new Set<() => void>();
+  private removed = new Set<string>();
   constructor(readonly repository: SourceCatalogRepository, private adapter: SourceCatalogAdapter, private findSource: (id: string) => Promise<UserSource | undefined>) {}
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   view = (id: string): SourceCatalogView => this.views.get(id) ?? EMPTY_VIEW;
@@ -32,7 +33,7 @@ export class SourceCatalogService {
     return next;
   }
   async load(source: UserSource): Promise<void> {
-    if (this.controllers.has(source.id)) return;
+    if (this.removed.has(source.id) || this.controllers.has(source.id)) return;
     const generation = this.generation(source.id);
     try {
       const stored = await this.repository.get(source.id);
@@ -43,6 +44,7 @@ export class SourceCatalogService {
     } catch { if (generation === this.generation(source.id)) this.publish(source.id, { ...initial(), status: "error", error: "Não foi possível ler o catálogo persistido desta fonte." }); }
   }
   async refresh(source: UserSource): Promise<void> {
+    if (this.removed.has(source.id)) return;
     if (!sourceCapabilities(source).supportsCatalog) throw new Error("Esta fonte oferece somente pesquisa.");
     const generation = this.invalidate(source.id), controller = new AbortController();
     this.controllers.set(source.id, controller);
@@ -69,14 +71,30 @@ export class SourceCatalogService {
     } finally { if (this.controllers.get(source.id) === controller) this.controllers.delete(source.id); }
   }
   async remove(id: string): Promise<void> {
-    this.invalidate(id);
-    await this.write(id, () => this.repository.remove(id));
-    this.publish(id, { catalog: null, status: "empty", error: null });
+    this.removed.add(id);
+    const generation = this.invalidate(id), previous = this.view(id);
+    try {
+      await this.write(id, () => this.repository.remove(id));
+      if (generation === this.generation(id)) this.publish(id, { catalog: null, status: "empty", error: null });
+    } catch (error) {
+      if (generation === this.generation(id)) {
+        this.removed.delete(id);
+        this.publish(id, { ...previous, status: previous.catalog ? "stale" : "error", error: "Não foi possível remover o catálogo. A fonte foi preservada; tente novamente." });
+      }
+      throw error;
+    }
   }
-  async recordImport(sourceId: string, remoteBookId: string, bookId: string): Promise<void> {
-    const generation = this.generation(sourceId);
+  async reset(id: string): Promise<void> { await this.remove(id); this.removed.delete(id); }
+  cancel(sourceId: string): void {
+    this.invalidate(sourceId);
+    const previous = this.view(sourceId);
+    this.publish(sourceId, { ...previous, status: previous.catalog ? "stale" : "empty", error: null });
+  }
+  async recordImport(sourceId: string, remoteBookId: string, bookId: string, identity?: string): Promise<void> {
     await this.write(sourceId, async () => {
-      if (generation !== this.generation(sourceId) || !(await this.findSource(sourceId))) return;
+      if (this.removed.has(sourceId)) return;
+      const source = await this.findSource(sourceId);
+      if (!source || this.removed.has(sourceId) || identity && sourceIdentity(source) !== identity) return;
       await this.repository.link({ sourceId, remoteBookId, bookId });
     });
   }
@@ -85,13 +103,15 @@ export class SourceCatalogService {
 const EMPTY_VIEW = initial();
 function safeUrl(value: string): string {
   const url = new URL(value);
-  if (!/^https?:$/.test(url.protocol) || url.username || url.password || [...url.searchParams.keys()].some(key => /^(access_token|token|authorization|signature|x-amz-signature|x-goog-signature)$/i.test(key))) throw new Error("URL não segura para persistência do catálogo.");
+  if (!/^https?:$/.test(url.protocol) || url.username || url.password || /(?:access_token|authorization|token|signature)=/i.test(url.hash) || [...url.searchParams.keys()].some(key => /^(access_token|token|authorization|signature|x-amz-signature|x-goog-signature)$/i.test(key))) throw new Error("URL não segura para persistência do catálogo.");
   return url.href;
 }
 export function catalogItems(source: UserSource, links: ScrapedLink[]): SourceCatalogItem[] {
+  if (source.kind === "json") safeUrl(source.url);
   const items = new Map<string, SourceCatalogItem>();
   for (const link of links) {
     if (!link.title?.trim() || (link.format !== "epub" && link.format !== "pdf")) throw new Error("Metadados inválidos na fonte.");
+    if (link.estimatedSize !== null && (!Number.isFinite(link.estimatedSize) || link.estimatedSize < 0)) throw new Error("Tamanho inválido na fonte.");
     const url = safeUrl(link.url), remoteBookId = link.drive?.fileId ?? link.remoteBookId ?? url;
     if (!remoteBookId || items.has(remoteBookId)) throw new Error("Identidade remota duplicada ou inválida.");
     // Explicit allowlist: arbitrary adapter fields, headers and credentials never reach disk.

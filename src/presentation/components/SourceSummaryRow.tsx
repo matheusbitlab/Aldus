@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { UserSource } from "@/src/domain/types/sources";
-import { sourceCapabilities } from "@/src/domain/types/sourceCatalog";
+import { sourceCapabilities, sourceTypeLabel } from "@/src/domain/types/sourceCatalog";
 import { sourceCatalogs } from "@/src/data/sources/sourceCatalogDependencies";
 import { useSourceCatalog } from "@/src/presentation/hooks/useSourceCatalog";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
@@ -11,12 +11,13 @@ export function SourceSummaryRow({ source, onManage }: { source: UserSource; onM
   const { palette } = useAppTheme(), view = useSourceCatalog(source), capabilities = sourceCapabilities(source);
   const open = () => {
     if (capabilities.supportsCatalog) router.push({ pathname: "/sources/[sourceId]", params: { sourceId: source.id } } as never);
-    else { useSearchStore.getState().selectSource(source.name); router.push("/(tabs)/search" as never); }
+    else if (capabilities.supportsSearch) { useSearchStore.getState().selectSource(source.name); router.push("/(tabs)/search" as never); }
+    else onManage();
   };
   return <View style={[styles.row, { backgroundColor: palette.surface, borderColor: palette.border }]}>
     <Pressable accessibilityRole="button" accessibilityLabel={`${capabilities.supportsCatalog ? "Abrir biblioteca" : "Pesquisar"}: ${source.name}`} onPress={open} style={{ gap: 6 }}>
       <Text style={{ color: palette.text, fontSize: 17, fontWeight: "600" }}>{source.name}</Text>
-      <Text style={{ color: palette.secondaryText }}>{source.kind.toUpperCase()} · {capabilities.supportsCatalog ? view.catalog ? `${view.catalog.items.length} livros` : "Ainda não indexada" : "Somente pesquisa"}</Text>
+      <Text style={{ color: palette.secondaryText }}>{sourceTypeLabel(source.kind)} · {capabilities.supportsCatalog ? view.catalog ? `${view.catalog.items.length} ${view.catalog.items.length === 1 ? "livro" : "livros"}` : "Ainda não indexada" : "Somente pesquisa"}</Text>
       {capabilities.supportsCatalog && view.catalog ? <Text style={{ color: palette.secondaryText, fontSize: 12 }}>Última atualização: {new Date(view.catalog.lastUpdated).toLocaleString("pt-BR")}</Text> : null}
       <Text style={{ color: palette.secondaryText, fontSize: 12 }}>{view.status === "auth_required" ? "Reconectar para atualizar; catálogo local preservado" : !source.enabled ? "Desativada" : view.status === "refreshing" || view.status === "loading" && capabilities.supportsCatalog ? "Carregando…" : view.error ? "Atualização pendente · último catálogo preservado" : capabilities.requiresAuthorization ? "Autorizada nesta sessão" : "Fonte cadastrada"}</Text>
     </Pressable>

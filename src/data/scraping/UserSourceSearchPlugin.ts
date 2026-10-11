@@ -70,6 +70,7 @@ export class UserSourceSearchPlugin implements SearchPlugin {
       const cover = typeof book.coverUrl === "string" ? new URL(book.coverUrl, this.source.url) : null;
       if (cover && !/^https?:$/.test(cover.protocol)) throw new Error("URL de capa inválida.");
       return {
+        sourceId: this.source.id,
         remoteBookId: typeof book.id === "string" && book.id.trim() ? book.id : undefined,
         modifiedAt: typeof book.modifiedAt === "string" ? book.modifiedAt : undefined,
         url: url.href, title: book.title.trim(),

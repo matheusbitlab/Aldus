@@ -13,8 +13,8 @@ export const sourceCatalogAdapter: SourceCatalogAdapter = {
     if (source.kind === "google-drive") return googleDrive.list(source, signal, true);
     const payload = await network.getText(source.url, { signal, retries: 0 });
     // JSON V1 is an entire static collection; reject pagination rather than pretend it is complete.
-    const parsed = JSON.parse(payload) as { next?: unknown; nextPageToken?: unknown; continuation?: unknown };
-    if (parsed?.next || parsed?.nextPageToken || parsed?.continuation) throw new Error("Catálogo JSON paginado não suportado.");
+    const parsed = JSON.parse(payload) as { next?: unknown; nextPageToken?: unknown; continuation?: unknown; nextPageUrl?: unknown; pagination?: unknown; hasMore?: boolean };
+    if (parsed?.next || parsed?.nextPageToken || parsed?.continuation || parsed?.nextPageUrl || parsed?.pagination || parsed?.hasMore) throw new Error("Catálogo JSON paginado não suportado.");
     return new UserSourceSearchPlugin(source).parseResults(payload);
   },
   authorizationRequired: source => {

@@ -37,5 +37,8 @@ export function sourceCapabilities(source: UserSource): SourceCapabilities {
   return { supportsCatalog, supportsSearch: source.kind !== "webview", supportsDownload: source.kind !== "webview", supportsRefresh: supportsCatalog, requiresAuthorization: source.kind === "google-drive" };
 }
 export function sourceIdentity(source: UserSource): string {
-  return JSON.stringify([source.kind, source.folderId ?? source.url, source.resourceKey ?? null]);
+  return JSON.stringify([source.kind, source.kind === "google-drive" ? source.folderId ?? source.url : source.url, source.kind === "google-drive" ? source.resourceKey ?? null : null]);
+}
+export function sourceTypeLabel(kind: SourceKind): string {
+  return ({ "google-drive": "Google Drive", json: "Catálogo JSON", opds: "OPDS", html: "HTML", bndigital: "BNDigital", gutenberg: "Gutenberg", webview: "Serviço Web" } satisfies Record<SourceKind, string>)[kind];
 }
