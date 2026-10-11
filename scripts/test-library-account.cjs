@@ -28,6 +28,6 @@ const { loader, sqliteAdapter } = require('./library-test-utils.cjs');
   const captured = scope.capture(); scope.set('B'); assert.throws(captured.check,/conta mudou/);
   let release; const delayed = new AccountBookRepository({ ...raw, listActive: () => new Promise(r=>release=r) }, scope);
   const pending = delayed.listActive(); scope.set('A'); release([book]); await assert.rejects(pending,/conta mudou/);
-  assert.equal(db.prepare('SELECT version FROM schema_version').get().version,4);
+  assert.equal(db.prepare('SELECT version FROM schema_version').get().version,5);
   db.close(); console.log('PASS account ownership: real SQLite migration, legacy preservation/explicit claim, A/logout/B/A, child ID/read/write guards, stale reads, UPSERT preserves annotations.');
 })().catch(error=>{ console.error(error);process.exitCode=1; });

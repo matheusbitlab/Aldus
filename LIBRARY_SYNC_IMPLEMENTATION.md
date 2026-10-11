@@ -59,3 +59,14 @@ MIGRATION CRIADA — NÃO APLICADA REMOTAMENTE. Sonda pública atual: Auth200, O
 Bloco1 commit3be78c6 — feat: scope local library by account. APK pós-commit FAIL,0bytes/nenhum APK criado; log artifacts/apk/build-3be78c6.log: APK BLOQUEADO POR AMBIENTE (Platform36/BuildTools35/licenças). Download do SDK Manager oficial ainda em andamento; nenhum artefato antigo renomeado. Ledger durável artifacts/apk/checkpoint.jsonl.
 
 PENDENTE: blocos3–8; Android físico/Supabase/Storage real NÃO TESTADOS. Bloco2 APK será executado imediatamente após commit e registrado no mesmo ledger.
+
+## Bloco 3 — engine/outbox/reconciliação
+
+IMPLEMENTADO: LibrarySyncService dedicado, persistence SQLite v5/IndexedDB v6 com transações estritas; read-modify-write Web atômico entre janelas. Entidades com fila dirty/ready, operation UUID, baseRevision/shadow e escrita antecipada antes da mutação local. Escrita local interrompida não é enviada ao servidor até ser reaplicada; falha não anuncia sucesso. Retry preserva operationId e usa receipt servidor; IDs independentes evitam duplicatas.
+
+Pull inicial aprende tombstones antes de enviar filhos offline; push usa CAS; pull final reconcilia metadados. Tombstones de livros anulam alterações pendentes de filhos e impedem recriação. Conflitos da mesma entidade preservam intenção local separadamente e aplicam estado ordenado pelo servidor, com resolução explícita local/remoto. Percentual maior NÃO vence; releitura .9→.1 testada. Network requests congelam JWT da conta por operação: troca para B não envia payload A com sessão B. Respostas antigas descartadas por generation+Abort. Sem polling; ligação aos gatilhos/UI será concluída no bloco6. Nenhuma UI chama Supabase diretamente.
+
+VALIDADO CONTROLADO: test-library-sync usa duas bases SQLite separadas e adapters controlados: offline/outbox/retry/resposta perdida/conflitos/releitura/tombstone vs nota offline/replay de escrita interrompida/troca de conta PASS. test-library-account atualizado v5 PASS; typecheck anterior aos últimos ajustes PASS, gate final em execução. IndexedDB atômico novo ainda requer browser real; Android/HTTP Supabase real NÃO TESTADOS.
+
+PENDENTE: wiring dos dados/transferência/reading/UI/gatilhos/legal (blocos4–8), real remote. Migration permanece NÃO APLICADA. Bloco2 commit d77f6e8 APK FAIL/nenhum arquivo/0bytes, APK BLOQUEADO POR AMBIENTE, log artifacts/apk/build-d77f6e8.log. SDK Manager oficial segue download seguro; recordar resultado antes do fechamento.
+Gates finais bloco3 PASS: typecheck, test:library:sync, test:library:account, export:web e diff check. SDK Manager oficial instalado e checksum SHA256 validado; licenças aceitas, componentes Android em instalação. APK pós-commit executado antes do próximo bloco.

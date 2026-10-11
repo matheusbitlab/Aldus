@@ -26,7 +26,8 @@
     "export:web": "expo export --platform web && node scripts/copy-books-to-dist.mjs",
     "test:library:account": "node scripts/test-library-account.cjs",
     "test:library:rls": "node scripts/test-library-rls.cjs",
-    "build:apk:archive": "node scripts/archive-commit-apk.mjs"
+    "build:apk:archive": "node scripts/archive-commit-apk.mjs",
+    "test:library:sync": "node scripts/test-library-sync.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

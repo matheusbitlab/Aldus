@@ -1,10 +1,24 @@
-type StoreName = "books" | "book_metadata" | "chapters" | "documents" | "reading_progress" | "bookmarks" | "highlights" | "web_search_history" | "pdf_reflow_cache" | "source_catalogs" | "source_import_links";
+type StoreName = "books" | "book_metadata" | "chapters" | "documents" | "reading_progress" | "bookmarks" | "highlights" | "web_search_history" | "pdf_reflow_cache" | "source_catalogs" | "source_import_links" | "library_sync_state";
 type StoredValue = { id: string };
 
-const storeNames: StoreName[] = ["books", "book_metadata", "chapters", "documents", "reading_progress", "bookmarks", "highlights", "web_search_history", "pdf_reflow_cache", "source_catalogs", "source_import_links"];
+const storeNames: StoreName[] = ["books", "book_metadata", "chapters", "documents", "reading_progress", "bookmarks", "highlights", "web_search_history", "pdf_reflow_cache", "source_catalogs", "source_import_links", "library_sync_state"];
 const memoryStores = new Map<StoreName, Map<string, StoredValue>>(storeNames.map((name) => [name, new Map()]));
 const memoryDeleted = new Map<StoreName, Set<string>>(storeNames.map((name) => [name, new Set()]));
 let databasePromise: Promise<IDBDatabase | null> | null = null;
+
+/** Atomic read-modify-write across windows; request success is not transaction commit. */
+export async function webMutatePersistent<T extends StoredValue>(storeName: StoreName, id: string, change: (value: T | null) => T): Promise<void> {
+  const database = await openDatabase();
+  if (!database) throw new Error("Armazenamento persistente indisponível para sincronização.");
+  await new Promise<void>((resolve,reject) => {
+    const transaction=database.transaction(storeName,'readwrite'), store=transaction.objectStore(storeName);
+    let failure: unknown;
+    transaction.oncomplete=()=>resolve();
+    transaction.onabort=transaction.onerror=()=>reject(failure??transaction.error??new Error('Falha ao persistir sincronização.'));
+    const read=store.get(id);
+    read.onsuccess=()=>{try{store.put(change(read.result??null));}catch(error){failure=error;transaction.abort();}};
+  });
+}
 
 export async function webGetPersistent<T extends StoredValue>(storeName: StoreName, id: string): Promise<T | null> {
   const database = await openDatabase();
@@ -141,7 +155,7 @@ async function openDatabase(): Promise<IDBDatabase | null> {
     databasePromise = new Promise((resolve) => {
       if (typeof indexedDB === "undefined") { resolve(null); return; }
       try {
-        const request = indexedDB.open("kindle-reader-web", 5);
+        const request = indexedDB.open("kindle-reader-web", 6);
         request.onupgradeneeded = (event) => {
           const database = request.result;
           for (const storeName of storeNames) if (!database.objectStoreNames.contains(storeName)) database.createObjectStore(storeName, { keyPath: "id" });

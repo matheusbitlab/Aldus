@@ -1,0 +1,30 @@
+export const libraryEntityKinds = ['book','progress','bookmark','highlight','organization','pdf_position'] as const;
+export type LibraryEntityKind = typeof libraryEntityKinds[number];
+export interface RemoteLibraryRow {
+  user_id: string; kind: LibraryEntityKind; id: string; book_id: string;
+  payload: Record<string, any>; revision: number; updated_at: string; deleted_at: string | null;
+}
+export interface LibrarySyncEntry {
+  key: string; kind: LibraryEntityKind; id: string; bookId: string;
+  payload: Record<string, any>; deleted: boolean; dirty: boolean; ready: boolean;
+  operationId: string; baseRevision: number;
+  shadow?: RemoteLibraryRow;
+  /** Preserve rejected local intent; never silently destroy concurrent edits. */
+  conflict?: { payload: Record<string, any>; deleted: boolean };
+}
+export interface LibrarySyncState { id: string; entries: Record<string, LibrarySyncEntry>; lastSync: number | null; }
+export interface LibrarySyncPersistence {
+  read(owner: string): Promise<LibrarySyncState>;
+  mutate(owner: string, change: (state: LibrarySyncState) => void): Promise<void>;
+}
+export interface LibraryRemoteAdapter {
+  pull(owner: string, signal: AbortSignal): Promise<RemoteLibraryRow[]>;
+  apply(owner: string, entry: LibrarySyncEntry, signal: AbortSignal): Promise<{ accepted: boolean; row: RemoteLibraryRow }>;
+}
+export const syncKey = (kind: LibraryEntityKind, id: string) => `${kind}:${id}`;
+export function emptySyncState(owner: string): LibrarySyncState { return { id: owner, entries: {}, lastSync: null }; }
+export function validateRemoteRow(row: RemoteLibraryRow, owner: string): void {
+  if (!row || row.user_id !== owner || !libraryEntityKinds.includes(row.kind) || !row.id || !row.book_id
+    || !Number.isSafeInteger(row.revision) || row.revision < 1 || !row.payload || typeof row.payload !== 'object'
+    || Array.isArray(row.payload) || (row.kind === 'book' && row.id !== row.book_id)) throw new Error('Resposta de sincronização inválida.');
+}
