@@ -1,4 +1,4 @@
-import { requireNativeModule } from "expo-modules-core";
+import { requireOptionalNativeModule } from "expo-modules-core";
 
 export interface NativeOcrLine {
   text: string;
@@ -21,4 +21,4 @@ interface AldusPdfOcrModule {
   recognizePage(uri: string, pageIndex: number, maxDimension: number, operationId: number): Promise<NativeOcrPage>;
 }
 
-export default requireNativeModule<AldusPdfOcrModule>("AldusPdfOcr");
+export default requireOptionalNativeModule<AldusPdfOcrModule>("AldusPdfOcr");

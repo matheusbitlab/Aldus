@@ -6,7 +6,7 @@ function load(file) {
   const source=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   new Function('require','exports',source)(name=>{
     if(name==='react-native')return {StyleSheet:{create:x=>x,absoluteFill:{}}};
-    if(name==='expo-modules-core')return {requireNativeModule:()=>({beginOperation:async()=>{},cancelOperation:async()=>{},recognizePage:async()=>({lines:[]})})};
+    if(name==='expo-modules-core')return {requireOptionalNativeModule:()=>({beginOperation:async()=>{},cancelOperation:async()=>{},recognizePage:async()=>({lines:[]})})};
     if(['react-native-webview','expo-file-system/legacy'].includes(name))return {};
     const base=name.startsWith('@/')?name.slice(2):path.posix.join(path.posix.dirname(file),name);
     const target=['.ts','.tsx',''].map(ext=>base+ext).find(p=>fs.existsSync(p));return target?load(target):require(name);

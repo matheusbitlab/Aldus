@@ -2,11 +2,12 @@ import AldusPdfOcr, { NativeOcrPage } from "@/modules/aldus-pdf-ocr/index";
 import type { PdfReflowPageData, PdfReflowTextItem } from "@/src/domain/types/pdfReader";
 
 export async function beginPdfOcr(operationId: number): Promise<void> {
-  await AldusPdfOcr.beginOperation(operationId);
+  const module = requirePdfOcrModule();
+  await module.beginOperation(operationId);
 }
 
 export async function cancelPdfOcr(operationId: number): Promise<void> {
-  await AldusPdfOcr.cancelOperation(operationId).catch(() => undefined);
+  await AldusPdfOcr?.cancelOperation(operationId).catch(() => undefined);
 }
 
 export async function recognizePdfPage(
@@ -14,8 +15,13 @@ export async function recognizePdfPage(
   page: PdfReflowPageData,
   operationId: number
 ): Promise<PdfReflowTextItem[]> {
-  const result = await AldusPdfOcr.recognizePage(uri, page.pageNumber - 1, 1800, operationId);
+  const result = await requirePdfOcrModule().recognizePage(uri, page.pageNumber - 1, 1800, operationId);
   return mapOcrLinesToPdf(result, page);
+}
+
+function requirePdfOcrModule() {
+  if (!AldusPdfOcr) throw new Error("O OCR local requer um build Android atualizado do Aldus Reader.");
+  return AldusPdfOcr;
 }
 
 export function mapOcrLinesToPdf(result: NativeOcrPage, page: PdfReflowPageData): PdfReflowTextItem[] {
