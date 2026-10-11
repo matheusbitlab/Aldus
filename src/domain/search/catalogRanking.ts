@@ -3,7 +3,7 @@ import { ScrapedLink } from "@/src/domain/types/search";
 const stopWords = new Set("a o as os um uma uns umas de do da dos das e em no na nos nas por para the an of and by to in".split(" "));
 const authorSpellings: Record<string, string> = { dostoievski: "dostoyevsky", dostoievsky: "dostoyevsky", dostoevsky: "dostoyevsky", dostoevski: "dostoyevsky", dostojevski: "dostoyevsky", dostoievskij: "dostoyevsky" };
 export function normalizeCatalogText(value: string): string {
-  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
+  return value.replace(/\.(?:pdf|epub)\s*$/i, "").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
 }
 export function catalogTokens(value: string): string[] {
   return [...new Set(normalizeCatalogText(value).split(" ").filter(word => word && !stopWords.has(word)).map(word => authorSpellings[word] ?? word))];
@@ -23,13 +23,12 @@ function oneEdit(a: string, b: string): boolean {
 }
 export function scoreCatalogBook(book: ScrapedLink, query: string): number {
   const terms = catalogTokens(query);
-  if (!terms.length) return 0;
+  if (!terms.length || terms.every(term => term.length < 2)) return 0;
   const title = catalogTokens(book.title), author = catalogTokens(book.author ?? ""), words = [...title, ...author];
   if (terms.join(" ") === title.join(" ")) return 500;
   if (terms.every(term => matches(term, title))) return 400 + terms.length / Math.max(1,title.length);
   const exact = terms.filter(term => matches(term, words));
   if (exact.length === terms.length) return 300 + terms.length / Math.max(1,words.length);
-  if (terms.length >= 3 && exact.length >= Math.ceil(terms.length * 2 / 3)) return 200 + exact.length / terms.length;
   const subjects = catalogTokens((book.subjects ?? []).join(" "));
   if (terms.every(term => matches(term, [...words, ...subjects]))) return 150;
   const missing = terms.filter(term => !matches(term,words));

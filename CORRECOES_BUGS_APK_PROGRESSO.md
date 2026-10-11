@@ -1,5 +1,10 @@
 # Campanha de correção dos bugs do APK
 
+## DRIVE — AUDITORIA / SEARCH, 11/10/2026
+
+Contrato Sources/Search e aquisição auditados; Google Supabase não concede Drive. Ranking existente consolidado, sem reabrir campanha Reader/Auth/OCR. Extensões e diacríticos Unicode removidos somente da representação de pesquisa; maioria de tokens que admitia termo alheio removida. Matriz de títulos/autor/typos/ordem/curtas ampliada em test-catalog-ranking. Auth Drive e download PDF ainda PENDENTES; nenhuma conta real conectada.
+
+
 ## OCR — AUDITORIA, checkpoint 11/10/2026
 
 **Classificação inicial: E (e A como comportamento observável).** A busca global confirmou somente detecção/fallback: PDF.js extraía texto, o validador identificava corrupção ou conteúdo insuficiente e o Reader retornava ao PDF Original. Não existiam engine, provider, dependência, módulo nativo, estados de OCR, cache com proveniência nem testes funcionais de reconhecimento. Os fallbacks de Sociedade/Manifesto eram reais; não eram OCR parcial escondido.

@@ -1,5 +1,12 @@
 # PROJECT CONTEXT
 
+## Itens novos — Google Drive, 11/10/2026 (em andamento)
+
+DRIVE — AUDITORIA: VALIDADO por inspeção. Fontes pessoais usam UserSourceRepository/AsyncStorage, configuredCatalog/SearchPlugin e SearchBooksUseCase; seleção escolhe adapters antes da consulta, Todas publica resultados parciais, searchStore conserva geração/AbortSignal. ScrapedLink carrega título/autor/formato/URL, mas faltavam IDs Drive e execução autenticada assíncrona. DownloadManager existente importa somente EPUB; PDF exige extensão restrita para reutilizar PdfFileImporter. Login Google Supabase é PKCE de identidade, NÃO autorização Drive; nenhum provider token será reutilizado.
+
+DRIVE — SEARCH: IMPLEMENTADO compartilhado em catalogRanking, sem biblioteca nova. Extensões finais EPUB/PDF e diacríticos Unicode são ignorados somente para ranking; título exibido preservado. Tokens reordenados, prefixos (mínimo 3 letras), autor com peso menor e uma edição/transposição conservadora. Uma letra/vazio não encontra livros; removida maioria 2/3 que aceitava termo totalmente alheio. Testes pedidos ampliados. Drive real NÃO TESTADO. Próxima etapa: BIBLIOTECA PERMANENTE POR FONTE; Reader/OCR/Auth geral preservados.
+
+
 ## Itens novos — OCR local de PDF, 11/10/2026
 
 **AUDITORIA A–E:** baseline classificado como **E**, com comportamento **A** visível: havia somente detecção de texto corrompido/insuficiente e fallback ao PDF Original; não havia engine, provider, módulo, cache OCR nem OCR funcional oculto. A pipeline preexistente de PDF Original, extração PDF.js, builder Reflow, validação conservadora, posições e cache foi preservada.

@@ -1,5 +1,10 @@
 # Roadmap funcional — atualizado em 2026-10-11
 
+## Google Drive / Fontes — terceira etapa em andamento
+
+DRIVE — AUDITORIA concluída; BUSCA TOLERANTE compartilhada consolidada com extensões, Unicode e casos solicitados. Auth Drive/listagem/download em implementação; Google real NÃO TESTADO. Próxima etapa: BIBLIOTECA PERMANENTE POR FONTE, fora do escopo atual.
+
+
 ## OCR local de PDF — item 4
 
 Estado: **🟡 IMPLEMENTADO NO CÓDIGO / ✅ GATES CONTROLADOS / 🧪 ANDROID REAL PENDENTE**.
