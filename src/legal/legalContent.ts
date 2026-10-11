@@ -42,6 +42,14 @@ export const privacyDocument: LegalDocument = {
   subtitle: "Como o Aldus Reader trata dados nesta versão.",
   sections: [
     {
+      heading: "Fonte Google Drive opcional",
+      paragraphs: [
+        "Conectar Drive é uma autorização separada do login Aldus. Solicitamos drive.readonly, que permite ler e baixar arquivos de todo o Drive, embora o aplicativo consulte somente a pasta cadastrada e baixe apenas livros escolhidos. Não enviamos livros nem alteramos arquivos no Drive.",
+        "O Google recebe autorização, IDs da pasta/arquivos e pedidos normais de conexão/listagem/download. Nomes, IDs, formato, tamanho e datas dos livros compõem um índice de metadados temporário em memória; a consulta de busca Drive é comparada localmente. Configuração da fonte e pasta fica no armazenamento local. Livros solicitados são baixados e importados na biblioteca local.",
+        "Tokens Drive ficam somente em memória do app; não salvamos refresh tokens. Google Play Services pode manter cache de autorização no sistema Android. Expiração exige reconexão. Desconectar ou remover limpa conexão/índice e, na remoção, configuração, sem apagar livros importados. Tentamos revogar o acesso Google; se não confirmado, remova o acesso nas conexões da conta Google. Revogar pode afetar outras fontes da mesma conta/projeto.",
+      ],
+    },
+    {
       heading: "1. Escopo e transparência",
       paragraphs: [
         "Esta política cobre o aplicativo Aldus Reader, incluindo autenticação, biblioteca local, leitura, estudo e pesquisa em catálogos. Ela não transforma todos os tratamentos em consentimento e não substitui avisos específicos que possam ser necessários.",
@@ -58,7 +66,7 @@ export const privacyDocument: LegalDocument = {
         "No login com Google, dados de identidade disponibilizados pelo Google e necessários para concluir a autenticação.",
       ],
       paragraphs: [
-        "O Supabase processa a autenticação e o perfil remoto. O Google participa somente quando esse método de login é escolhido. A configuração efetiva, a região de hospedagem e os contratos desses provedores devem ser confirmados pelo operador do serviço.",
+        "O Supabase processa a autenticação e o perfil remoto. O Google participa no login Google, quando escolhido, e separadamente na autorização opcional da fonte Google Drive. A configuração efetiva, a região de hospedagem e os contratos desses provedores devem ser confirmados pelo operador do serviço.",
       ],
     },
     {
@@ -109,7 +117,7 @@ export const privacyDocument: LegalDocument = {
       heading: "8. Compartilhamento e transferências",
       bullets: [
         "Supabase: autenticação e perfil.",
-        "Google: autenticação escolhida pela pessoa.",
+        "Google: autenticação escolhida pela pessoa e autorização/consultas/downloads da fonte Drive, quando conectada.",
         "Catálogos, sites e serviços escolhidos: consulta, navegação e download solicitado.",
         "Autoridades ou terceiros quando houver fundamento e obrigação jurídica aplicável.",
       ],

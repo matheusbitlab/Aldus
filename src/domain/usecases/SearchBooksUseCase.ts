@@ -54,6 +54,13 @@ export class SearchBooksUseCase {
       const trace = (stage: string) => searchDiagnostic(options.operationId, stage, { sourceIndex });
       let result: { links: ScrapedLink[]; status: SearchSourceStatus };
       try {
+        if (plugin.search) {
+          const links = rankCatalogBooks(await withAbort(plugin.search(cleanQuery, signal), signal), cleanQuery);
+          throwIfAborted(signal);
+          completed.set(sourceIndex, { links, status: { sourceName, status: links.length ? "success" : "empty" } });
+          options.onPartial?.(snapshot());
+          return;
+        }
         trace("endpoint");
         const endpoint = endpointOverrides[sourceName] ?? plugin.getSearchEndpoint(remoteQueries.primary);
         const url = new URL(endpoint);

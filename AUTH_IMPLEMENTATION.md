@@ -1,5 +1,9 @@
 # Autenticação, perfis e acesso — atualizado em 2026-10-10
 
+## Drive — autorização separada, 11/10/2026
+
+IMPLEMENTADO: AuthorizationClient Android (package/SHA) e GIS token model Web (EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID), drive.readonly sem tokens Supabase/client_secret. Tokens app memória, expires_in Web/45 min conservadores Android/401, sem refresh/offline access. SDK Google mantém cache próprio; clearToken na invalidação. Reconnect explícito; revoke best effort pode afetar grants da mesma conta/projeto, preferir Cloud dedicado. Configuração exata/origins sem redirect Web/Android sem custom URI em GOOGLE_DRIVE_IMPLEMENTATION.md. Geral Auth NÃO ALTERADO; Drive real NÃO TESTADO; console PENDENTE.
+
 O Aldus Reader mantém Expo Router e Supabase Auth. Este documento distingue código preparado de configuração e testes no projeto remoto. Não há sincronização de livros/cartões nem cobrança nesta etapa.
 
 ## Auditoria do banco

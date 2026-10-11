@@ -2,6 +2,8 @@
 
 ## Google Drive / Fontes — terceira etapa em andamento
 
+AUTH/CONEXÃO e LISTAGEM IMPLEMENTADOS, Drive mocks/pipeline/parsing/erros/cancel/source-specific PASS. Configuração externa PENDENTE; NÃO TESTADO COM CONTA REAL. Android AuthorizationClient/Web GIS sem segredo, drive.readonly. Download/import no próximo checkpoint desta etapa; roteiro GOOGLE_DRIVE_IMPLEMENTATION.md.
+
 DRIVE — AUDITORIA concluída; BUSCA TOLERANTE compartilhada consolidada com extensões, Unicode e casos solicitados. Auth Drive/listagem/download em implementação; Google real NÃO TESTADO. Próxima etapa: BIBLIOTECA PERMANENTE POR FONTE, fora do escopo atual.
 
 

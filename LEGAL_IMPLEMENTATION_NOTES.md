@@ -2,7 +2,7 @@
 
 Data da auditoria: 11/10/2026
 
-Versão dos documentos públicos: 0.2
+Versão dos documentos públicos: 0.3
 
 Estado: **implementação jurídica inicial; revisão profissional e validação operacional pendentes**.
 
@@ -36,7 +36,7 @@ Este arquivo registra o que foi observado no código e por que os textos públic
 - Sistema operacional/plataforma: armazenamento isolado, permissões, console e entrega do aplicativo.
 - Google ML Kit: motor de OCR executado no aparelho; modelo latino empacotado. O conteúdo e o resultado não são enviados ao Google para reconhecimento, mas o SDK pode contatar serviços do fornecedor para correções, compatibilidade e métricas técnicas.
 
-Não foi encontrada integração funcional com Google Drive, publicidade comportamental, analytics ou crash reporting. Isso descreve o repositório auditado, não prova a inexistência de logs na hospedagem, lojas, sistema operacional ou painéis externos.
+Google Drive agora implementado (NÃO TESTADO COM CONTA REAL): autorização separada Android AuthorizationClient/Web GIS; drive.readonly restrito/amplo leitura/download, consultas app só na pasta direta. Configuração nome/URL/folderId/resourceKey local, índice metadata memória (5 min), token memória/SDK cache Android, sem refresh/segredo/upload. Google recebe IDs/pedidos/autorização/transferências; busca Drive não envia query. Disconnect/removal limpa conexão/índice/configuração conforme ação; revoke best effort, importados preservados. Revisar consentimento/verificação de scopes/políticas/Data safety e termos de Play Services Auth 22.0.0 antes de publicação. Roteiro GOOGLE_DRIVE_IMPLEMENTATION.md. Não foram encontrados publicidade comportamental, analytics ou crash reporting dedicados; não prova ausência de logs externos.
 
 ## 3. Decisões de redação
 

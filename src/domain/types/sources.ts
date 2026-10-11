@@ -1,5 +1,8 @@
-export type SourceKind = "json" | "opds" | "html" | "bndigital" | "gutenberg" | "webview";
+export type SourceKind = "json" | "opds" | "html" | "bndigital" | "gutenberg" | "webview" | "google-drive";
 export interface UserSource {
+  /** Non-secret Drive configuration. id is the persistent sourceId. */
+  folderId?: string;
+  resourceKey?: string;
 	id: string;
 	name: string;
 	url: string;

@@ -2,6 +2,8 @@
 
 ## DRIVE — AUDITORIA / SEARCH, 11/10/2026
 
+DRIVE — AUTH/CONEXÃO / LISTAGEM: Android separado do Supabase/GIS Web, tokens memória/fontes estáveis. Parsing/paginação/TTL/refresh/erros/abort/late validados com mocks; store source-specific Drive e regressões JSON/OPDS/HTML/parciais/stale PASS. Build Android/Drive real NÃO TESTADOS neste checkpoint. Configuração/scopes/limites em GOOGLE_DRIVE_IMPLEMENTATION.md.
+
 Contrato Sources/Search e aquisição auditados; Google Supabase não concede Drive. Ranking existente consolidado, sem reabrir campanha Reader/Auth/OCR. Extensões e diacríticos Unicode removidos somente da representação de pesquisa; maioria de tokens que admitia termo alheio removida. Matriz de títulos/autor/typos/ordem/curtas ampliada em test-catalog-ranking. Auth Drive e download PDF ainda PENDENTES; nenhuma conta real conectada.
 
 

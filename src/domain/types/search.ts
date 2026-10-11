@@ -1,4 +1,6 @@
 export interface ScrapedLink {
+  sourceId?: string;
+  drive?: { fileId: string; resourceKey?: string; modifiedTime?: string; canDownload?: boolean };
 	url: string;
 	title: string;
 	author?: string;
@@ -15,6 +17,8 @@ export interface ScrapedLink {
 }
 
 export interface SearchPlugin {
+  /** Authenticated APIs can execute without exposing tokens in URLs/results. */
+  search?(query: string, signal?: AbortSignal): Promise<ScrapedLink[]>;
 	name: string;
 	/** Only legacy HTML crawlers consult robots; catalog APIs do not. */
 	requiresRobotsPolicy?: boolean;

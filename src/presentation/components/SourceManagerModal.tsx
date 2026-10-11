@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,8 @@ import { configuredCatalog, BUILTIN_CATALOG_NAMES } from "@/src/data/scraping/ca
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { appDependencies } from "@/src/presentation/services/dependencies";
 import { useSourceStore } from "@/src/presentation/stores/sourceStore";
+import { googleDrive } from "@/src/data/drive/driveDependencies";
+import { parseDriveFolder } from "@/src/data/drive/driveFolder";
 
 interface Props {
   visible: boolean;
@@ -28,17 +30,28 @@ export function SourceManagerModal({ visible, onClose }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [driveReady, setDriveReady] = useState(false);
+  const operation = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (visible) void load();
+    if (visible) {
+      void load();
+      void googleDrive.authorization.prepare().then(() => setDriveReady(true)).catch(() => setDriveReady(false));
+    }
+    return () => { operation.current?.abort(); operation.current = null; setBusyId(null); };
   }, [visible, load]);
 
-  const probe = async (source: UserSource): Promise<ProbeResult> => {
+  const probe = async (source: UserSource, signal: AbortSignal): Promise<ProbeResult> => {
     setBusyId(source.id);
     try {
+      if (source.kind === "google-drive") {
+        await googleDrive.connect(source, signal);
+        await googleDrive.list(source, signal, true);
+        return { status: "active", error: null };
+      }
       const response = await appDependencies.searchBooks.executeDetailed(
         "Dom Casmurro",
-        [configuredCatalog(source)]
+        [configuredCatalog(source)], {}, signal
       );
       const outcome = response.sources[0];
       if (!outcome || outcome.status === "error") {
@@ -46,25 +59,32 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       }
       return { status: "active", error: null };
     } catch (failure) {
+      if (signal.aborted && source.kind === "google-drive") {
+        googleDrive.authorization.invalidate(source.id);
+        googleDrive.clearIndex(source.id);
+      }
       return {
         status: "error",
         error: failure instanceof Error ? failure.message : "Não foi possível testar a fonte.",
       };
     } finally {
-      setBusyId(null);
+      if (operation.current?.signal === signal) setBusyId(null);
     }
   };
 
   const save = async () => {
+    if (busyId) return;
     setFormError(null);
-    let parsedUrl: URL;
+    let parsedUrl: URL | undefined;
+    let folder: ReturnType<typeof parseDriveFolder> | undefined;
     try {
-      parsedUrl = new URL(url.trim().replaceAll("{query}", "consulta"));
+      if (kind === "google-drive") folder = parseDriveFolder(url);
+      else parsedUrl = new URL(url.trim().replaceAll("{query}", "consulta"));
     } catch {
-      setFormError("Informe uma URL de busca válida.");
+      setFormError(kind === "google-drive" ? "Informe o ID ou link de uma pasta do Google Drive." : "Informe uma URL de busca válida.");
       return;
     }
-    if (!/^https?:$/.test(parsedUrl.protocol) || !name.trim()) {
+    if ((!folder && !/^https?:$/.test(parsedUrl?.protocol ?? "")) || !name.trim()) {
       setFormError("Informe o nome da fonte e uma URL HTTP ou HTTPS.");
       return;
     }
@@ -80,10 +100,15 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       name: name.trim(),
       url: url.trim(),
       kind,
+      folderId: folder?.folderId,
+      resourceKey: folder?.resourceKey,
       enabled: true,
       createdAt: existing?.createdAt ?? Date.now(),
     };
-    const result = await probe(candidate);
+    const controller = operation.current = new AbortController();
+    const result = await probe(candidate, controller.signal);
+    if (controller.signal.aborted) return;
+    if (existing?.kind === "google-drive" && kind !== "google-drive") await googleDrive.disconnect(sourceId);
     const verified: UserSource = {
       ...candidate,
       enabled: result.status === "active",
@@ -109,17 +134,20 @@ export function SourceManagerModal({ visible, onClose }: Props) {
     setEditingId(source.id);
     setName(source.name);
     setUrl(source.url);
-    setKind(source.kind === "json" ? "json" : source.kind === "opds" ? "opds" : "html");
+    setKind(source.kind === "google-drive" ? "google-drive" : source.kind === "json" ? "json" : source.kind === "opds" ? "opds" : "html");
     setFormError(null);
   };
 
   const refresh = async (source: UserSource) => {
-    const result = await probe(source);
+    if (busyId) return;
+    const controller = operation.current = new AbortController();
+    const result = await probe(source, controller.signal);
+    if (controller.signal.aborted) return;
     await update(source.id, {
       status: result.status,
       lastError: result.error,
       lastCheckedAt: Date.now(),
-      enabled: result.status === "active" ? source.enabled : false,
+      enabled: result.status === "active" ? source.kind === "google-drive" || source.enabled : false,
     });
   };
 
@@ -128,7 +156,9 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       await update(source.id, { enabled: false });
       return;
     }
-    const result = await probe(source);
+    const controller = operation.current = new AbortController();
+    const result = await probe(source, controller.signal);
+    if (controller.signal.aborted) return;
     await update(source.id, {
       enabled: result.status === "active",
       status: result.status,
@@ -136,6 +166,15 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       lastCheckedAt: Date.now(),
     });
   };
+
+  const disconnect = async (source: UserSource) => {
+    setBusyId(source.id);
+    try {
+      const revoked = await googleDrive.disconnect(source.id);
+      await update(source.id, { enabled: false, status: "error", lastError: revoked ? "Drive desconectado. Livros importados preservados." : "Desconectado localmente. Revogação Google não confirmada; remova o acesso em myaccount.google.com/connections. Livros preservados." });
+    } finally { setBusyId(null); }
+  };
+  const reportFailure = (failure: unknown) => setFormError(failure instanceof Error ? failure.message : "Não foi possível atualizar a fonte.");
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -151,6 +190,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
             <Text style={[styles.sectionTitle, { color: palette.secondaryText }]}>{editingId ? "EDITAR FONTE" : "ADICIONAR FONTE"}</Text>
             <TextInput
               value={name}
+              editable={!busyId}
               onChangeText={setName}
               placeholder="Nome da fonte"
               placeholderTextColor={palette.secondaryText}
@@ -158,30 +198,33 @@ export function SourceManagerModal({ visible, onClose }: Props) {
             />
             <TextInput
               value={url}
+              editable={!busyId}
               onChangeText={setUrl}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
-              placeholder="https://catalogo.exemplo/busca?q={query}"
+              placeholder={kind === "google-drive" ? "Link da pasta Drive ou folderId" : "https://catalogo.exemplo/busca?q={query}"}
               placeholderTextColor={palette.secondaryText}
               style={[styles.input, { color: palette.text, backgroundColor: palette.surface, borderColor: palette.separator }]}
             />
             <View style={[styles.segmented, { backgroundColor: palette.surfaceSecondary }]}>
-              {(["json", "opds", "html"] as const).map((sourceKind) => (
+              {(["json", "opds", "html", "google-drive"] as const).map((sourceKind) => (
                 <Pressable
                   key={sourceKind}
+                  disabled={Boolean(busyId)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: kind === sourceKind }}
                   onPress={() => setKind(sourceKind)}
                   style={[styles.segment, kind === sourceKind ? { backgroundColor: palette.accent } : null]}
                 >
                   <Text style={{ color: kind === sourceKind ? "#FFFFFF" : palette.text, fontWeight: "600" }}>
-                    {sourceKind === "json" ? "JSON" : sourceKind === "opds" ? "OPDS" : "Busca HTML"}
+                    {sourceKind === "json" ? "JSON" : sourceKind === "opds" ? "OPDS" : sourceKind === "google-drive" ? "Drive" : "HTML"}
                   </Text>
                 </Pressable>
               ))}
             </View>
-            <Text style={[styles.helper, { color: palette.secondaryText }]}>{kind === "json" ? 'URL de catálogo com { "books": [{ "title": "Livro", "author": "Autor", "url": "https://…/livro.epub" }] }. A busca filtra título e autor. Na Web, o servidor precisa permitir CORS.' : 'O endereço será testado antes de ficar ativo. A URL pode usar {query}. Na Web, o servidor precisa permitir CORS.'}</Text>
+            {kind !== "google-drive" ? <Text style={[styles.helper, { color: palette.secondaryText }]}>{kind === "json" ? 'URL de catálogo com { "books": [{ "title": "Livro", "author": "Autor", "url": "https://…/livro.epub" }] }. A busca filtra título e autor. Na Web, o servidor precisa permitir CORS.' : 'O endereço será testado antes de ficar ativo. A URL pode usar {query}. Na Web, o servidor precisa permitir CORS.'}</Text> : null}
+            {kind === "google-drive" ? <Text style={[styles.helper, { color: palette.secondaryText }]}>Autorização separada do login: solicita drive.readonly, que permite ler e baixar arquivos de todo o Drive. O Aldus consulta somente a pasta cadastrada e baixa apenas o livro escolhido. Índice de metadados em memória por 5 minutos; Atualizar reconecta e refaz o índice. Sem subpastas/atalhos. Tokens não são salvos pelo app. Revogar pode afetar outras fontes da mesma conta/projeto Google. {driveReady ? "" : "Autorização Web ainda não pronta ou configuração ausente; consulte GOOGLE_DRIVE_IMPLEMENTATION.md."}</Text> : null}
             {formError ? <Text accessibilityRole="alert" style={[styles.error, { color: palette.accent }]}>{formError}</Text> : null}
             <View style={styles.formActions}>
               {editingId ? (
@@ -190,7 +233,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
                 </Pressable>
               ) : null}
               <Pressable accessibilityRole="button" disabled={busyId !== null} onPress={() => void save().catch((error) => setFormError(error instanceof Error ? error.message : "Não foi possível salvar a fonte."))} style={[styles.primaryButton, { backgroundColor: palette.accent, opacity: busyId ? 0.6 : 1 }]}>
-                <Text style={styles.primaryText}>{busyId ? "Testando…" : editingId ? "Salvar alterações" : "Adicionar fonte"}</Text>
+                <Text style={styles.primaryText}>{busyId ? "Conectando / indexando…" : kind === "google-drive" ? "Conectar e salvar pasta" : editingId ? "Salvar alterações" : "Adicionar fonte"}</Text>
               </Pressable>
             </View>
 
@@ -210,16 +253,17 @@ export function SourceManagerModal({ visible, onClose }: Props) {
                     <Text numberOfLines={1} style={[styles.sourceUrl, { color: palette.secondaryText }]}>{source.url}</Text>
                     {source.lastError && source.enabled === false ? <Text numberOfLines={2} style={[styles.errorHint, { color: palette.accent }]}>{source.lastError}</Text> : null}
                     <View style={styles.actions}>
-                      <TextAction label="Editar" color={palette.accent} onPress={() => edit(source)} />
-                      <TextAction label={busyId === source.id ? "Testando…" : "Atualizar"} color={palette.accent} disabled={busyId !== null} onPress={() => void refresh(source)} />
-                      <TextAction label="Remover" color={palette.secondaryText} onPress={() => void remove(source.id)} />
+                      <TextAction label="Editar" color={palette.accent} disabled={busyId !== null} onPress={() => edit(source)} />
+                      <TextAction label={busyId === source.id ? "Testando…" : source.kind === "google-drive" ? "Conectar / Atualizar" : "Atualizar"} color={palette.accent} disabled={busyId !== null} onPress={() => void refresh(source).catch(reportFailure)} />
+                      {source.kind === "google-drive" ? <TextAction label="Desconectar" color={palette.accent} disabled={busyId !== null} onPress={() => void disconnect(source).catch(reportFailure)} /> : null}
+                      <TextAction label="Remover" color={palette.secondaryText} disabled={busyId !== null} onPress={() => void remove(source.id).catch(reportFailure)} />
                     </View>
                   </View>
                   <Switch
                     accessibilityLabel={`${source.enabled ? "Desativar" : "Ativar"} ${source.name}`}
                     value={source.enabled}
                     disabled={busyId !== null}
-                    onValueChange={(enabled) => void toggle(source, enabled)}
+                    onValueChange={(enabled) => void toggle(source, enabled).catch(reportFailure)}
                     thumbColor={source.enabled ? palette.accent : palette.surface}
                     trackColor={{ false: palette.separator, true: palette.accent }}
                   />
@@ -266,5 +310,5 @@ const styles = StyleSheet.create({
   status: { fontSize: 11, fontWeight: "700" },
   sourceUrl: { fontSize: 11 },
   errorHint: { fontSize: 11 },
-  actions: { flexDirection: "row", gap: 14, marginTop: 7 },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 14, marginTop: 7 },
 });

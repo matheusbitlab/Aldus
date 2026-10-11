@@ -1,9 +1,10 @@
 import { create } from "zustand";
 import { UserSource } from "@/src/domain/types/sources";
 import { UserSourceRepository } from "@/src/data/sources/UserSourceRepository";
+import { googleDrive } from "@/src/data/drive/driveDependencies";
 
 const repository = new UserSourceRepository();
-type NewUserSource = Omit<UserSource, "id" | "createdAt">;
+type NewUserSource = Omit<UserSource, "id" | "createdAt"> & { id?: string };
 type UserSourceUpdate = Partial<Omit<UserSource, "id" | "createdAt">>;
 
 interface SourceState {
@@ -20,7 +21,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
   add: async (source) => {
     const item: UserSource = {
       ...source,
-      id: `source-${Date.now()}`,
+      id: source.id ?? `source-${Date.now()}`,
       createdAt: Date.now(),
     };
     await repository.save(item);
@@ -33,6 +34,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     await get().load();
   },
   remove: async (id) => {
+    if (get().sources.find(source => source.id === id)?.kind === "google-drive") await googleDrive.disconnect(id);
     await repository.remove(id);
     await get().load();
   },
