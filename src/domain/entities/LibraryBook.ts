@@ -3,6 +3,10 @@ export interface LibraryBook {
   ownerUserId?: string | null;
   bundledAssetId?: string;
   importComplete?: boolean;
+  /** Private, immutable object; never a public URL or a device URI. */
+  remotePath?: string | null;
+  localEvictionPath?: string;
+  remoteCleanupDone?: boolean;
   id: string;
   title: string;
   author: string;

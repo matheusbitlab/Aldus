@@ -6,43 +6,30 @@ import { Bookmark, BookmarkRepository } from "@/src/domain/repositories/Bookmark
 import { Highlight, HighlightRepository } from "@/src/domain/repositories/HighlightRepository";
 import { SearchHistoryRepository } from "@/src/domain/repositories/SearchHistoryRepository";
 import { SearchHistory } from "@/src/domain/types/search";
-import { webDelete, webGet, webGetAll, webPut, webGetAllPersistent, webPutPersistent, webDeletePersistent, webImportStudyPersistent } from "@/src/data/database/connection/webLibraryStore";
+import { webGet, webGetAll, webPut, webGetPersistent, webSaveBookPersistent, webReplaceChaptersPersistent, webGetAllPersistent, webPutPersistent, webDeletePersistent, webImportStudyPersistent } from "@/src/data/database/connection/webLibraryStore";
 
 export class IndexedDbBookRepository implements BookRepository {
   async listAll(): Promise<LibraryBook[]> { return webGetAllPersistent<LibraryBook>("book_metadata"); }
   async listActive(): Promise<LibraryBook[]> {
-    const [books, progress] = await Promise.all([webGetAll<LibraryBook>("book_metadata"), webGetAll<ReadingProgress>("reading_progress")]);
+    const [books, progress] = await Promise.all([webGetAllPersistent<LibraryBook>("book_metadata"), webGetAllPersistent<ReadingProgress>("reading_progress")]);
     const progressByBook = new Map(progress.map((item) => [item.bookId, item.percentage]));
     return books.filter((book) => !book.isDeleted).map((book) => ({ ...book, progress: progressByBook.get(book.id) ?? book.progress ?? 0 })).sort((first, second) => (second.lastOpenedDate ?? second.addedDate) - (first.lastOpenedDate ?? first.addedDate));
   }
-  async findById(bookId: string): Promise<LibraryBook | null> { const book = await webGet<LibraryBook>("books", bookId); return book && !book.isDeleted ? book : null; }
+  async findById(bookId: string): Promise<LibraryBook | null> { const book = await webGetPersistent<LibraryBook>("books", bookId); return book && !book.isDeleted ? book : null; }
   async save(book: LibraryBook): Promise<void> {
-    await Promise.all([
-      webPut("books", book),
-      webPut("book_metadata", {
-        ...book,
-        filePath: book.filePath.startsWith("data:application/pdf")
-          ? `web-pdf://${book.id}`
-          : book.filePath,
-      }),
-    ]);
+    await webSaveBookPersistent(book);
   }
   async softDelete(bookId: string): Promise<void> {
-    const book = await webGet<LibraryBook>("books", bookId);
+    const book = await webGetPersistent<LibraryBook>("books", bookId);
     if (!book) return;
-    await Promise.all([
-      webPut("books", { ...book, isDeleted: true }),
-      webPut("book_metadata", { ...book, isDeleted: true, filePath: `web-pdf://${book.id}` }),
-    ]);
+    await webSaveBookPersistent({ ...book, isDeleted: true });
   }
 }
 
 export class IndexedDbChapterRepository implements ChapterRepository {
-  async listByBookId(bookId: string): Promise<StoredChapter[]> { return (await webGetAll<StoredChapter>("chapters")).filter((chapter) => chapter.bookId === bookId).sort((first, second) => first.chapterIndex - second.chapterIndex); }
+  async listByBookId(bookId: string): Promise<StoredChapter[]> { return (await webGetAllPersistent<StoredChapter>("chapters")).filter((chapter) => chapter.bookId === bookId).sort((first, second) => first.chapterIndex - second.chapterIndex); }
   async replaceForBook(bookId: string, chapters: StoredChapter[]): Promise<void> {
-    const current = await this.listByBookId(bookId);
-    await Promise.all(current.map((chapter) => webDelete("chapters", chapter.id)));
-    await Promise.all(chapters.map((chapter) => webPut("chapters", chapter)));
+    await webReplaceChaptersPersistent(bookId, chapters);
   }
 }
 

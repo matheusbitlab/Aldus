@@ -1,4 +1,4 @@
-import { webDelete, webGet, webPut } from "@/src/data/database/connection/webLibraryStore";
+import { webDeletePersistent, webGetPersistent, webPutPersistent } from "@/src/data/database/connection/webLibraryStore";
 
 interface StoredBookFile {
   id: string;
@@ -10,7 +10,7 @@ interface StoredBookFile {
 export class WebBookFileStore {
   constructor(private readonly canRead?: (bookId: string) => Promise<boolean>) {}
   async save(bookId: string, fileName: string, file: Blob): Promise<void> {
-    await webPut("documents", {
+    await webPutPersistent("documents", {
       id: bookId,
       data: file,
       fileName,
@@ -20,12 +20,12 @@ export class WebBookFileStore {
 
   async get(bookId: string): Promise<Blob | null> {
     if (this.canRead && !await this.canRead(bookId)) return null;
-    const storedFile = await webGet<StoredBookFile>("documents", bookId);
+    const storedFile = await webGetPersistent<StoredBookFile>("documents", bookId);
     if (this.canRead && !await this.canRead(bookId)) return null;
     return storedFile?.data ?? null;
   }
 
   async delete(bookId: string): Promise<void> {
-    await webDelete("documents", bookId);
+    await webDeletePersistent("documents", bookId);
   }
 }

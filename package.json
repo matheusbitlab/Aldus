@@ -27,10 +27,12 @@
     "test:library:account": "node scripts/test-library-account.cjs",
     "test:library:rls": "node scripts/test-library-rls.cjs",
     "build:apk:archive": "node scripts/archive-commit-apk.mjs",
-    "test:library:sync": "node scripts/test-library-sync.cjs"
+    "test:library:sync": "node scripts/test-library-sync.cjs",
+    "test:library:files": "node scripts/test-library-files.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
+    "@noble/hashes": "2.0.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/slider": "5.2.0",
     "@react-native/js-polyfills": "0.76.9",

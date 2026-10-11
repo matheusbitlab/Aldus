@@ -1,10 +1,12 @@
 import { LibraryBook } from "@/src/domain/entities/LibraryBook";
 import { BookRepository } from "@/src/domain/repositories/BookRepository";
 import { LibraryAccountScope, libraryAccountScope } from "./LibraryAccountScope";
+import { findBundledAsset } from './BundledBookIdentity';
 
 export interface LocalBookStorage extends BookRepository { listAll(): Promise<LibraryBook[]>; }
 export class AccountBookRepository implements BookRepository {
   constructor(readonly storage: LocalBookStorage, readonly scope: LibraryAccountScope = libraryAccountScope) {}
+  async listOwned() { const run=this.scope.capture(); const books=await this.storage.listAll(); run.check(); return run.userId ? books.filter(book=>book.ownerUserId===run.userId) : []; }
   async listActive() {
     const run = this.scope.capture();
     const books = await this.storage.listActive(); run.check();
@@ -31,7 +33,7 @@ export class AccountBookRepository implements BookRepository {
   async listLegacy() {
     const run = this.scope.capture();
     const books = await this.storage.listAll(); run.check();
-    return run.userId ? books.filter(book => !book.ownerUserId && !book.isDeleted && !book.id.startsWith("bundled-")) : [];
+    return run.userId ? books.filter(book => !book.ownerUserId && !book.isDeleted) : [];
   }
   async claimLegacy(ids: string[]) {
     const run = this.scope.capture();
@@ -40,7 +42,9 @@ export class AccountBookRepository implements BookRepository {
     for (const id of ids) {
       const book = available.find(item => item.id === id);
       if (!book) throw new Error("Livro local indisponível para vinculação.");
-      run.check(); await this.storage.save({ ...book, ownerUserId: run.userId, importComplete: true });
+      const bundled = book.id.startsWith('bundled-') ? findBundledAsset(book.id) : undefined;
+      run.check(); await this.storage.save({ ...book, ownerUserId: run.userId, importComplete: true,
+        ...(bundled ? { bundledAssetId: bundled.id, ...(book.filePath.startsWith('bundled-') ? { fileHash: bundled.hash, fileSize: bundled.size } : {}) } : {}) });
     }
     run.check();
   }

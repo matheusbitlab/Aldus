@@ -19,6 +19,8 @@ node_modules/
 *.apk
 artifacts/
 modules/*/android/.gradle/
+modules/*/android/build/
+modules/*/android/.cxx/
 *.aab
 credentials.json
 *.jks

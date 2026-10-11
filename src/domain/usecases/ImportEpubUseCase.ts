@@ -35,7 +35,7 @@ export class ImportEpubUseCase {
     const previousBook = await withAbort(this.books.findById(bookId), options.signal);
     const now = Date.now();
     accountRun.check();
-    const book: LibraryBook = { ...previousBook, ownerUserId: accountRun.userId, importComplete: false, id: bookId, title: parsed.title, author: parsed.author, fileName: input.fileName, filePath: input.filePath, fileHash: input.fileHash ?? null, mimeType: "application/epub+zip", fileSize: input.fileSize, coverImagePath: parsed.coverImagePath, totalChapters: parsed.chapters.length, totalWords: parsed.chapters.reduce((total, chapter) => total + chapter.characterCount, 0), addedDate: now, lastOpenedDate: null, isDeleted: false, progress: 0 };
+    const book: LibraryBook = { ...previousBook, ownerUserId: accountRun.userId, importComplete: false, id: bookId, title: parsed.title, author: parsed.author, fileName: input.fileName, filePath: input.filePath, fileHash: input.fileHash ?? previousBook?.fileHash ?? null, mimeType: "application/epub+zip", fileSize: input.fileSize, coverImagePath: parsed.coverImagePath, totalChapters: parsed.chapters.length, totalWords: parsed.chapters.reduce((total, chapter) => total + chapter.characterCount, 0), addedDate: previousBook?.addedDate ?? now, lastOpenedDate: previousBook?.lastOpenedDate ?? null, isDeleted: false, progress: previousBook?.progress ?? 0 };
     const storedChapters: StoredChapter[] = parsed.chapters.map((chapter) => ({ ...chapter, id: `${bookId}:${chapter.id}`, bookId }));
     throwIfAborted(options.signal);
     options.onPhase?.({ phase: "persisting", cancellable: false, fileSize: input.fileSize || input.bytes.byteLength });

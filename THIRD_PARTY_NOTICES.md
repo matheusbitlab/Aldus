@@ -8,6 +8,7 @@
 | Pacote | Versão | Licença declarada | Copyright identificado | Repositório |
 | --- | --- | --- | --- | --- |
 | @expo/vector-icons | 15.1.1 | MIT | Copyright (c) 2015 Joel Arvidsson; Copyright (c) 2020 650 Industries; The above copyright notice and this permission notice shall be included in all; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER | [origem](https://github.com/expo/vector-icons) |
+| @noble/hashes | 2.0.1 | MIT | Copyright (c) 2022 Paul Miller (https://paulmillr.com); The above copyright notice and this permission notice shall be included in; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER | [origem](https://github.com/paulmillr/noble-hashes) |
 | @react-native-async-storage/async-storage | 2.2.0 | MIT | Copyright (c) 2015-present, Facebook, Inc.; The above copyright notice and this permission notice shall be included in all; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER | [origem](https://github.com/react-native-async-storage/async-storage) |
 | @react-native-community/slider | 5.2.0 | MIT | não destacado no arquivo | [origem](https://github.com/callstack/react-native-slider) |
 | @react-native/js-polyfills | 0.76.9 | MIT | não destacado no arquivo | [origem](https://github.com/facebook/react-native) |
@@ -1247,6 +1248,33 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### MIT — @noble/hashes@2.0.1
+
+```text
+--- LICENSE ---
+The MIT License (MIT)
+
+Copyright (c) 2022 Paul Miller (https://paulmillr.com)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ### MIT — @supabase/supabase-js@2.117.2

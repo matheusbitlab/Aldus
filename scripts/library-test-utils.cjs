@@ -2,13 +2,13 @@ const fs = require('node:fs'), path = require('node:path'), ts = require('typesc
 function loader(mocks = {}) {
   const cache = new Map();
   function load(file) {
-    file = path.resolve(file); if (cache.has(file)) return cache.get(file);
+    file = path.resolve(file); if (file.endsWith('.json')) return JSON.parse(fs.readFileSync(file,'utf8')); if (cache.has(file)) return cache.get(file);
     const exports = {}; cache.set(file, exports);
-    const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
     new Function('require', 'exports', code)(name => {
       if (name in mocks) return mocks[name];
       if (name.startsWith('@/')) return load(name.slice(2) + '.ts');
-      if (name.startsWith('.')) return load(path.resolve(path.dirname(file), name) + '.ts');
+      if (name.startsWith('.')) return load(path.resolve(path.dirname(file), name) + (name.endsWith('.json') ? '' : '.ts'));
       return require(name);
     }, exports); return exports;
   }

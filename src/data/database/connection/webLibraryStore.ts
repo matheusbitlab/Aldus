@@ -6,6 +6,39 @@ const memoryStores = new Map<StoreName, Map<string, StoredValue>>(storeNames.map
 const memoryDeleted = new Map<StoreName, Set<string>>(storeNames.map((name) => [name, new Set()]));
 let databasePromise: Promise<IDBDatabase | null> | null = null;
 
+export async function webSaveBookPersistent<T extends StoredValue>(book: T): Promise<void> {
+  const database = await openDatabase();
+  if (!database) throw new Error('Armazenamento persistente indisponível para livros.');
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(['books', 'book_metadata'], 'readwrite');
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = transaction.onerror = () => reject(transaction.error ?? new Error('Falha ao salvar o livro.'));
+    transaction.objectStore('books').put(book);
+    transaction.objectStore('book_metadata').put(book);
+  });
+}
+
+export async function webReplaceChaptersPersistent<T extends StoredValue & { bookId: string }>(bookId: string, chapters: T[]): Promise<void> {
+  if (chapters.some(chapter => chapter.bookId !== bookId) || new Set(chapters.map(chapter => chapter.id)).size !== chapters.length) throw new Error('Capítulos incompatíveis com o livro.');
+  const database = await openDatabase();
+  if (!database) throw new Error('Armazenamento persistente indisponível para capítulos.');
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction('chapters', 'readwrite'), store = transaction.objectStore('chapters');
+    let failure: unknown;
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = transaction.onerror = () => reject(failure ?? transaction.error ?? new Error('Falha ao salvar capítulos.'));
+    const read = store.getAll();
+    read.onsuccess = () => {
+      try {
+        const existing = read.result as T[];
+        if (chapters.some(chapter => existing.some(item => item.id === chapter.id && item.bookId !== bookId))) throw new Error('Identificador de capítulo usado em outro livro.');
+        for (const chapter of existing) if (chapter.bookId === bookId) store.delete(chapter.id);
+        for (const chapter of chapters) store.put(chapter);
+      } catch (error) { failure = error; transaction.abort(); }
+    };
+  });
+}
+
 /** Atomic read-modify-write across windows; request success is not transaction commit. */
 export async function webMutatePersistent<T extends StoredValue>(storeName: StoreName, id: string, change: (value: T | null) => T): Promise<void> {
   const database = await openDatabase();

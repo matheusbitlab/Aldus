@@ -6,9 +6,11 @@ const git = (...args) => { const r=spawnSync('git',args,{cwd:root,encoding:'utf8
 const commit=git('rev-parse','HEAD'), short=git('rev-parse','--short','HEAD');
 if(git('status','--porcelain','--untracked-files=no')) throw new Error('Tracked worktree/staging must match the commit before building.');
 const directory=path.join(root,'artifacts/apk'); mkdirSync(directory,{recursive:true});
-const target=path.join(directory,`Aldus-${short}.apk`), log=path.join(directory,`build-${short}.log`);
+const target=path.join(directory,`Aldus-${short}.apk`), log=path.join(directory,`build-${short}-${new Date().toISOString().replace(/\D/g,'')}.log`);
 git('check-ignore',target); if(git('ls-files','--',target)) throw new Error('APK is tracked.');
 const env={...process.env};
+env.GRADLE_OPTS ??= '-Dorg.gradle.workers.max=2';
+console.log(`Official APK build log: ${log}`);
 if(!env.JAVA_HOME && existsSync('C:/Program Files/Java/jdk-17')) env.JAVA_HOME='C:/Program Files/Java/jdk-17';
 if(!env.ANDROID_HOME && existsSync('C:/Android/sdk')) env.ANDROID_HOME='C:/Android/sdk';
 if(env.JAVA_HOME) env.Path=`${env.JAVA_HOME}/bin;${env.Path??env.PATH??''}`;
