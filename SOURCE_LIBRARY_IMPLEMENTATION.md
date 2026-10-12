@@ -1,5 +1,11 @@
 # Biblioteca permanente por fonte — 11/10/2026
 
+## Evolução atual — biblioteca pessoal sincronizada
+
+Source Library continua catálogo local da fonte. Depois de importado com sucesso, EPUB/PDF recebe ownership da conta e entra na USER LIBRARY: arquivo definitivo e dados pessoais podem sincronizar no Supabase privado. O dispositivo B abre a cópia privada sob demanda e não depende de Drive/JSON/Gutendex nem de token da fonte original. sourceId/remoteBookId→bookId, catálogo, configuração e credenciais da Source permanecem locais, fora dos payloads pessoais.
+
+Remover Source preserva livro pessoal; remover cópia local ou biblioteca pessoal usa os controles próprios de sync. Regressões catálogo/ações/browser PASS, incluindo import/reload/offline/rollback e preservação de Blob. Backend HTTP dos testes é controlado; Supabase/Storage real PENDENTES, migrations NÃO APLICADAS. Ver LIBRARY_SYNC_IMPLEMENTATION.md e LIBRARY_SYNC_DEPLOYMENT.md. Afirmações históricas de ausência de USER LIBRARY SYNC abaixo foram superadas; Google Drive real permanece NÃO TESTADO.
+
 ## Checkpoint final — SOURCE LIBRARY VALIDADA (CONTROLADO / WEB)
 
 Implementação concluída. Gates PASS: npm run typecheck; npm run test:source-catalog (SQLite real e testes de adapter/ações); test-catalog-ranking; test-catalogs; test-search-pipeline; test-source-integrations; npm run test:drive; npm run test:import; test-study-storage; npm run test:legal; legal:notices:check; npm run export:web (2358 módulos); npm run test:source-library:browser; git diff --check. Scripts de fronteira antigos ganharam somente mock de catalog persistence para não carregar Expo em Node. Importadores/Reader/OCR/Auth geral não foram reimplementados.

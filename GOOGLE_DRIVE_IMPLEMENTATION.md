@@ -1,5 +1,11 @@
 # Google Drive — terceira etapa, 11/10/2026
 
+## Evolução atual — cópia privada da biblioteca Aldus
+
+Autorização Drive continua separada de login/sessão Supabase, somente leitura e tokens em memória. O app não envia nem modifica arquivos no Drive. Depois da importação local existente, o livro pertence à conta Aldus e seu arquivo definitivo pode ser enviado ao Storage privado do Supabase; metadados/progresso/estudo sincronizam. Outro aparelho recebe metadados e baixa a cópia pessoal ao abrir, sem depender de autorização Drive. Catálogo, folderId/resourceKey, vínculos e credenciais da fonte não são enviados com a biblioteca.
+
+test:drive/test:source-catalog e Sources browser PASS controlado após integração. Drive real e Android físico NÃO TESTADOS; Supabase/RLS/Storage real PENDENTES e duas migrations NÃO APLICADAS. Detalhes/limites/implantação: LIBRARY_SYNC_IMPLEMENTATION.md e LIBRARY_SYNC_DEPLOYMENT.md. Registros anteriores de sem cloud sync devem ser lidos como checkpoints históricos da integração Drive, não estado atual da biblioteca pessoal.
+
 ## Evolução na quarta etapa — biblioteca permanente por fonte
 
 Agora há /sources/[sourceId], snapshot de metadados persistente SQLite/IndexedDB, busca local e refresh atômico via listagem paginada já existente. Reload perde apenas tokens/índice memória, não o catálogo local. Desconectar preserva snapshot; remover purga configuração/catalog/link mas preserva Library. Importação registra sourceId+fileId->bookId somente após sucesso, sem igualdade de títulos; estado remoto/importando/importado/indisponível separado de leitura. Detalhes/gates atuais em SOURCE_LIBRARY_IMPLEMENTATION.md. As afirmações abaixo de índice exclusivamente em memória e próxima etapa não implementada são históricas. GOOGLE DRIVE REAL — NÃO TESTADO; sem subpastas/atalhos/upload/sync.

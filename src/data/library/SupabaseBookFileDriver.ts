@@ -47,21 +47,33 @@ export class SupabaseBookFileDriver implements BookFileDriver {
   async upload(owner: string, path: string, file: BookFileReference, mime: string, signal: AbortSignal): Promise<'created' | 'exists'> {
     const headers = { ...await this.headers(owner), 'Content-Type': mime, 'x-upsert': 'false' }, url = this.url(path, owner);
     throwIfAborted(signal);
-    let status: number;
+    let status: number, errorBody = '';
     if (Platform.OS === 'web') {
       if (!file.blob) throw new Error('Arquivo local indisponível.');
-      status = (await fetch(url, { method: 'POST', headers, body: file.blob, signal })).status;
+      const response = await fetch(url, { method: 'POST', headers, body: file.blob, signal });
+      status = response.status;
+      if (status === 400) errorBody = await response.text();
     } else {
       // Native streams the definitive file; no JS ArrayBuffer of the entire book.
       const task = FileSystem.createUploadTask(url, file.uri, { headers, httpMethod: 'POST', uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT });
       const cancel = () => { void task.cancelAsync().catch(() => undefined); };
       signal.addEventListener('abort', cancel, { once: true });
-      try { const result = await withAbort(task.uploadAsync(), signal); if (!result) throw new Error('Upload cancelado.'); status = result.status; }
+      try { const result = await withAbort(task.uploadAsync(), signal); if (!result) throw new Error('Upload cancelado.'); status = result.status; errorBody = result.body ?? ''; }
       finally { signal.removeEventListener('abort', cancel); }
     }
     throwIfAborted(signal);
-    if (status === 409) return 'exists';
+    // Storage deployments can return the legacy HTTP 400 Duplicate response.
+    // Only an identified duplicate enters recovery, which still checks remote bytes.
+    if (status === 409 || (status === 400 && this.isDuplicate(errorBody))) return 'exists';
     this.checkStatus(status); return 'created';
+  }
+  private isDuplicate(body: string) {
+    if (body.length > 4096) return false;
+    try {
+      const error = JSON.parse(body);
+      const codes = ['Duplicate', 'AssetAlreadyExists', 'ResourceAlreadyExists', 'KeyAlreadyExists', 'already_exists'];
+      return codes.includes(error?.code) || codes.includes(error?.error);
+    } catch { return false; }
   }
   async download(owner: string, path: string, signal: AbortSignal): Promise<BookFileReference> {
     const headers = await this.headers(owner), url = this.url(path, owner, true); throwIfAborted(signal);

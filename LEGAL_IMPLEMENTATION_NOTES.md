@@ -2,7 +2,17 @@
 
 Data da auditoria: 11/10/2026
 
-Versão dos documentos públicos: 0.4
+Versão dos documentos públicos: 0.5
+
+## Checkpoint atual — biblioteca privada da conta, 11/10/2026
+
+IMPLEMENTADO / VALIDADO CONTROLADO: arquivos EPUB/PDF importados são locais primeiro e depois enviados automaticamente ao bucket privado Supabase da conta. Metadados, progresso, posições PDF, favoritos, coleções, tags, marcadores/notas e grifos/comentários sincronizam. Outro dispositivo recebe metadados; arquivo só é baixado ao abrir. Legados exigem seleção explícita. Política, Privacidade e Dados, Termos e Direitos Autorais descrevem o fluxo, o fornecedor, exclusões, offline e ausência de criptografia de ponta a ponta. Direitos das obras permanecem com seus titulares; sincronizar privadamente não concede licença sobre a obra.
+
+Capas, capítulos, cache/OCR, aparência, histórico, catálogo/configuração/credenciais das Sources continuam locais e são excluídos dos payloads pessoais. Assets bundled verificados não são enviados. Capa personalizada nova, publicação, links públicos, compartilhamento entre contas e marketplace não foram implementados.
+
+Remover deste dispositivo exige cópia remota confirmada e verificada, limpa ponteiro/cópia local e mantém o livro na conta. Remover da biblioteca gera tombstone; o coordinator só apaga objetos privados depois da confirmação e retoma falhas. Tombstones, recibos e registros pessoais excluídos logicamente permanecem. Logout revoga acesso de UI/repository, sem apagar todos os bytes locais. Caches de outros aparelhos, exportações e backups do provedor não têm eliminação física garantida pelo app.
+
+PENDENTE EXTERNO: as duas migrations foram criadas, NÃO APLICADAS REMOTAMENTE. RLS REMOTO PENDENTE; STORAGE REMOTO PENDENTE; Android físico NÃO TESTADO. Região, contratos, limites do plano, retenção/expurgo/backups, responsável/canal de direitos e exclusão de conta precisam de definição operacional. Não há prazo inventado de retenção nem certificação de conformidade. O roteiro técnico está em LIBRARY_SYNC_DEPLOYMENT.md; o relatório de 41 itens em LIBRARY_SYNC_FINAL_REPORT.md. Registros abaixo são históricos quando divergirem deste checkpoint.
 
 Checkpoint SOURCE LIBRARY (quarta etapa): catálogo metadata local permanente SQLite v3 / IndexedDB v4, separado da Library. Pesquisa local/reabertura não requer token/rede; refresh completo é atômico. Indexação não baixa EPUB/PDF; capa remota gera somente pedido de imagem. Desconectar invalida autorização/índice memória mas preserva snapshot; remover elimina configuração/snapshot/vínculos, sem tocar livros/arquivos/progresso/notas/highlights/capas importados. Nenhum envio de catálogo ao Supabase/Cloud Sync/upload. Política pública e descrição do modal atualizadas. Notas antigas de índice somente temporário abaixo são históricas, superadas por este checkpoint.
 
@@ -17,11 +27,11 @@ Este arquivo registra o que foi observado no código e por que os textos públic
 | Área | Dados observados | Local / destinatário nesta versão | Observação usada nos textos |
 | --- | --- | --- | --- |
 | Conta e sessão | email, UUID, provedor, tokens de sessão, username, nome de exibição, avatar, papel, status e overrides | Supabase; sessão/cache também no armazenamento local | Login com email/username e Google. Tokens são administrados pelo SDK. |
-| Biblioteca | EPUB/PDF, Blob/caminho, capa, título, autor, hash, MIME, tamanho, capítulos e datas | SQLite no Native; IndexedDB no Web | Não foi encontrada sincronização da biblioteca nem upload automático para nuvem. |
-| Leitura | capítulo, CFI/âncora, percentual, página, cache de reflow, tema, fonte, margens, brilho e modo PDF | SQLite/IndexedDB/AsyncStorage local | Alguns registros usam chaves legadas `kindle-*`; elas foram preservadas por compatibilidade. |
+| Biblioteca | EPUB/PDF, Blob/caminho, capa, título, autor, hash, MIME, tamanho, capítulos e datas | SQLite/arquivos Native; IndexedDB/Blob Web; EPUB/PDF e allowlist de metadados no Supabase privado | Upload após import completo; outro aparelho baixa ao abrir. Caminho local, capas e capítulos não são enviados. |
+| Leitura | capítulo, CFI/âncora, percentual, página, cache de reflow, tema, fonte, margens, brilho e modo PDF | Local e Supabase para progresso, modo e posições PDF | Cache, tema, fonte, margens e brilho são locais. Chaves legadas preservadas por compatibilidade. |
 | OCR de PDF | imagem renderizada das páginas necessárias, texto reconhecido, limites geométricos e proveniência do motor | processamento local no Android; resultado validado no cache Reflow local | ML Kit Text Recognition v2 latino `16.0.1`, modelo empacotado; conteúdo e resultado não são enviados para executar OCR. O SDK pode transmitir métricas técnicas de uso/desempenho e consultar informações de correção/compatibilidade conforme os termos do fornecedor. |
-| Organização | favorito, coleções, tags, série, volume, status, metadados editados e capa | AsyncStorage local | Exportação/importação de backup transfere responsabilidade ao arquivo exportado. |
-| Estudo | marcadores, notas, grifos, trecho, comentário, posição e exportações | SQLite/IndexedDB local | Comentário do grifo fica codificado no payload da localização. |
+| Organização | favorito, coleções, tags, série, volume, status, metadados editados e capa | AsyncStorage local e Supabase por livro; capa apenas local | Payload exclui capa/revision/relógio local; exportações permanecem sob controle da pessoa. |
+| Estudo | marcadores, notas, grifos, trecho, comentário, posição e exportações | SQLite/IndexedDB e Supabase para entidades próprias de leitura | IDs independentes; nota no marcador e comentário no payload da localização. Exportações locais. |
 | Flashcards locais | decks, cartões, imagens/desenhos, origem, respostas, revisões, pontuação e sessões | SQLite Native / IndexedDB Web; migração local legada | Estudo individual não envia cartões ao Supabase. |
 | Batalha | deck selecionado, cartões completos, conta, partida, escolha, ordinal, pontuação e estado | RPC/tabelas Supabase quando o recurso for habilitado | Migration e cliente existem, mas a aplicação no backend remoto não foi comprovada. |
 | Pesquisa | consulta, fonte, resultados e horário | Consulta enviada à fonte; histórico salvo localmente | Gutendex, Gutenberg e fontes JSON/OPDS/HTML do usuário. |
@@ -32,7 +42,7 @@ Este arquivo registra o que foi observado no código e por que os textos públic
 
 ## 2. Serviços e destinatários externos observados
 
-- Supabase: autenticação, perfil, recuperação de conta e batalha de flashcards preparada.
+- Supabase: autenticação, perfil, recuperação de conta, biblioteca/arquivos/dados de leitura privados e batalha de flashcards preparada.
 - Google: OAuth quando escolhido.
 - Gutendex e Project Gutenberg: busca e aquisição de livros.
 - Fontes personalizadas HTTP/HTTPS: JSON, OPDS ou HTML cadastrados pelo usuário.

@@ -3,7 +3,7 @@ const {loader}=require('./library-test-utils.cjs');
 const A='11111111-1111-4111-8111-111111111111',B='22222222-2222-4222-8222-222222222222';
 const clone=x=>structuredClone(x);
 (async()=>{
- let user=A,offline=false,lost=false,corrupt=false,hold,gets=0; const objects=new Map();
+ let user=A,offline=false,lost=false,corrupt=false,hold,gets=0,duplicateStatus=409,duplicateBody=''; const objects=new Map();
  const previousFetch=global.fetch;
  process.env.EXPO_PUBLIC_SUPABASE_URL='https://private.example.test';process.env.EXPO_PUBLIC_SUPABASE_KEY='public-test-key';
  global.fetch=async(url,options={})=>{
@@ -11,11 +11,12 @@ const clone=x=>structuredClone(x);
    assert.equal(options.headers.Authorization,`Bearer jwt-${A}`,'JWT stays frozen to the operation owner');
    const path=decodeURIComponent(new URL(url).pathname.split('/aldus-private-library/')[1]??'');
    assert.ok(path.startsWith(A+'/'),'private own prefix');
-   if(options.method==='POST'){if(objects.has(path))return new Response('',{status:409});objects.set(path,options.body);if(lost){lost=false;throw Error('lost response');}return new Response('',{status:200});}
+   if(options.method==='POST'){if(objects.has(path))return new Response(duplicateBody,{status:duplicateStatus});objects.set(path,options.body);if(lost){lost=false;throw Error('lost response');}return new Response('',{status:200});}
    gets++;const file=objects.get(path);if(!file)return new Response('',{status:404});
    return new Response(corrupt?new Blob(['corrupt']):file,{status:200});
  };
- const load=loader({'react-native':{Platform:{OS:'web'}},'expo-file-system/legacy':{},
+ const platform={OS:'web'},nativeFiles={createUploadTask:()=>({uploadAsync:async()=>({status:400,body:duplicateBody}),cancelAsync:async()=>{}}),FileSystemUploadType:{BINARY_CONTENT:0}};
+ const load=loader({'react-native':{Platform:platform},'expo-file-system/legacy':nativeFiles,
    '@/src/data/remote/supabase':{supabase:{auth:{getSession:async()=>({data:{session:{user:{id:user},access_token:`jwt-${user}`}}})}}},
    '@/src/presentation/services/PdfThumbnailGenerator':{pdfThumbnailGenerator:{generate:async()=>null}}});
  const {libraryAccountScope:scope}=load('src/data/library/LibraryAccountScope.ts');scope.set(A);
@@ -40,10 +41,22 @@ const clone=x=>structuredClone(x);
  offline=true;await assert.rejects(a.service.upload('x'),/offline/);assert.equal((await a.books.findById('x')).filePath,'web-pdf://x');assert.equal(a.service.states.get('x').state,'ERROR');
  offline=false;lost=true;await assert.rejects(a.service.upload('x'),/lost response/);await a.service.upload('x');assert.equal(objects.size,1,'lost upload response retry does not duplicate files');
  const published=await a.books.findById('x');assert.equal(published.fileSize,pdf.size);assert.match(published.fileHash,/^[a-f0-9]{64}$/);
+ duplicateStatus=400;
+ for(const body of [{statusCode:'409',error:'Duplicate',message:'The resource already exists'},{code:'ResourceAlreadyExists'}, {code:'KeyAlreadyExists'}, {code:'already_exists'}]) {
+   duplicateBody=JSON.stringify(body);assert.equal(await a.driver.upload(A,published.remotePath,{blob:pdf,size:pdf.size,uri:''},'application/pdf',new AbortController().signal),'exists');
+ }
+ duplicateBody=JSON.stringify({code:'InvalidMimeType'});await assert.rejects(a.driver.upload(A,published.remotePath,{blob:pdf,size:pdf.size,uri:''},'application/pdf',new AbortController().signal),/Falha na transferência/);
+ duplicateBody='not JSON';await assert.rejects(a.driver.upload(A,published.remotePath,{blob:pdf,size:pdf.size,uri:''},'application/pdf',new AbortController().signal),/Falha na transferência/);
+ platform.OS='android';duplicateBody=JSON.stringify({error:'Duplicate'});assert.equal(await a.driver.upload(A,published.remotePath,{size:pdf.size,uri:'controlled://file'},'application/pdf',new AbortController().signal),'exists');
+ duplicateBody=JSON.stringify({code:'AccessDenied'});await assert.rejects(a.driver.upload(A,published.remotePath,{size:pdf.size,uri:'controlled://file'},'application/pdf',new AbortController().signal),/Falha na transferência/);platform.OS='web';
+ // Exercise the whole lost-response recovery for HTTP 400, including SHA verification.
+ await a.books.save(book('legacy'));a.files.set('legacy',pdf);lost=true;await assert.rejects(a.service.upload('legacy'),/lost response/);duplicateBody=JSON.stringify({error:'Duplicate'});
+ corrupt=true;await assert.rejects(a.service.upload('legacy'),/incompleto|integridade/);assert.ok(!(await a.books.findById('legacy')).remotePath,'HTTP 400 duplicate must not publish corrupt remote bytes');corrupt=false;
+ await a.service.upload('legacy');assert.ok((await a.books.findById('legacy')).remotePath);duplicateStatus=409;duplicateBody='';
  await b.books.save({...published,filePath:'',coverImagePath:null});assert.equal(b.files.size,0,'metadata only does not download a book');
  b.fail(true);await assert.rejects(b.service.ensureLocal('x'),/disk full/);assert.equal((await b.books.findById('x')).filePath,'','failed publication must not expose an incomplete local book');b.fail(false);
  const local=await b.service.ensureLocal('x');assert.equal(local.filePath,'web-pdf://x');assert.equal(local.progress,.42);assert.equal(b.chapters.get('x').length,1);assert.equal(await b.files.get('x').text(),await pdf.text());assert.equal((await require('pdf-lib').PDFDocument.load(await b.files.get('x').arrayBuffer())).getPageCount(),1);
- await b.service.removeDeviceCopy('x');assert.equal((await b.books.findById('x')).filePath,'');assert.equal(b.files.size,0);assert.equal(objects.size,1);await b.service.ensureLocal('x');assert.equal(b.files.size,1);
+ await b.service.removeDeviceCopy('x');assert.equal((await b.books.findById('x')).filePath,'');assert.equal(b.files.size,0);assert.equal(objects.size,2);await b.service.ensureLocal('x');assert.equal(b.files.size,1);
  await b.service.removeDeviceCopy('x');corrupt=true;await assert.rejects(b.service.ensureLocal('x'),/incompleto|integridade/);assert.equal((await b.books.findById('x')).filePath,'');assert.equal(b.files.size,0);corrupt=false;
  let release;hold=new Promise(r=>release=r);const late=b.service.ensureLocal('x');await new Promise(r=>setTimeout(r,5));scope.set(B);user=B;release();await assert.rejects(late,/conta mudou|cancel/i);assert.equal(await b.books.findById('x'),null);assert.equal(b.files.size,0);hold=null;scope.set(A);user=A;
  // The actual EPUB ZIP/XML parser builds chapters with the same stable book identity.

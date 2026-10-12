@@ -1,6 +1,12 @@
 
-USER LIBRARY SYNC — etapa mestre 11/10/2026: bloco1 ownership local implementado; SQLite v4/IndexedDB v5, legados preservados sem adoção automática, repositories e organização isolados por conta, IDs novos UUID e assets bundled por conta. Checkpoint canônico LIBRARY_SYNC_IMPLEMENTATION.md. Sync remoto/blocos2–8 pendentes. Regra APK por commit via script oficial + arquivo ignorado artifacts/apk/checkpoint.jsonl. Build inicial confirmou bloqueio de ambiente Platform36/Build Tools35/licenças; correção legítima em avaliação. Android físico/Supabase real NÃO TESTADOS.
+USER LIBRARY SYNC — checkpoint final 11/10/2026: isolamento por conta e revogação imediata implementados; Auth lifecycle/repositories/duas bases/Web/RLS PostgreSQL controlado PASS. Biblioteca/sync completos no código, SQLite v5/IndexedDB v6. Duas migrations CRIADAS/NÃO APLICADAS; Supabase/RLS/Storage HTTP real e Android físico NÃO TESTADOS. APKs dos sete commits iniciais PASS, SDK legítimo reparado; último APK/commit no ledger pós-commit. LIBRARY_SYNC_IMPLEMENTATION.md e LIBRARY_SYNC_DEPLOYMENT.md são os checkpoints atuais; notas de estados anteriores abaixo são históricas.
 # Autenticação, perfis e acesso — atualizado em 2026-10-10
+
+## Biblioteca vinculada à conta — checkpoint atual, 11/10/2026
+
+AuthContext revoga imediatamente o scope da biblioteca em eventos/troca/logout. Tickets de evento e geração descartam getSession/profile/callbacks antigos, inclusive A→B→A e INITIAL_SESSION síncrono. signOut/refresh atrasados não restabelecem A nem encerram B. Repositories/Blob/organização/filhos verificam ownership; store e status limpam a conta anterior. JWT de RPC/Storage fica congelado por operação, sem persistir tokens na fila. Arquivos locais são preservados para relogin, sem acesso da próxima conta pelo app. Legados não têm dono automático.
+
+VALIDADO CONTROLADO: Auth flows/lifecycle, A/logout/B/A, duas bases, IndexedDB/Reader Web e RLS PostgreSQL/PGlite PASS. As novas policies de biblioteca usam auth.uid() e mantêm isolamento de dados inclusive para master; não fornecem acesso administrativo no cliente. Gatilhos de sync exigem sessão/profile ativo. Migrations de biblioteca CRIADAS/NÃO APLICADAS; Supabase/Auth/RLS/Storage HTTP real e Android físico NÃO TESTADOS nesta tarefa. Pendências históricas de Auth remoto permanecem. Roteiro em LIBRARY_SYNC_DEPLOYMENT.md; detalhes em LIBRARY_SYNC_IMPLEMENTATION.md.
 
 ## Drive — autorização separada, 11/10/2026
 

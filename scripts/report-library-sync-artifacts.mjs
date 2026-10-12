@@ -1,0 +1,40 @@
+import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync, statSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const git = (...args) => {
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true });
+  if (result.status !== 0) throw Error(result.stderr || `git ${args[0]} failed`);
+  return result.stdout.trim();
+};
+const baseline = process.argv[2] ?? '73f6dfe';
+if (git('status', '--porcelain', '--untracked-files=no')) throw Error('Tracked worktree/staging must be clean.');
+const head = git('rev-parse', 'HEAD');
+const commits = git('rev-list', '--reverse', `${baseline}..${head}`).split('\n').filter(Boolean);
+if (!commits.length) throw Error('No commits in the requested range.');
+const ledger = readFileSync(path.join(root, 'artifacts/apk/checkpoint.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+const records = commits.map(commit => {
+  const record = ledger.filter(item => item.commit === commit && item.status === 'PASS').at(-1);
+  if (!record?.path || !record.apk || !record.log || !existsSync(record.log)) throw Error(`Missing successful exact-commit build/log: ${commit}`);
+  const short = git('rev-parse', '--short', commit), expected = path.join(root, 'artifacts/apk', `Aldus-${short}.apk`);
+  if (path.resolve(record.path).toLowerCase() !== expected.toLowerCase() || record.apk !== path.basename(expected)) throw Error(`Unexpected APK path/name: ${commit}`);
+  const size = statSync(expected).size;
+  if (!size || size !== record.size) throw Error(`Missing/empty/mismatched APK: ${commit}`);
+  git('check-ignore', expected);
+  if (git('ls-files', '--', expected)) throw Error(`Tracked APK: ${commit}`);
+  return { ...record, short, path: expected.replaceAll('\\', '/'), message: git('show', '-s', '--format=%s', commit) };
+});
+const text = readFileSync(path.join(root, 'LIBRARY_SYNC_FINAL_REPORT.md'), 'utf8');
+const start = text.indexOf('## 40. Commits'), end = text.indexOf('<!-- ARTIFACTS_END -->');
+if (start < 0 || end < start) throw Error('Report boundaries missing.');
+const scopes = ['Ownership/legados/repositories/identidade/APK', 'Schema/RPC/RLS/bucket/policies', 'Outbox/CAS/replay/conflitos/tombstones', 'Arquivos SHA/staging/bundles/recovery', 'Replica/journal/progresso/estudo/organização', 'Gatilhos/UI/download/remoções/legal', 'Restart/Chrome/A×B/Auth/security/cleanup', 'HTTP400 legado/legal/documentação/relatório/gates finais'];
+const table = `## 40. Commits\n\n| Hash completo | Mensagem | Escopo |\n| --- | --- | --- |\n${records.map((r, index) => `| ${r.commit} | ${r.message} | ${scopes[index] ?? r.message} |`).join('\n')}\n\n## 41. APKs gerados\n\nTodos PASS; arquivos maiores que zero, ignorados/não rastreados/staging limpo. Build oficial executado no respectivo hash; histórico de falhas e logs preservado no ledger.\n\n| Commit | APK / path absoluto | Tamanho (bytes) | Build |\n| --- | --- | ---: | --- |\n${records.map(r => `| ${r.short} | ${r.path} | ${r.size} | PASS |`).join('\n')}\n\n${records.map(r => `- ${r.short}: início UTC ${r.started}; log ${r.log.replaceAll('\\', '/')}; comando ${r.command}.`).join('\n')}\n\n`;
+const files = git('diff', '--name-only', baseline, head).split('\n').filter(Boolean);
+const result = `Registro pós-commit: HEAD ${head}; baseline ${git('rev-parse', baseline)}; gerado ${new Date().toISOString()}. Source/staging versionados limpos. ${records.length} commits / ${records.length} APKs PASS conferidos.\n\n` + text.slice(0, start) + table + text.slice(end) + `\n\n## Lista exata de arquivos alterados desde o baseline\n\n${files.map(file => `- ${file}`).join('\n')}\n`;
+const target = path.join(root, 'artifacts/LIBRARY_SYNC_FINAL_REPORT.md');
+git('check-ignore', target);
+if (git('ls-files', '--', target)) throw Error('Generated report must remain untracked.');
+writeFileSync(target, result, 'utf8');
+console.log(JSON.stringify({ head, commits: records.length, apks: records.length, status: 'PASS', report: target, trackedWorktree: 'clean', records: records.map(({ commit, path, size }) => ({ commit, path, size })) }));
