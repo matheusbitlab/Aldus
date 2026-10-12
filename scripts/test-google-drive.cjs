@@ -43,7 +43,7 @@ const response = data => new Response(JSON.stringify(data),{headers:{'Content-Ty
   await service.list(source,undefined,true); assert.equal(requests.length,6,'Explicit update traverses pages again');
   const acquisition=await service.downloadRequest(source,'epub1'); assert.match(acquisition.url,/alt=media/);assert.equal(acquisition.headers['X-Goog-Drive-Resource-Keys'],'epub1/key123');
   await assert.rejects(service.downloadRequest(source,'not-in-folder'),e=>e.code==='not-found');
-  console.log('PASS EPUB/PDF metadata only, unsupported/shortcuts excluded, shared-drive pagination, index refresh and explicit acquisition headers');
+  console.log('PASS EPUB/PDF metadata only, unsupported/file shortcuts excluded, shared-drive pagination, index refresh and explicit acquisition headers');
   for(const [status,code] of [[401,'expired'],[403,'api'],[404,'not-found'],[429,'rate-limit'],[503,'api']]) {
     const a=new DriveAuthorization(provider);await a.connect(source.id);
     const s=new GoogleDriveService(a,async()=>new Response('',{status}));await assert.rejects(s.list(source),e=>e.code===code);
@@ -84,12 +84,16 @@ const response = data => new Response(JSON.stringify(data),{headers:{'Content-Ty
   await webGesture.connect(source.id);const webReconnection=webGesture.connect(source.id);assert.equal(gestures,2,'GIS must start synchronously in the reconnect gesture before any await');await webReconnection;neverClear.resolve();
   console.log('PASS native reconnect clear-cache generation race and synchronous Web reconnect gesture');
   await auth.connect(source.id);
-  const pluginLoad=loader({'@/src/data/drive/driveDependencies':{googleDrive:service}}),{GoogleDriveSearchPlugin}=pluginLoad('src/data/scraping/GoogleDriveSearchPlugin.ts'),{SearchBooksUseCase}=pluginLoad('src/domain/usecases/SearchBooksUseCase.ts');
+  const localCatalog={sourceIdentity:JSON.stringify(['google-drive',source.folderId,null]),items:books.map(item=>({...item,remoteBookId:item.drive.fileId,availability:'available'}))};
+  const pluginLoad=loader({'@/src/data/sources/sourceCatalogDependencies':{sourceCatalogs:{view:()=>({catalog:localCatalog}),load:async()=>{throw Error('No source reload for a known snapshot');}}}}),{GoogleDriveSearchPlugin}=pluginLoad('src/data/scraping/GoogleDriveSearchPlugin.ts'),{SearchBooksUseCase}=pluginLoad('src/domain/usecases/SearchBooksUseCase.ts');
   const uc=new SearchBooksUseCase([],{getText:async()=>{throw Error('No public fetch for Drive');}},{canFetch:async()=>{throw Error('No robots for Drive');}},{waitFor:async()=>{}},{validate:async()=>{throw Error('No binary HEAD for Drive');}},{save:async()=>{}});
   const plugin=new GoogleDriveSearchPlugin(source);assert.equal((await uc.executeDetailed('bras cubas',[plugin])).results[0].title,books[0].title);
-  console.log('PASS Drive adapter uses existing use case and shared ranking without public scraping/download');
+  const callsBeforeSearch=requests.length;await plugin.search('sociedade espetaculo');assert.equal(requests.length,callsBeforeSearch,'Search reads the local full snapshot without Drive calls');
+  const noSnapshot=loader({'@/src/data/sources/sourceCatalogDependencies':{sourceCatalogs:{view:()=>({catalog:null}),load:async()=>{}}}})('src/data/scraping/GoogleDriveSearchPlugin.ts').GoogleDriveSearchPlugin;
+  await assert.rejects(new noSnapshot(source).search('Dom Casmuro'),/Atualize esta fonte/,'Search never performs implicit refresh');
+  console.log('PASS Drive search uses existing use case/ranker and local persisted snapshot without API calls/download');
   // Repository/selection tests mock only platform authorization, not source dispatch.
-  const storeLoad=loader({'@/src/data/drive/driveDependencies':{googleDrive:service},'@/src/data/sources/UserSourceRepository':{UserSourceRepository:class{async list(){return [source];}}},'@/src/presentation/services/dependencies':{appDependencies:{searchBooks:uc}}});
+  const storeLoad=loader({'@/src/data/drive/driveDependencies':{googleDrive:service},'@/src/data/sources/sourceCatalogDependencies':{sourceCatalogs:{view:()=>({catalog:localCatalog}),load:async()=>{}}},'@/src/data/sources/UserSourceRepository':{UserSourceRepository:class{async list(){return [source];}}},'@/src/presentation/services/dependencies':{appDependencies:{searchBooks:uc}}});
   const store=storeLoad('src/presentation/stores/searchStore.ts').useSearchStore;
   store.getState().setQuery('bras cubas');await store.getState().search(source.name);assert.equal(store.getState().results[0].sourceId,source.id);assert.equal(store.getState().sourceStatuses.length,1);
   console.log('PASS source-specific Drive selection runs only its adapter');

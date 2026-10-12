@@ -1,5 +1,11 @@
 # Biblioteca permanente por fonte — 11/10/2026
 
+## Adendo de 12/10/2026 — árvore Drive navegável
+
+As limitações históricas pasta direta/sem subpastas/atalhos abaixo foram superadas. SourceCatalog schemaVersion2 acrescenta raiz e SourceFolder ao mesmo snapshot JSON atômico SQLite/IndexedDB; versões antigas continuam legíveis e recebem árvore após refresh. SourceLibraryScreen mistura folders e BookCard, usa breadcrumbs e voltar ao pai/raiz; pesquisa default em toda a fonte com motor existente pré-indexado, caminho e ações diretas. GoogleDriveService percorre somente filhos/atalhos alcançados, respeita visitedFolderIds e publica árvore completa; movimentos/renomes/remoções/erro profundo/rollback testados. Snapshot local navega/pesquisa sem token Drive/rede; download só por escolha. GoogleDriveSearchPlugin global também lê catálogo local, sem refresh implícito.
+
+ROOT/A/B/back e Dom Casmuro pesquisado na ROOT/na Pasta C PASS controlados e no Web/IndexedDB real; 500 pastas/5000 livros e atalhos/ciclos/homônimos PASS controlados. Pasta pública real livros geral observada no Chrome isolado; OAuth/API/import pelo Aldus e Android físico PENDENTES. Não há migration/alteração funcional Library Sync, Auth ou Reader/importadores. Política0.6. Detalhes/limites/arquivos/registro APK em DRIVE_FOLDER_NAVIGATION_IMPLEMENTATION.md e artifacts/drive-tree/DRIVE_FOLDER_NAVIGATION_FINAL_REPORT.md.
+
 ## Evolução atual — biblioteca pessoal sincronizada
 
 Source Library continua catálogo local da fonte. Depois de importado com sucesso, EPUB/PDF recebe ownership da conta e entra na USER LIBRARY: arquivo definitivo e dados pessoais podem sincronizar no Supabase privado. O dispositivo B abre a cópia privada sob demanda e não depende de Drive/JSON/Gutendex nem de token da fonte original. sourceId/remoteBookId→bookId, catálogo, configuração e credenciais da Source permanecem locais, fora dos payloads pessoais.

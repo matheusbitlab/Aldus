@@ -18,6 +18,7 @@ export function SourceSummaryRow({ source, onManage }: { source: UserSource; onM
     <Pressable accessibilityRole="button" accessibilityLabel={`${capabilities.supportsCatalog ? "Abrir biblioteca" : "Pesquisar"}: ${source.name}`} onPress={open} style={{ gap: 6 }}>
       <Text style={{ color: palette.text, fontSize: 17, fontWeight: "600" }}>{source.name}</Text>
       <Text style={{ color: palette.secondaryText }}>{sourceTypeLabel(source.kind)} · {capabilities.supportsCatalog ? view.catalog ? `${view.catalog.items.length} ${view.catalog.items.length === 1 ? "livro" : "livros"}` : "Ainda não indexada" : "Somente pesquisa"}</Text>
+      {view.catalog?.rootFolderId ? <Text style={{ color: palette.secondaryText, fontSize: 12 }}>{(view.catalog.folders?.length ?? 1) - 1} pastas · navegação e pesquisa locais</Text> : null}
       {capabilities.supportsCatalog && view.catalog ? <Text style={{ color: palette.secondaryText, fontSize: 12 }}>Última atualização: {new Date(view.catalog.lastUpdated).toLocaleString("pt-BR")}</Text> : null}
       <Text style={{ color: palette.secondaryText, fontSize: 12 }}>{view.error ?? (view.status === "auth_required" ? "Reconectar para atualizar; catálogo local preservado" : !source.enabled ? "Desativada" : view.status === "refreshing" || view.status === "loading" && capabilities.supportsCatalog ? "Carregando…" : capabilities.requiresAuthorization ? "Conectado" : "Fonte cadastrada")}</Text>
     </Pressable>

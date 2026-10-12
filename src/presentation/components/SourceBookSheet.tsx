@@ -40,6 +40,7 @@ export function SourceBookSheet({ source, item, importedBookId, onImported, onCl
   return <Modal visible transparent onRequestClose={onClose}><View style={[styles.backdrop, { backgroundColor: palette.overlay }]}><View style={[styles.sheet, { backgroundColor: palette.panel }]}><ScrollView contentContainerStyle={{ gap: 16 }}>
     <Text style={{ color: palette.text, fontSize: 20, fontWeight: "600" }}>{item.title}</Text>
     <Text style={{ color: palette.secondaryText }}>{item.author ?? "Autor não informado"} · {item.format.toUpperCase()}{item.estimatedSize != null ? ` · ${(item.estimatedSize / 1048576).toFixed(1)} MB` : ""}</Text>
+    {item.parentFolderId ? <Text style={{ color: palette.secondaryText, fontSize: 12 }}>{item.relativeFolderPath || "Raiz da fonte"}</Text> : null}
     <Text style={{ color: palette.secondaryText }}>{state === "imported" ? "Na biblioteca" : state === "unavailable" ? "Download indisponível nesta fonte." : "Arquivo remoto. Baixado somente quando você escolhe importar."}</Text>
     {active ? <View style={{ gap: 12 }}><ActivityIndicator color={palette.accent} /><Text accessibilityLiveRegion="polite" style={{ color: palette.secondaryText }}>{progress}</Text>{job?.cancellable ? <Pressable accessibilityRole="button" onPress={() => void cancel(job.id)}><Text style={{ color: palette.accent }}>Cancelar importação</Text></Pressable> : null}</View> : null}
     {message || job?.error ? <Text accessibilityRole="alert" style={{ color: palette.accent }}>{message ?? job?.error}</Text> : null}

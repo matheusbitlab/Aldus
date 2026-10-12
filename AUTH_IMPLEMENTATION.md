@@ -2,6 +2,8 @@
 USER LIBRARY SYNC — checkpoint final 11/10/2026: isolamento por conta e revogação imediata implementados; Auth lifecycle/repositories/duas bases/Web/RLS PostgreSQL controlado PASS. Biblioteca/sync completos no código, SQLite v5/IndexedDB v6. Duas migrations CRIADAS/NÃO APLICADAS; Supabase/RLS/Storage HTTP real e Android físico NÃO TESTADOS. APKs dos sete commits iniciais PASS, SDK legítimo reparado; último APK/commit no ledger pós-commit. LIBRARY_SYNC_IMPLEMENTATION.md e LIBRARY_SYNC_DEPLOYMENT.md são os checkpoints atuais; notas de estados anteriores abaixo são históricas.
 # Autenticação, perfis e acesso — atualizado em 2026-10-12
 
+Adendo Drive de 12/10/2026: navegação por pastas, árvore persistida e pesquisa source-wide implementadas separadamente, sem alterar Auth/callback/provider. Pasta pública real agora identificada e observada; acesso pelo adapter/grant real continua pendente. Não interpretar a nova árvore como correção da allowlist Supabase ou PASS de login físico. DRIVE_FOLDER_NAVIGATION_IMPLEMENTATION.md registra os novos testes e limites.
+
 ## Correção urgente Google / localhost — 12/10/2026
 
 **ORIGEM REMOTA COMPROVADA:** `npm run audit:auth:redirects -- --expect-native` inicia OAuth Google PKCE no projeto real e simula somente cancelamento com o `state` real devolvido pelo provedor. O próprio endpoint `https://cmivracxuihtmsbmtuec.supabase.co/auth/v1/callback` respondeu HTTP302 para `http://localhost:8081/` tanto ao solicitar `aldus://auth/callback` quanto ao solicitar `aldus://auth/callback?next=reset-password`. O controle Web preservou `http://localhost:8081/auth/callback`. Nenhum login, senha, token de sessão ou conteúdo pessoal foi necessário para essa prova. Evidência sanitizada em `artifacts/auth/urgent/redirect-probe.json`.

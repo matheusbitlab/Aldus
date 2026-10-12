@@ -1,8 +1,12 @@
 # Aldus Reader — notas da implementação legal inicial
 
-Data da auditoria: 11/10/2026
+Data da auditoria: 12/10/2026
 
-Versão dos documentos públicos: 0.5
+Versão dos documentos públicos: 0.6
+
+## Adendo Drive — árvore de pastas, 12/10/2026
+
+Política0.6 e Privacidade/Dados descrevem raiz, subpastas, destinos acessíveis de atalhos encontrados (inclusive externos), IDs/parent/caminhos no snapshot local, navegação/busca local sem enviar query nem reindexar, download só por escolha. drive.readonly permanece amplo/leitura; nenhum token novo persistido ou dado da Source enviado ao Supabase. Dados da biblioteca pessoal após import continuam sujeitos ao fluxo já documentado. Sem nova autorização/secret/scopes ou alteração do consentimento SDK. Pasta pública livros geral visualizada sem login; grant/API/app/Android real não validados. DRIVE_FOLDER_NAVIGATION_IMPLEMENTATION.md é o checkpoint atual; consultas só na pasta direta descritas no histórico abaixo foram superadas.
 
 ## Checkpoint atual — biblioteca privada da conta, 11/10/2026
 

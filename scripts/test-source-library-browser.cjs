@@ -40,6 +40,11 @@ async function cdp(url) {
     const session = { access_token: jwt, refresh_token: 'fixture-not-real', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400, user };
     const source = { id: 'browser-source', name: 'Minha biblioteca de teste', kind: 'json', url: origin + '/fixture.json', enabled: true, status: 'active', createdAt: 1 };
     const drive = { ...source, id: 'drive-offline', name: 'Drive sem autorização', kind: 'google-drive', url: 'folder_123456789', folderId: 'folder_123456789' };
+    const treeFolder = (id, name, parentFolderId, relativePath, target) => ({ id, sourceId: drive.id, remoteFolderId: target ?? id, parentFolderId, name, relativePath, isShortcut: !!target, shortcutTargetId: target });
+    const treeBook = (id, title, parentFolderId, relativeFolderPath) => ({ sourceId: drive.id, remoteBookId: id, title, parentFolderId, relativeFolderPath, url: 'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media', format: title.endsWith('.pdf') ? 'pdf' : 'epub', estimatedSize: 123, sourceSite: drive.name, availability: 'available', drive: { fileId: id } });
+    const driveTree = { sourceId: drive.id, sourceName: drive.name, sourceType: drive.kind, sourceIdentity: JSON.stringify(['google-drive',drive.folderId,null]), schemaVersion: 2, rootFolderId: drive.folderId, lastUpdated: Date.now(),
+      folders: [treeFolder(drive.folderId,'ROOT',null,''),treeFolder('a','Pasta A',drive.folderId,'Pasta A'),treeFolder('b','Pasta B','a','Pasta A › Pasta B'),treeFolder('c','Pasta C',drive.folderId,'Pasta C'),treeFolder('alias-b','Atalho para Pasta B',drive.folderId,'Atalho para Pasta B','b'),treeFolder('cycle','Voltar à raiz','b','Pasta A › Pasta B › Voltar à raiz',drive.folderId)],
+      items: [treeBook('root-book','Livro Root.epub',drive.folderId,''),treeBook('a-book','Livro A.pdf','a','Pasta A'),treeBook('dom','Dom Casmurro.epub','b','Pasta A › Pasta B'),treeBook('sociedade','Sociedade do Espetáculo.pdf','c','Pasta C')] };
     const errorSource = { ...source, id: 'error-source', name: 'Fonte indisponível' };
     await client.command('Page.enable');
     await client.command('Runtime.enable');
@@ -94,12 +99,28 @@ async function cdp(url) {
     })()`);
     assert.deepEqual(indexed, { rejected: true, count: 20, links: 1 });
     const importedBookId = await client.evaluate(`(async()=> (await window.fixturePersistence.webSourceLinksPersistent('browser-source'))[0].bookId)()`);
-    await client.evaluate(`window.fixturePersistence.webPutPersistent('source_catalogs', {id:'drive-offline', catalog:{sourceId:'drive-offline',sourceName:'Drive sem autorização',sourceType:'google-drive',sourceIdentity:${JSON.stringify(JSON.stringify(['google-drive',drive.folderId,null]))},lastUpdated:Date.now(),items:[{sourceId:'drive-offline',remoteBookId:'file-offline',title:'Livro offline do Drive.pdf',url:'https://www.googleapis.com/drive/v3/files/file-offline?alt=media',format:'pdf',estimatedSize:123,sourceSite:'Drive sem autorização',availability:'available',drive:{fileId:'file-offline'}}]}})`);
+    await client.evaluate(`window.fixturePersistence.webPutPersistent('source_catalogs', {id:'drive-offline', catalog:${JSON.stringify(driveTree)}})`);
     await client.command('Network.enable'); await client.command('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
     await click('Atualizar'); await until('última atualização disponível'); await input('bras cubas'); await until('Memórias Póstumas'); await screenshot('offline-search');
     await client.command('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
     await navigate('/sources/drive-offline'); await until('Reconecte o Google Drive'); await screenshot('auth-required');
-    await until('Livro offline do Drive.pdf'); assert.ok((await text()).includes('1 livro'),'stored Drive snapshot visible without auth');
+    await until('Livro Root.epub'); assert.ok((await text()).includes('4 livros'),'stored Drive tree visible without auth');
+    assert.ok(!(await text()).includes('Dom Casmurro.epub'), 'Root does not flatten nested books');
+    const openFolder = async name => { const selector = '[aria-label=' + JSON.stringify('Abrir pasta: ' + name) + ']'; assert.ok(await client.evaluate(`(() => {const e=document.querySelector(${JSON.stringify(selector)});e?.click();return !!e;})()`)); await wait(300); };
+    await screenshot('drive-tree-root');
+    await openFolder('Pasta A'); await until('Livro A.pdf'); assert.ok(!(await text()).includes('Livro Root.epub')); await screenshot('drive-tree-a');
+    await openFolder('Pasta B'); await until('Dom Casmurro.epub'); await screenshot('drive-tree-b');
+    await click('← Pasta anterior'); await until('Livro A.pdf'); await click('← Pasta anterior'); await until('Livro Root.epub');
+    await input('Dom Casmuro'); await until('Dom Casmurro.epub'); await until('Pasta A › Pasta B'); await input('');
+    await openFolder('Pasta C'); await until('Sociedade do Espetáculo.pdf'); await input('Dom Casmuro'); await until('Dom Casmurro.epub'); await until('Pasta A › Pasta B'); await screenshot('drive-tree-global-search-from-c');
+    await client.evaluate(`document.querySelector('[aria-label="Abrir Dom Casmurro.epub, de Autor não informado"]').click()`); await until('Importar para a Biblioteca'); await until('Arquivo remoto.'); await click('Fechar');
+    await input(''); await until('Sociedade do Espetáculo.pdf'); await client.evaluate(`document.querySelector('[aria-label="Ir para raiz da fonte"]').click()`); await until('Livro Root.epub');
+    await openFolder('Atalho para Pasta B'); await until('Dom Casmurro.epub'); await openFolder('Voltar à raiz'); await until('Livro Root.epub');
+    await input('Pasta B'); await until('Resultados em toda a fonte'); await openFolder('Pasta B'); await until('Dom Casmurro.epub'); await screenshot('drive-tree-folder-search');
+    await navigate('/sources/drive-offline'); await until('Livro Root.epub'); await openFolder('Pasta A'); await openFolder('Pasta B'); await until('Dom Casmurro.epub'); await screenshot('drive-tree-offline-reopen');
+    assert.equal(await client.evaluate(`window.fixtureRequests.filter(path=>path.startsWith('/drive/v3/files')).length`),0,'Navigation/search/open actions do not query Drive or download files');
+    await client.evaluate(`document.querySelector('[aria-label="Ir para raiz da fonte"]').click()`); await click('← Fontes'); await until('Minha biblioteca de teste');
+    console.log('PASS exported hierarchical Drive snapshot: ROOT/A/B/back/breadcrumbs, source-wide fuzzy from C + path/actions, folder search, shortcut/cycle, offline IndexedDB reopen; no Drive API or media requests');
     await navigate('/sources/error-source'); fail=true; await click('Atualizar'); await until('Não foi possível carregar esta fonte.'); await screenshot('error-no-snapshot'); fail=false;
     await navigate('/sources/browser-source'); await until('20 livros'); books = []; await click('Atualizar'); await until('Nenhum EPUB ou PDF'); await screenshot('empty');
     books = Array.from({ length: 1000 }, (_, i) => ({ id: `remote-${i}`, title: `Livro ${String(i).padStart(4,'0')}`, url: '/fixture.epub', format: 'epub' }));

@@ -21,22 +21,36 @@ function oneEdit(a: string, b: string): boolean {
   }
   return edits + (i<a.length || j<b.length ? 1 : 0) <= 1;
 }
-export function scoreCatalogBook(book: ScrapedLink, query: string): number {
-  const terms = catalogTokens(query);
+function prepareCatalogBook(book: ScrapedLink) {
+  const title = catalogTokens(book.title), author = catalogTokens(book.author ?? "");
+  return { title, words: [...title, ...author], subjects: catalogTokens((book.subjects ?? []).join(" ")) };
+}
+function scorePreparedBook(book: ReturnType<typeof prepareCatalogBook>, terms: string[]): number {
   if (!terms.length || terms.every(term => term.length < 2)) return 0;
-  const title = catalogTokens(book.title), author = catalogTokens(book.author ?? ""), words = [...title, ...author];
+  const { title, words, subjects } = book;
   if (terms.join(" ") === title.join(" ")) return 500;
   if (terms.every(term => matches(term, title))) return 400 + terms.length / Math.max(1,title.length);
   const exact = terms.filter(term => matches(term, words));
   if (exact.length === terms.length) return 300 + terms.length / Math.max(1,words.length);
-  const subjects = catalogTokens((book.subjects ?? []).join(" "));
   if (terms.every(term => matches(term, [...words, ...subjects]))) return 150;
   const missing = terms.filter(term => !matches(term,words));
   if (missing.length === 1 && (exact.length > 0 || terms.length === 1 && missing[0].length >= 6) && missing[0].length >= 4 && words.some(word => word.length >= 4 && word[0] === missing[0][0] && oneEdit(missing[0],word))) return 100;
   return 0;
 }
+export function scoreCatalogBook(book: ScrapedLink, query: string): number { return scorePreparedBook(prepareCatalogBook(book), catalogTokens(query)); }
+/** Same scoring rules, with book tokens prepared once per immutable snapshot. */
+export function createCatalogSearchIndex<T extends ScrapedLink>(books: T[]) {
+  const rows = books.map((book, index) => ({ book, index, prepared: prepareCatalogBook(book) }));
+  return {
+    search(query: string, tieBreak?: (a: T, b: T) => number): T[] {
+      const terms = catalogTokens(query);
+      return rows.map(row => ({ ...row, score: scorePreparedBook(row.prepared, terms) }))
+        .filter(row => row.score > 0).sort((a, b) => b.score - a.score || (tieBreak?.(a.book, b.book) ?? 0) || a.index - b.index).map(row => row.book);
+    },
+  };
+}
 export function rankCatalogBooks<T extends ScrapedLink>(books: T[], query: string): T[] {
-  return books.map((book,index) => ({book,index,score:scoreCatalogBook(book,query)})).filter(row => row.score > 0).sort((a,b) => b.score-a.score || a.index-b.index).map(row => row.book);
+  return createCatalogSearchIndex(books).search(query);
 }
 export function catalogRemoteQueries(query: string): { primary: string; fallback: string | null } {
   const terms = catalogTokens(query), primary = terms.join(" ");

@@ -9,6 +9,7 @@ import { SourceCatalogService, SourceCatalogAdapter } from "./SourceCatalogServi
 
 const sources = new UserSourceRepository(), network = new NetworkFetcherService();
 export const sourceCatalogAdapter: SourceCatalogAdapter = {
+  catalog: async (source, signal) => source.kind === "google-drive" ? googleDrive.listCatalog(source, signal, true) : { items: await sourceCatalogAdapter.list(source, signal) },
   list: async (source, signal) => {
     if (source.kind === "google-drive") return googleDrive.list(source, signal, true);
     const payload = await network.getText(source.url, { signal, retries: 0 });

@@ -7,7 +7,24 @@ export interface SourceCatalogItem extends ScrapedLink {
   remoteBookId: string;
   modifiedAt?: string;
   availability: "available" | "unavailable";
+  parentFolderId?: string;
+  relativeFolderPath?: string;
+  normalizedTitle?: string;
+  normalizedAuthor?: string;
 }
+/** IDs come from Drive. A shortcut has its own id and exposes its target's contents. */
+export interface SourceFolder {
+  id: string;
+  sourceId: string;
+  remoteFolderId: string;
+  parentFolderId: string | null;
+  name: string;
+  relativePath: string;
+  isShortcut: boolean;
+  shortcutTargetId?: string;
+  updatedAt?: string;
+}
+export interface SourceCatalogListing { items: ScrapedLink[]; rootFolderId?: string; folders?: SourceFolder[]; }
 export type SourceCatalogStatus = "loading" | "empty" | "ready" | "refreshing" | "stale" | "offline" | "error" | "auth_required";
 export interface SourceCatalog {
   sourceId: string;
@@ -16,6 +33,10 @@ export interface SourceCatalog {
   /** Prevents rendering a snapshot from a previous folder/endpoint after an edit. */
   sourceIdentity: string;
   items: SourceCatalogItem[];
+  /** Optional for snapshots written before hierarchical catalogs existed. */
+  schemaVersion?: 2;
+  rootFolderId?: string;
+  folders?: SourceFolder[];
   lastUpdated: number;
 }
 export interface SourceCatalogView {

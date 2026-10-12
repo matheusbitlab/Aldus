@@ -2,6 +2,10 @@
 USER LIBRARY SYNC — item3 IMPLEMENTADO / VALIDADO CONTROLADO, 11/10/2026: biblioteca privada por conta, local primeiro, offline/outbox, upload após import, metadata-only no outro dispositivo, download/validação ao abrir, progresso/entidades de leitura, conflitos explícitos, tombstones, remoções distintas e adoção selecionada de legados. Duas bases reais + Web real controlado PASS. PENDENTE EXTERNO: aplicar as duas novas migrations após inventário, validar Supabase/RLS/Storage HTTP com duas contas e testar Android físico. APKs por commit no ledger ignorado artifacts/apk/checkpoint.jsonl; SDK reparado por ferramentas oficiais. Documentos LIBRARY_SYNC_IMPLEMENTATION.md, LIBRARY_SYNC_DEPLOYMENT.md e LIBRARY_SYNC_FINAL_REPORT.md. Próxima etapa do caderno: capa personalizada; ainda fora do escopo. Registros de item3 não iniciado abaixo são históricos.
 # Roadmap funcional — atualizado em 2026-10-12
 
+## Adendo obrigatório — navegação real da biblioteca Drive
+
+IMPLEMENTADO / GATES CONTROLADOS E WEB PASS: raiz/pastas/subpastas/atalhos por IDs, snapshot folders+books atômico, breadcrumbs e voltar ao pai/raiz, pesquisa padrão em toda a fonte pelo fuzzy original com localização/ações, índice preparado no refresh/load e busca local sem API. Persistência antiga compatível, sem migration nova. ROOT/A/B/back e busca de Dom Casmuro a partir de C exercitados no app Web/IndexedDB; 500 pastas/5000 livros e ciclos/alias/refresh parcial/rename/move testados no adapter real com HTTP fixtures. Download exclusivamente por escolha, scope drive.readonly preservado; política0.6. Pasta pública real livros geral observada; OAuth/API/subpastas/import pelo Aldus e **ANDROID REAL — PENDENTE**. Detalhes DRIVE_FOLDER_NAVIGATION_IMPLEMENTATION.md; artefato/hash/APK no relatório pós-commit artifacts/drive-tree/DRIVE_FOLDER_NAVIGATION_FINAL_REPORT.md. Bloqueio remoto Auth descrito abaixo permanece.
+
 ## Prioridade urgente — Auth Google e Drive Android
 
 **CLIENTE IMPLEMENTADO / GATES CONTROLADOS PASS / BLOQUEIO REMOTO COMPROVADO / ANDROID REAL — PENDENTE.**

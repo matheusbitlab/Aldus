@@ -61,7 +61,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       if (source.kind === "google-drive") {
         // Refresh an active grant; an expired/missing grant requires this explicit gesture.
         if (!googleDrive.authorization.connected(source.id)) await googleDrive.connect(source, signal);
-        await googleDrive.list(source, signal, true);
+        await googleDrive.validateRoot(source, signal);
         return { status: "active", error: null };
       }
       const response = await appDependencies.searchBooks.executeDetailed(
@@ -74,7 +74,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       }
       return { status: "active", error: null };
     } catch (failure) {
-      // connect/list already discard cancelled or stale results. An old modal
+      // Connection/root probes already discard cancelled results. An old modal
       // cancellation must never invalidate a grant from a newer connection.
       return {
         status: "error",

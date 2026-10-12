@@ -1,12 +1,13 @@
 import { SourceCatalogRepository } from "@/src/domain/repositories/SourceCatalogRepository";
 import { ScrapedLink } from "@/src/domain/types/search";
 import { UserSource } from "@/src/domain/types/sources";
-import { SourceCatalog, SourceCatalogItem, SourceCatalogView, SourceImportLink, sourceCapabilities, sourceIdentity } from "@/src/domain/types/sourceCatalog";
-import { rankCatalogBooks } from "@/src/domain/search/catalogRanking";
+import { SourceCatalog, SourceCatalogItem, SourceCatalogListing, SourceCatalogView, SourceFolder, SourceImportLink, sourceCapabilities, sourceIdentity } from "@/src/domain/types/sourceCatalog";
+import { createCatalogSearchIndex, normalizeCatalogText } from "@/src/domain/search/catalogRanking";
 import { DriveError } from "@/src/data/drive/DriveErrors";
 
 export interface SourceCatalogAdapter {
   list(source: UserSource, signal: AbortSignal): Promise<ScrapedLink[]>;
+  catalog?(source: UserSource, signal: AbortSignal): Promise<SourceCatalogListing>;
   authorizationRequired(source: UserSource): boolean;
 }
 const initial = (): SourceCatalogView => ({ catalog: null, status: "loading", error: null });
@@ -40,6 +41,7 @@ export class SourceCatalogService {
       const stored = await this.repository.get(source.id);
       if (generation !== this.generation(source.id)) return;
       const catalog = stored?.sourceIdentity === sourceIdentity(source) ? { ...stored, sourceName: source.name } : null;
+      if (catalog) querySourceCatalog(catalog.items, "", "az");
       if (this.controllers.has(source.id)) return;
       this.publish(source.id, { catalog, status: this.adapter.authorizationRequired(source) ? "auth_required" : typeof navigator !== "undefined" && navigator.onLine === false ? "offline" : catalog ? "stale" : "empty", error: null });
     } catch { if (generation === this.generation(source.id)) this.publish(source.id, { ...initial(), status: "error", error: "Não foi possível ler o catálogo persistido desta fonte." }); }
@@ -53,14 +55,18 @@ export class SourceCatalogService {
     this.publish(source.id, { ...previous, status: previous.catalog ? "refreshing" : "loading", error: null });
     try {
       if (!source.enabled) throw new Error("Ative ou reconecte esta fonte em Gerenciar fontes.");
-      const links = await this.adapter.list(source, controller.signal);
-      const catalog: SourceCatalog = { sourceId: source.id, sourceName: source.name, sourceType: source.kind, sourceIdentity: sourceIdentity(source), items: catalogItems(source, links), lastUpdated: Date.now() };
+      const listing = this.adapter.catalog ? await this.adapter.catalog(source, controller.signal) : { items: await this.adapter.list(source, controller.signal) };
+      const tree = catalogFolders(source, listing);
+      const catalog: SourceCatalog = { sourceId: source.id, sourceName: source.name, sourceType: source.kind, sourceIdentity: sourceIdentity(source), items: catalogItems(source, listing.items), ...tree, lastUpdated: Date.now() };
+      const parentIds = new Set(tree.folders.map(folder => folder.remoteFolderId));
+      if (tree.rootFolderId && catalog.items.some(item => !item.parentFolderId || !parentIds.has(item.parentFolderId))) throw new Error("Pasta de livro fora da árvore.");
+      querySourceCatalog(catalog.items, "", "az");
       await this.write(source.id, async () => {
         if (generation !== this.generation(source.id) || controller.signal.aborted) return;
         const current = await this.findSource(source.id);
         if (!current || !current.enabled || sourceIdentity(current) !== catalog.sourceIdentity || generation !== this.generation(source.id)) return;
         await this.repository.save(catalog);
-        if (generation === this.generation(source.id)) this.publish(source.id, { catalog, status: catalog.items.length ? "ready" : "empty", error: null });
+        if (generation === this.generation(source.id)) this.publish(source.id, { catalog, status: catalog.items.length || (catalog.folders?.length ?? 0) > 1 ? "ready" : "empty", error: null });
       });
     } catch (error) {
       if (generation !== this.generation(source.id)) return;
@@ -113,11 +119,14 @@ export function catalogItems(source: UserSource, links: ScrapedLink[]): SourceCa
   for (const link of links) {
     if (!link.title?.trim() || (link.format !== "epub" && link.format !== "pdf")) throw new Error("Metadados inválidos na fonte.");
     if (link.estimatedSize !== null && (!Number.isFinite(link.estimatedSize) || link.estimatedSize < 0)) throw new Error("Tamanho inválido na fonte.");
+    if (link.parentFolderId != null && (typeof link.parentFolderId !== "string" || !/^[\w-]+$/.test(link.parentFolderId)) || link.relativeFolderPath != null && typeof link.relativeFolderPath !== "string") throw new Error("Localização inválida na fonte.");
     const url = safeUrl(link.url), remoteBookId = link.drive?.fileId ?? link.remoteBookId ?? url;
     if (!remoteBookId || items.has(remoteBookId)) throw new Error("Identidade remota duplicada ou inválida.");
     // Explicit allowlist: arbitrary adapter fields, headers and credentials never reach disk.
     items.set(remoteBookId, {
       sourceId: source.id, remoteBookId, url, title: link.title, author: link.author,
+      parentFolderId: link.parentFolderId, relativeFolderPath: link.relativeFolderPath,
+      normalizedTitle: normalizeCatalogText(link.title), normalizedAuthor: link.author ? normalizeCatalogText(link.author) : undefined,
       sourceSite: source.name, format: link.format, estimatedSize: link.estimatedSize,
       coverUrl: link.coverUrl ? safeUrl(link.coverUrl) : undefined, language: link.language,
       subjects: link.subjects, description: link.description,
@@ -129,8 +138,35 @@ export function catalogItems(source: UserSource, links: ScrapedLink[]): SourceCa
   return [...items.values()];
 }
 export type SourceCatalogSort = "az" | "za" | "recent";
+const queryIndexes = new WeakMap<SourceCatalogItem[], { index: ReturnType<typeof createCatalogSearchIndex<SourceCatalogItem>>; sorted: Record<SourceCatalogSort, SourceCatalogItem[]> }>();
+const compareItems = (sort: SourceCatalogSort) => (a: SourceCatalogItem, b: SourceCatalogItem) => sort === "recent" ? (Date.parse(b.modifiedAt ?? "") || 0) - (Date.parse(a.modifiedAt ?? "") || 0) || a.title.localeCompare(b.title, "pt") : a.title.localeCompare(b.title, "pt") * (sort === "za" ? -1 : 1);
 export function querySourceCatalog(items: SourceCatalogItem[], query: string, sort: SourceCatalogSort): SourceCatalogItem[] {
-  const sorted = [...items].sort((a, b) => sort === "recent" ? (Date.parse(b.modifiedAt ?? "") || 0) - (Date.parse(a.modifiedAt ?? "") || 0) || a.title.localeCompare(b.title, "pt") : a.title.localeCompare(b.title, "pt") * (sort === "za" ? -1 : 1));
-  // Existing ranker orders relevance first, retaining chosen order for ties.
-  return query.trim() ? rankCatalogBooks(sorted, query) : sorted;
+  let cached = queryIndexes.get(items);
+  if (!cached) {
+    cached = { index: createCatalogSearchIndex(items), sorted: { az: [...items].sort(compareItems("az")), za: [...items].sort(compareItems("za")), recent: [...items].sort(compareItems("recent")) } };
+    queryIndexes.set(items, cached);
+  }
+  return query.trim() ? cached.index.search(query, compareItems(sort)) : cached.sorted[sort];
+}
+
+function catalogFolders(source: UserSource, listing: SourceCatalogListing): { schemaVersion?: 2; rootFolderId?: string; folders: SourceFolder[] } {
+  if (!listing.rootFolderId && !listing.folders?.length) return { folders: [] };
+  const folders = (listing.folders ?? []).map(folder => ({ id: folder.id, sourceId: source.id, remoteFolderId: folder.remoteFolderId,
+    parentFolderId: folder.parentFolderId, name: folder.name, relativePath: folder.relativePath, isShortcut: folder.isShortcut,
+    shortcutTargetId: folder.isShortcut ? folder.shortcutTargetId : undefined, updatedAt: folder.updatedAt }));
+  const ids = new Set<string>(), containers = new Set(folders.map(folder => folder.remoteFolderId));
+  for (const folder of folders) {
+    if (!/^[\w-]+$/.test(folder.id) || !/^[\w-]+$/.test(folder.remoteFolderId) || ids.has(folder.id) || typeof folder.name !== "string" || typeof folder.relativePath !== "string" || typeof folder.isShortcut !== "boolean"
+      || folder.isShortcut && folder.shortcutTargetId !== folder.remoteFolderId || !folder.isShortcut && folder.remoteFolderId !== folder.id || folder.parentFolderId !== null && !containers.has(folder.parentFolderId)) throw new Error("Estrutura de pastas inválida.");
+    ids.add(folder.id);
+  }
+  const root = folders.find(folder => folder.id === listing.rootFolderId);
+  if (!root || source.folderId && source.folderId !== root.id || root.parentFolderId !== null || root.isShortcut || root.remoteFolderId !== root.id || folders.some(folder => folder.id !== root.id && folder.parentFolderId === null)) throw new Error("Raiz da fonte inválida.");
+  const reachable = new Set([root.remoteFolderId]);
+  const children = new Map<string, SourceFolder[]>();
+  for (const folder of folders) if (folder.parentFolderId) { const siblings = children.get(folder.parentFolderId) ?? []; siblings.push(folder); children.set(folder.parentFolderId, siblings); }
+  const queue = [root.remoteFolderId];
+  for (let i = 0; i < queue.length; i++) for (const child of children.get(queue[i]) ?? []) if (!reachable.has(child.remoteFolderId)) { reachable.add(child.remoteFolderId); queue.push(child.remoteFolderId); }
+  if (folders.some(folder => !reachable.has(folder.remoteFolderId) || folder.parentFolderId && !reachable.has(folder.parentFolderId))) throw new Error("Pasta fora da raiz da fonte.");
+  return { schemaVersion: 2, rootFolderId: root.id, folders };
 }

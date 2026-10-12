@@ -19,7 +19,7 @@ const messages: Record<DriveErrorCode, string> = {
   network: "Não foi possível contatar o Drive. Confira a rede e tente novamente.",
   api: "Não foi possível concluir a consulta ao Drive. A causa não foi identificada; tente atualizar novamente.",
   "invalid-folder": "Informe o ID ou um link de pasta válido do Google Drive.",
-  unsupported: "Use uma pasta real do Drive. Atalhos e subpastas não são percorridos nesta etapa.",
+  unsupported: "O destino não é uma pasta do Google Drive. Use uma pasta real; atalhos para arquivos não são percorridos.",
   configuration: "A autorização Google Drive não está configurada nesta plataforma/build.",
   busy: "Já existe uma autorização Drive em andamento. Conclua ou cancele a janela do Google e tente novamente.",
 };

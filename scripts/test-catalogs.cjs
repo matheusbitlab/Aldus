@@ -4,7 +4,18 @@ const path = require('node:path');
 const ts = require('typescript');
 const cache = new Map();
 const storage = new Map();
+// Node has no IndexedDB. Explicit test persistence bridge; the browser suite uses real IndexedDB.
+const webRows = new Map();
+const rows = store => { if (!webRows.has(store)) webRows.set(store, new Map()); return webRows.get(store); };
+const webGet = async (store, id) => rows(store).get(id) ?? null;
+const webGetAll = async store => [...rows(store).values()];
+const webPut = async (store, value) => { rows(store).set(value.id, structuredClone(value)); };
 const mocks = {
+  '@/src/data/database/connection/webLibraryStore': { webGet, webGetAll, webPut, webGetPersistent: webGet, webGetAllPersistent: webGetAll, webPutPersistent: webPut,
+    webSaveBookPersistent: async book => { await webPut('books', book); await webPut('book_metadata', book); },
+    webReplaceChaptersPersistent: async (bookId, chapters) => { for (const [id, chapter] of rows('chapters')) if (chapter.bookId === bookId) rows('chapters').delete(id); for (const chapter of chapters) await webPut('chapters', chapter); },
+  },
+  '@/src/data/sources/sourceCatalogDependencies': { sourceCatalogs: { load: async () => {}, refresh: async () => {}, cancel: () => {}, reset: async () => {}, remove: async () => {}, view: () => ({ catalog: null }) } },
   'expo-modules-core': { requireOptionalNativeModule: () => null },
   'react-native': { Platform: { OS: 'web' } },
   'expo-file-system/legacy': {},
@@ -122,7 +133,7 @@ function load(file) {
   assert.ok(!document.includes('evil.invalid'));
   await repo.save(source); await repo.remove(source.id); assert.ok(await books.findById(first.id));
   global.fetch = originalFetch;
-  console.log('PASS: download -> ZIP/EPUB validation -> import -> Library -> OpenBook, isolated chapter IDs and source removal preserves books (memory storage fallback)');
+  console.log('PASS: download -> ZIP/EPUB validation -> import -> Library -> OpenBook, isolated chapter IDs and source removal preserves books (explicit controlled persistence bridge; real IndexedDB covered by browser suite)');
 
   if (process.argv.includes('--benchmark-parser')) {
     const fixturePath = '.expo/gutendex-real-book.epub';
