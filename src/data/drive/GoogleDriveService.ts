@@ -92,10 +92,13 @@ export class GoogleDriveService {
     if (current.capabilities?.canDownload === false) throw new DriveError("permission");
     return { url: book.url, headers: { ...headers, Authorization: `Bearer ${this.authorization.token(source.id)}` } };
   }
-  checkDownloadStatus(sourceId: string, status: number, expectedToken?: string): void {
+  checkDownloadStatus(sourceId: string, status: number, expectedToken?: string, body?: unknown): void {
     if (expectedToken && this.authorization.token(sourceId) !== expectedToken) throw new DriveError("disconnected");
     if (status === 401) { this.authorization.invalidate(sourceId); this.clearIndex(sourceId); }
-    assertDriveResponse(status);
+    try { assertDriveResponse(status, body); } catch (error) {
+      if (error instanceof DriveError && error.code === "auth-denied") { this.authorization.invalidate(sourceId); this.clearIndex(sourceId); }
+      throw error;
+    }
   }
   private async json<T>(sourceId: string, url: string, headers: Record<string, string>, signal?: AbortSignal): Promise<T> {
     const token = this.authorization.token(sourceId);
@@ -106,7 +109,11 @@ export class GoogleDriveService {
     try {
       throwIfAborted(signal);
       const response = await withAbort(this.request(url, { headers: { ...headers, Authorization: `Bearer ${token}`, Accept: "application/json" }, signal: controller.signal }), controller.signal);
-      this.checkDownloadStatus(sourceId, response.status, token);
+      let errorBody: unknown;
+      if (!response.ok) {
+        try { errorBody = await withAbort(response.json(), controller.signal); } catch { /* Some failures have no JSON body. */ }
+      }
+      this.checkDownloadStatus(sourceId, response.status, token, errorBody);
       try { return await withAbort(response.json(), controller.signal) as T; } catch { throw new DriveError("api"); }
     } catch (error) {
       throwIfAborted(signal);

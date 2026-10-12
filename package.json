@@ -23,6 +23,7 @@
     "test:source-catalog": "node scripts/test-source-catalog.cjs && node scripts/test-source-library-actions.cjs",
     "test:source-library:browser": "node scripts/test-source-library-browser.cjs",
     "audit:supabase:public": "node scripts/audit-supabase-public.cjs",
+    "audit:auth:redirects": "node scripts/audit-google-redirects.cjs",
     "export:web": "expo export --platform web && node scripts/copy-books-to-dist.mjs",
     "test:library:account": "node scripts/test-library-account.cjs",
     "test:library:rls": "node scripts/test-library-rls.cjs",

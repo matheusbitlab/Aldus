@@ -7,7 +7,8 @@ export function readAuthCallback(url: string | null | undefined) {
     error_description: read("error_description"), error_code: read("error_code") };
 }
 
-export function callbackFailureMessage(description?: string) {
+export function callbackFailureMessage(description?: string, error?: string) {
+  if (error === "access_denied") return "A autenticação foi cancelada ou não autorizada. Você pode tentar novamente.";
   return description?.includes("Unable to exchange external code")
     ? "O serviço não conseguiu concluir o acesso com o Google. A configuração do provedor precisa ser verificada."
     : "Não foi possível concluir a autenticação. Solicite um novo link ou tente entrar novamente.";

@@ -6,6 +6,8 @@ import { exchangeCallbackCode } from "@/src/data/remote/authService";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { useURL } from "expo-linking";
 import { readAuthCallback, callbackFailureMessage } from "@/src/data/remote/authCallback";
+import { isExpectedAuthCallback } from "@/src/data/remote/authRedirect";
+import { diagnoseAuthCallback, finishAuthOAuthOperation } from "@/src/utils/authOAuthDiagnostics";
 
 export default function Callback() {
   const params = useLocalSearchParams<{
@@ -18,15 +20,25 @@ export default function Callback() {
   const { palette } = useAppTheme();
   const linkedUrl = useURL();
   const [error, setError] = useState<string | null>(null);
-  const values = readAuthCallback(Platform.OS === "web" && typeof window !== "undefined" ? window.location.href : linkedUrl);
+  const callbackUrl = Platform.OS === "web" && typeof window !== "undefined" ? window.location.href : linkedUrl;
+  const values = readAuthCallback(callbackUrl);
   const effectiveCode = params.code || values.code;
   const effectiveError = params.error || params.error_description || params.error_code || values.error || values.error_description || values.error_code;
   const description = params.error_description || values.error_description;
   const next = params.next || values.next;
+  const webOrigin = Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : undefined;
 
   useEffect(() => {
+    if (!isExpectedAuthCallback(callbackUrl, Platform.OS, webOrigin)) {
+      const operationId = diagnoseAuthCallback(callbackUrl, next, "rejected");
+      finishAuthOAuthOperation(operationId);
+      setError("O retorno de autenticação não pertence a este aplicativo. A configuração do serviço precisa ser verificada.");
+      return;
+    }
+    const operationId = diagnoseAuthCallback(callbackUrl, next, effectiveError ? "denied" : "received");
     if (effectiveError) {
-      setError(callbackFailureMessage(description));
+      finishAuthOAuthOperation(operationId);
+      setError(callbackFailureMessage(description, params.error || values.error));
       return;
     }
 
@@ -37,7 +49,7 @@ export default function Callback() {
 
     setError(null);
     let active = true;
-    void exchangeCallbackCode(effectiveCode)
+    void exchangeCallbackCode(effectiveCode, operationId)
       .then(() => {
         if (active) {
           router.replace((next === "reset-password" ? "/auth/reset-password" : "/") as never);
@@ -52,7 +64,7 @@ export default function Callback() {
     return () => {
       active = false;
     };
-  }, [effectiveCode, effectiveError, description, next]);
+  }, [effectiveCode, effectiveError, description, next, callbackUrl, params.error, values.error, webOrigin]);
 
   return (
     <AuthForm title={error ? "Não foi possível concluir" : "Concluindo acesso"}>

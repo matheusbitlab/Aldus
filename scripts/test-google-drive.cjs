@@ -44,7 +44,7 @@ const response = data => new Response(JSON.stringify(data),{headers:{'Content-Ty
   const acquisition=await service.downloadRequest(source,'epub1'); assert.match(acquisition.url,/alt=media/);assert.equal(acquisition.headers['X-Goog-Drive-Resource-Keys'],'epub1/key123');
   await assert.rejects(service.downloadRequest(source,'not-in-folder'),e=>e.code==='not-found');
   console.log('PASS EPUB/PDF metadata only, unsupported/shortcuts excluded, shared-drive pagination, index refresh and explicit acquisition headers');
-  for(const [status,code] of [[401,'expired'],[403,'permission'],[404,'not-found'],[429,'rate-limit'],[503,'api']]) {
+  for(const [status,code] of [[401,'expired'],[403,'api'],[404,'not-found'],[429,'rate-limit'],[503,'api']]) {
     const a=new DriveAuthorization(provider);await a.connect(source.id);
     const s=new GoogleDriveService(a,async()=>new Response('',{status}));await assert.rejects(s.list(source),e=>e.code===code);
     if(status===401) assert.throws(()=>a.token(source.id),e=>e.code==='disconnected');
@@ -55,12 +55,34 @@ const response = data => new Response(JSON.stringify(data),{headers:{'Content-Ty
   const repeat=new GoogleDriveService(auth,async url=>response(new URL(url).pathname.endsWith(source.folderId)?{mimeType:'application/vnd.google-apps.folder'}:{files:[],nextPageToken:'repeat'}));await assert.rejects(repeat.list(source),e=>e.code==='api');
   const denied=new GoogleDriveService(auth,async url=>response(new URL(url).pathname.endsWith(source.folderId)?{mimeType:'application/vnd.google-apps.folder'}:new URL(url).pathname.endsWith('file1')?{capabilities:{canDownload:false}}:{files:[file('file1','Book.epub')]}));await assert.rejects(denied.downloadRequest(source,'file1'),e=>e.code==='permission');
   console.log('PASS empty folder, incomplete/repeated pagination, download permission, 401/403/404/429/503 and sanitized network failures');
+  for (const [reason, code, category] of [['accessNotConfigured','api-disabled','DRIVE_API_DISABLED'],['SERVICE_DISABLED','api-disabled','DRIVE_API_DISABLED'],['userRateLimitExceeded','rate-limit','RATE_LIMIT'],['ACCESS_TOKEN_SCOPE_INSUFFICIENT','auth-denied','AUTH_DENIED'],['insufficientFilePermissions','permission','FOLDER_FORBIDDEN']]) {
+    await auth.connect(source.id);
+    const body={error:{message:'secret provider details must not escape',errors:[{reason}]}};
+    const classified=new GoogleDriveService(auth,async()=>new Response(JSON.stringify(body),{status:403}));
+    await assert.rejects(classified.list(source),e=>e.code===code&&e.category===category&&!e.message.includes('secret'));
+    if (code==='auth-denied') assert.equal(auth.connected(source.id),false,'A deficient scope must ask for reauthorization');
+  }
+  const foreignShared=new GoogleDriveService(auth,async url=>{
+    const u=new URL(url);assert.equal(u.searchParams.has('ownedByMe'),false);
+    return response(u.pathname.endsWith(source.folderId)?{mimeType:'application/vnd.google-apps.folder',owners:[{me:false}]}:{files:[file('foreign-epub','Livro compartilhado.epub'),file('foreign-pdf','PDF compartilhado.pdf','application/pdf')]});
+  });
+  assert.deepEqual((await foreignShared.list(source)).map(item=>item.format),['epub','pdf']);
+  console.log('PASS specific API-disabled/scope/forbidden/rate-limit reasons and folder shared by another owner without ownership filtering (HTTP fixtures)');
   const gate=deferred(), controller=new AbortController(), late=new GoogleDriveService(auth,()=>gate.promise);
   const cancelled=late.list(source,controller.signal);controller.abort();await assert.rejects(cancelled,e=>e.name==='AbortError');gate.resolve(response({mimeType:'application/vnd.google-apps.folder'}));await tick();
   const disconnectGate=deferred(), disconnected=new GoogleDriveService(auth,()=>disconnectGate.promise);const old=disconnected.list(source);await disconnected.disconnect(source.id);disconnectGate.resolve(response({mimeType:'application/vnd.google-apps.folder'}));await assert.rejects(old);assert.throws(()=>auth.token(source.id));assert.equal(revoked,1);
   const consent=deferred(), lateAuth=new DriveAuthorization({...provider,authorize:()=>consent.promise});const connecting=lateAuth.connect(source.id);await lateAuth.disconnect(source.id);consent.resolve({accessToken:'late-fixture',expiresAt:Date.now()+3600000});await assert.rejects(connecting);assert.throws(()=>lateAuth.token(source.id));
   const expired=new DriveAuthorization({...provider,authorize:async()=>({accessToken:'fixture-token',expiresAt:Date.now()+1000})});await expired.connect(source.id);assert.throws(()=>expired.token(source.id),e=>e.code==='expired');
   console.log('PASS cancellation, late network/consent ignored, disconnect/index purge, token expiry and no credential persistence');
+  // A cache-clear finishing after a newer connection must not even launch old consent.
+  const clearingGate=deferred();let authorizeCalls=0;
+  const delayedClear=new DriveAuthorization({...provider,clearBeforeAuthorize:true,clearToken:()=>clearingGate.promise,authorize:async()=>({accessToken:`grant-${++authorizeCalls}`,expiresAt:Date.now()+3600000})});
+  await delayedClear.connect(source.id);const oldReconnect=delayedClear.connect(source.id);
+  const newerReconnect=delayedClear.connect(source.id);await newerReconnect;clearingGate.resolve();
+  await assert.rejects(oldReconnect,e=>e.code==='disconnected');assert.equal(authorizeCalls,2);assert.equal(delayedClear.token(source.id),'grant-2');
+  let gestures=0;const neverClear=deferred(),webGesture=new DriveAuthorization({...provider,clearBeforeAuthorize:false,clearToken:()=>neverClear.promise,authorize:()=>{gestures++;return Promise.resolve({accessToken:`web-${gestures}`,expiresAt:Date.now()+3600000});}});
+  await webGesture.connect(source.id);const webReconnection=webGesture.connect(source.id);assert.equal(gestures,2,'GIS must start synchronously in the reconnect gesture before any await');await webReconnection;neverClear.resolve();
+  console.log('PASS native reconnect clear-cache generation race and synchronous Web reconnect gesture');
   await auth.connect(source.id);
   const pluginLoad=loader({'@/src/data/drive/driveDependencies':{googleDrive:service}}),{GoogleDriveSearchPlugin}=pluginLoad('src/data/scraping/GoogleDriveSearchPlugin.ts'),{SearchBooksUseCase}=pluginLoad('src/domain/usecases/SearchBooksUseCase.ts');
   const uc=new SearchBooksUseCase([],{getText:async()=>{throw Error('No public fetch for Drive');}},{canFetch:async()=>{throw Error('No robots for Drive');}},{waitFor:async()=>{}},{validate:async()=>{throw Error('No binary HEAD for Drive');}},{save:async()=>{}});
@@ -93,16 +115,38 @@ const response = data => new Response(JSON.stringify(data),{headers:{'Content-Ty
   try {
     process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID='public-fixture.apps.googleusercontent.com';
     let callback,mode='success';
-    global.window={google:{accounts:{oauth2:{initTokenClient:options=>{assert.equal(options.include_granted_scopes,false);assert.equal(options.scope,'https://www.googleapis.com/auth/drive.readonly');callback=options.callback;return {requestAccessToken:()=>{if(mode==='success')callback({access_token:'fixture-web-token',expires_in:3600,scope:options.scope});if(mode==='denied')callback({access_token:'fixture',expires_in:3600,scope:'openid'});if(mode==='closed')options.error_callback();}};}}}}};
+    global.window={google:{accounts:{oauth2:{initTokenClient:options=>{assert.equal(options.include_granted_scopes,false);assert.equal(options.scope,'https://www.googleapis.com/auth/drive.readonly');callback=options.callback;return {requestAccessToken:request=>{assert.equal(request.prompt,'select_account consent');if(mode==='success')callback({access_token:'fixture-web-token',expires_in:3600,scope:options.scope});if(mode==='denied')callback({access_token:'fixture',expires_in:3600,scope:'openid'});if(mode==='closed')options.error_callback({type:'popup_closed'});if(mode==='blocked')options.error_callback({type:'popup_failed_to_open'});}};}}}}};
     const webAuth=loader({'react-native':{Platform:{OS:'web'}},'expo-modules-core':{requireOptionalNativeModule:()=>{throw Error('No native lookup on Web');}}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;
     await webAuth.prepare();assert.equal((await webAuth.authorize()).accessToken,'fixture-web-token');
     let webRevoked=false;global.window.google.accounts.oauth2.revoke=(token,callback)=>{assert.equal(token,'fixture-web-token');webRevoked=true;callback({successful:true});};await webAuth.revoke('fixture-web-token');assert.equal(webRevoked,true);
-    mode='denied';await assert.rejects(webAuth.authorize(),e=>e.code==='permission');mode='closed';await assert.rejects(webAuth.authorize(),e=>e.code==='disconnected');
+    mode='denied';await assert.rejects(webAuth.authorize(),e=>e.code==='auth-denied'&&e.category==='AUTH_DENIED');mode='closed';await assert.rejects(webAuth.authorize(),e=>e.code==='cancelled'&&e.category==='AUTH_CANCELLED');mode='blocked';await assert.rejects(webAuth.authorize(),e=>e.code==='popup-blocked'&&e.message.includes('pop-ups'));
     mode='late';const abort=new AbortController(),lateWeb=webAuth.authorize(abort.signal);abort.abort();await assert.rejects(lateWeb,e=>e.name==='AbortError');callback({access_token:'late',expires_in:3600,scope:'https://www.googleapis.com/auth/drive.readonly'});
     delete process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID;await assert.rejects(webAuth.prepare(),e=>e.code==='configuration');
     const gate=deferred();let cancels=0;
     const nativeAuth=loader({'react-native':{Platform:{OS:'android'}},'expo-modules-core':{requireOptionalNativeModule:()=>({authorize:()=>gate.promise,cancelAuthorization:async()=>{cancels++;},clearToken:async()=>{}})}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;
     const nativeAbort=new AbortController(),nativePending=nativeAuth.authorize(nativeAbort.signal);nativeAbort.abort();await assert.rejects(nativePending,e=>e.name==='AbortError');assert.equal(cancels,1);gate.resolve({accessToken:'late-native',expiresAt:Date.now()+3600000});await tick();
+    for(const [nativeCode,code,category] of [['DRIVE_AUTH_CANCELLED','cancelled','AUTH_CANCELLED'],['DRIVE_AUTH_REQUIRED','disconnected','AUTH_REQUIRED'],['DRIVE_AUTH_DENIED','auth-denied','AUTH_DENIED'],['DRIVE_CONFIGURATION','configuration','UNKNOWN'],['DRIVE_NETWORK','network','NETWORK_ERROR'],['DRIVE_UNKNOWN','api','UNKNOWN']]) {
+      const wrapper=loader({'react-native':{Platform:{OS:'android'}},'expo-modules-core':{requireOptionalNativeModule:name=>{assert.equal(name,'AldusDriveAuth');return {authorize:async id=>{assert.match(id,/^drive-/);throw Object.assign(new Error('sensitive native failure'),{code:nativeCode});},cancelAuthorization:async()=>{}};}}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;
+      await assert.rejects(wrapper.authorize(),e=>e.code===code&&e.category===category&&!e.message.includes('sensitive'));
+    }
+    const noModule=loader({'react-native':{Platform:{OS:'android'}},'expo-modules-core':{requireOptionalNativeModule:()=>null}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;
+    await assert.rejects(noModule.prepare(),e=>e.code==='configuration');await assert.rejects(noModule.authorize(),e=>e.code==='configuration');
+    const alreadyAborted=new AbortController();alreadyAborted.abort();let invoked=0;
+    const nativeSuccess=loader({'react-native':{Platform:{OS:'android'}},'expo-modules-core':{requireOptionalNativeModule:()=>({authorize:async()=>{invoked++;return {accessToken:'native-only-fixture',expiresAt:Date.now()+3600000};},cancelAuthorization:async()=>{}})}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;
+    await assert.rejects(nativeSuccess.authorize(alreadyAborted.signal),e=>e.name==='AbortError');assert.equal(invoked,0);
+    // A global GIS API deliberately exists. Android must still invoke only its native module.
+    global.window.google.accounts.oauth2.initTokenClient=()=>{throw Error('Android must never invoke GIS');};
+    assert.equal((await nativeSuccess.authorize()).accessToken,'native-only-fixture');assert.equal(invoked,1);
+    console.log('PASS Android dispatch with GIS present/no Web Client ID, missing module fails closed, pre-abort opens no activity, native failure taxonomy');
+    const oldFlag=process.env.EXPO_PUBLIC_DRIVE_DIAGNOSTICS,oldInfo=console.info,diagnostics=[];
+    try {
+      process.env.EXPO_PUBLIC_DRIVE_DIAGNOSTICS='1';console.info=(...values)=>diagnostics.push(values.join(' '));
+      const diagLoader=loader({'react-native':{Platform:{OS:'android'},AppState:{currentState:'active'}}});
+      const diag=diagLoader('src/utils/driveDiagnostics.ts');
+      diag.driveDiagnostic({operationId:diag.driveOperationId(),implementation:'AUTHORIZATION_CLIENT',callbackReceived:true,authorizationResult:'success',accessToken:'must-never-appear',returnedUrl:'http://localhost/?code=never',category:'UNKNOWN'});
+      assert.equal(diagnostics.length,1);assert.match(diagnostics[0],/AUTHORIZATION_CLIENT/);assert.match(diagnostics[0],/"flow":"DRIVE"/);assert.doesNotMatch(diagnostics[0],/must-never|localhost|never|accessToken|returnedUrl/);
+      console.log('PASS diagnostic allowlist preserves flow/platform/native path without token, URL or code');
+    } finally {console.info=oldInfo;if(oldFlag===undefined)delete process.env.EXPO_PUBLIC_DRIVE_DIAGNOSTICS;else process.env.EXPO_PUBLIC_DRIVE_DIAGNOSTICS=oldFlag;}
     const unsupported=loader({'react-native':{Platform:{OS:'ios'}},'expo-modules-core':{requireOptionalNativeModule:()=>null}})('src/data/drive/drivePlatformAuth.ts').drivePlatformAuth;await assert.rejects(unsupported.authorize(),e=>e.code==='configuration');
     console.log('PASS Web GIS gesture/scope/denial/close/late/config and Android wrapper cancel/late/iOS unavailable (controlled boundaries)');
   } finally {global.window=originalWindow;if(originalClient===undefined)delete process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID;else process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID=originalClient;}

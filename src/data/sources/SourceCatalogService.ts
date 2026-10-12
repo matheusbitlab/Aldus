@@ -3,6 +3,7 @@ import { ScrapedLink } from "@/src/domain/types/search";
 import { UserSource } from "@/src/domain/types/sources";
 import { SourceCatalog, SourceCatalogItem, SourceCatalogView, SourceImportLink, sourceCapabilities, sourceIdentity } from "@/src/domain/types/sourceCatalog";
 import { rankCatalogBooks } from "@/src/domain/search/catalogRanking";
+import { DriveError } from "@/src/data/drive/DriveErrors";
 
 export interface SourceCatalogAdapter {
   list(source: UserSource, signal: AbortSignal): Promise<ScrapedLink[]>;
@@ -67,7 +68,7 @@ export class SourceCatalogService {
       const auth = code === "expired" || code === "disconnected" || this.adapter.authorizationRequired(source);
       const offline = code === "network" || (typeof navigator !== "undefined" && navigator.onLine === false);
       // No raw provider/URL errors persisted or exposed (may contain credentials).
-      this.publish(source.id, { catalog: previous.catalog, status: auth ? "auth_required" : offline ? "offline" : previous.catalog ? "stale" : "error", error: auth ? "Reconecte o Google Drive para atualizar esta fonte." : "Não foi possível atualizar. Exibindo a última atualização disponível, quando houver. Confira rede e permissões; aguarde se o limite de consultas foi atingido." });
+      this.publish(source.id, { catalog: previous.catalog, status: auth ? "auth_required" : offline ? "offline" : previous.catalog ? "stale" : "error", error: error instanceof DriveError ? error.message : auth ? "Reconecte o Google Drive para atualizar esta fonte." : "Não foi possível atualizar. Exibindo a última atualização disponível, quando houver. Confira rede e permissões; aguarde se o limite de consultas foi atingido." });
     } finally { if (this.controllers.get(source.id) === controller) this.controllers.delete(source.id); }
   }
   async remove(id: string): Promise<void> {

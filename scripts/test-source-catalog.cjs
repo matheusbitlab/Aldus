@@ -57,6 +57,12 @@ const book = (i, title = `Livro ${String(i).padStart(4, '0')}.epub`) => ({ sourc
     assert.deepEqual(await repo.get(source.id), snapshot); assert.equal(service.view(source.id).status, status); assert.doesNotMatch(service.view(source.id).error, /unsafe|token provider/);
   }
   failure = null;
+  const {DriveError}=load('src/data/drive/DriveErrors.ts');
+  for(const code of ['api-disabled','auth-denied','permission','rate-limit']) {
+    failure=new DriveError(code);await service.refresh(source);
+    assert.equal(service.view(source.id).error,failure.message);assert.deepEqual(await repo.get(source.id),snapshot);
+  }
+  failure=null;
   assert.equal(querySourceCatalog(snapshot.items, 'Dom Casmuro', 'az')[0].remoteBookId, 'file1');
   assert.equal(querySourceCatalog(snapshot.items, 'bras cubas', 'az')[0].remoteBookId, 'file20');
   console.log('PASS add/remove/modify, personal book preserved, offline/401/403/429/partial failure snapshots and local tolerant ranking');

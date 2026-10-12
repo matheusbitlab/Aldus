@@ -1,4 +1,44 @@
-# Google Drive — terceira etapa, 11/10/2026
+# Google Drive — atualizado em 12/10/2026
+
+## Correção urgente de Auth/Drive — causa e limites atuais
+
+**LOCALHOST COMPROVADO NO SUPABASE, NÃO NO ADAPTER DRIVE.** A sonda HTTP real de 12/10/2026 iniciou OAuth Google/PKCE no projeto `cmivracxuihtmsbmtuec` e devolveu o estado real ao callback Supabase com cancelamento do provider. Quando o `redirect_to` solicitado era `aldus://auth/callback` ou sua variante de recovery, a resposta `Location` do Supabase foi `http://localhost:8081/`. O Web dev `http://localhost:8081/auth/callback` foi preservado; um scheme de controle não cadastrado também caiu na raiz localhost. Isso comprova que o backend produz o fallback no cancelamento e que o contrato Native está recusado nessa sonda; a configuração administrativa exata e o retorno após consentimento bem-sucedido precisam de confirmação remota. Não se inferiu a conclusão de um login a partir do primeiro 302 Google. Evidência sanitizada: `artifacts/auth/urgent/redirect-probe.json`; execução reproduzível: `npm run audit:auth:redirects`.
+
+**DRIVE ANDROID — CAMINHO NATIVO COMPROVADO NO APK BASELINE.** `artifacts/auth/urgent/APK_BASELINE_EVIDENCE.json` registra `Aldus-eab97ee.apk`: módulo Expo `AldusDriveAuth` presente no registro e no DEX, chamada a `Identity.getAuthorizationClient(...).authorize()`, `PendingIntent`/`startIntentSenderForResult` e `getAuthorizationResultFromIntent`. O bundle seleciona GIS somente com `Platform.OS === "web"`; Android consulta somente o módulo Native. Não havia fallback GIS/browser/localhost no Drive Android auditado. Esse exame prova empacotamento e despacho, sem equivaler a uma execução em aparelho.
+
+**CORREÇÕES DRIVE IMPLEMENTADAS:**
+
+- Android mantém `AuthorizationClient`/PendingIntent/ActivityResult. `authorize(operationId)` e `cancelAuthorization(operationId)` identificam a operação; um cancelamento antigo não encerra a nova. Resultado atrasado com outro request code é ignorado. Falta de módulo ou Activity encerra com erro de configuração, sem abrir Web. Cancelamento, sessão necessária, configuração, rede, escopo negado e falha desconhecida permanecem separados. Falha genérica de Play Services não é chamada de recusa do usuário.
+- Web mantém GIS token model por clique, Client ID público do ambiente e origem real do navegador. Reconexão não aguarda o `clearToken` Web antes de `requestAccessToken`, preservando o gesto do popup. O prompt solicita seletor de conta/consentimento; popup fechado e popup bloqueado têm mensagens distintas. Nenhum redirect customizado foi inventado para GIS.
+- `drive.readonly` permanece o único scope. Tokens do app continuam somente em memória; token Supabase não é usado como token Drive. SDK Android mantém seu cache próprio. Expiração local/HTTP401 e scope insuficiente conhecido pedem reconexão, invalidando o índice em memória e preservando o catálogo persistido. `clearToken` não garante seletor ou troca de conta no Android; `AuthorizationResult` não informa a identidade da conta e não foram acrescentados scopes de perfil.
+- O adapter usa somente reasons conhecidos no corpo JSON Google para distinguir API desabilitada (`accessNotConfigured`/`SERVICE_DISABLED`), limite (inclusive HTTP403), scope insuficiente e permissão de arquivo. HTTP403 sem reason suficiente permanece `UNKNOWN`; não vira automaticamente pasta inválida ou autorização negada. Mensagens brutas/respostas Google não chegam a logs ou persistência.
+- Minhas fontes mostra **Conectado / Atualizar** quando há grant válido e **Reconectar** quando ele falta/expirou. Atualizar aproveita o grant válido. A operação permanece ocupada até salvar/atualizar o catálogo e termina em `finally`; autorização é limitada a 120 s. Fechar o modal aborta a operação; uma conclusão antiga não apaga grant de conexão nova. Mensagens específicas alcançam também o overview/biblioteca da fonte. Falha/revogação não elimina o último snapshot.
+
+| Categoria sanitizada (`DriveError.category`) | Situação |
+| --- | --- |
+| `AUTH_CANCELLED` | Usuário fechou/cancelou a autorização |
+| `AUTH_REQUIRED` | Grant ausente; popup Web bloqueado tem orientação própria |
+| `AUTH_DENIED` | Provider negou o grant ou scope obrigatório não foi concedido/aceito |
+| `TOKEN_EXPIRED` | Prazo local ou HTTP401; expiração e revogação não são distinguíveis só pelo 401 |
+| `DRIVE_API_DISABLED` | Reason Google conhecido para serviço desabilitado |
+| `FOLDER_NOT_FOUND` | HTTP404, que pode significar ausência ou recurso não visível |
+| `FOLDER_FORBIDDEN` | Reason conhecido de permissão de arquivo ou canDownload=false |
+| `NETWORK_ERROR` | Falha de transporte ou timeout |
+| `RATE_LIMIT` | HTTP429 ou reason Google conhecido de limite |
+| `INVALID_FOLDER` | Parsing inválido ou ID que não representa pasta real |
+| `UNKNOWN` | Configuração/build, resposta HTTP403 sem reason suficiente ou falha não identificada |
+
+`DriveError.code` mantém os identificadores anteriores para os consumers existentes; `category` oferece a taxonomia técnica solicitada. Diagnóstico `[DriveDiagnostic]` é opt-in por `EXPO_PUBLIC_DRIVE_DIAGNOSTICS=1` ou `EXPO_PUBLIC_AUTH_DIAGNOSTICS=1`: operationId, flow DRIVE, plataforma, implementação `AUTHORIZATION_CLIENT`/`GIS_WEB`, appState, callbackReceived, authorizationResult e categoria. A resolução/ActivityResult envia somente ID/etapa via evento Expo; emissão é best effort e nunca interrompe o resultado. `callbackReceived` representa ActivityResult observado, não qualquer rejeição de Task. Sucesso de cache sem ActivityResult não finge retorno de consentimento. Token, code, verifier, senha, segredo, conta, folderId e URL retornada não fazem parte da allowlist. Drive não usa URI de callback; initialRedirectScheme é `none`.
+
+**ASSINATURA DO APK REAL AUDITADO:** package `com.aldus.reader`, variant `release` local, chave `android/app/debug.keystore` porque o Gradle atual assina debug e release com `signingConfigs.debug`. Certificado do APK baseline verificado por `apksigner`: SHA-1 `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`. Isso identifica exclusivamente os APKs locais atuais; não identifica EAS nem Play signing. Nenhuma senha da chave foi adicionada ao diagnóstico/documentação.
+
+**CONFIGURAÇÃO EXTERNA — NÃO CONFIRMADA:** projeto Google Cloud dono do client Android, Drive API habilitada, Android client com package/SHA acima, consentimento/Testing/test users e permissões da pasta real requerem acesso administrativo à conta correta. O projeto Cloud Drive não pode ser deduzido do provider Google/Supabase. `EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID` continua ausente do ambiente local auditado; isso bloqueia GIS Web, sem bloquear o caminho AuthorizationClient Android. Não preencher com um Client ID suposto ou secret. O checklist exato está abaixo; os redirects Supabase pertencem ao fluxo de Auth e estão documentados em `AUTH_IMPLEMENTATION.md`.
+
+**VALIDAÇÃO ATUAL:** typecheck, `npm run test:drive`, `npm run test:source-catalog`, `node scripts/test-source-integrations.cjs` PASS. Kotlin `:aldus-drive-auth:compileReleaseKotlin` PASS com JDK17/SDK legítimo, após fornecer `ANDROID_HOME=C:\Android\sdk`. Testes executam código real JS/adapters/repos e fronteiras Google/ponte/HTTP controladas: dispatch Android mesmo com GIS global disponível/sem Client ID Web, módulo ausente sem fallback, pre-abort, callback tardio, geração durante clearToken, gesto Web síncrono, cancelamento/denial/popup/expiração/reconnect, razão específica de HTTP403, pasta de outra conta compartilhada (sem filtro de ownership), EPUB/PDF metadata/páginas/rollback/snapshot e download para pipeline existente. A inspeção DEX/manifesta/assinatura é real; os resultados de Drive HTTP dessa suíte são fixtures.
+
+**ANDROID REAL — PENDENTE.** Sem aparelho ADB disponível, login/retorno foreground/background, pasta real cadastrada, listagem EPUB/PDF/paginação, importação de livro autorizado/reabertura, revogação real e troca de conta Google permanecem pendentes. Nenhum folderId do usuário ou token de conta real está disponível neste workspace; não foi substituído por uma pasta pública aleatória. Nenhuma listagem ou importação real foi declarada concluída. O APK e o relatório pós-commit são registrados pelo fluxo principal em `artifacts/apk`/relatório da tarefa; compilar Kotlin e passar mocks não resolve o bloqueio remoto do Supabase nem prova o teste físico.
+
+Referências de configuração e limites: [autorização Android e seleção da conta](https://developer.android.com/identity/authorization), [GIS token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model), [reasons de erros Drive](https://developers.google.com/workspace/drive/api/guides/handle-errors).
 
 ## Evolução atual — cópia privada da biblioteca Aldus
 

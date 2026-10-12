@@ -3,6 +3,8 @@ import { DriveError } from "./DriveErrors";
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 export interface DriveGrant { accessToken: string; expiresAt: number; }
 export interface DriveAuthorizationProvider {
+  /** Native cache clearing must finish first; Web must preserve its click gesture. */
+  clearBeforeAuthorize?: boolean;
   prepare(): Promise<void>;
   authorize(signal?: AbortSignal): Promise<DriveGrant>;
   clearToken?(token: string): Promise<void>;
@@ -19,8 +21,12 @@ export class DriveAuthorization {
     this.generations.set(sourceId, generation);
     const previous = this.grants.get(sourceId);
     this.grants.delete(sourceId);
-    if (previous) await this.provider.clearToken?.(previous.accessToken).catch(() => undefined);
+    if (previous) {
+      const clearing = this.provider.clearToken?.(previous.accessToken).catch(() => undefined);
+      if (this.provider.clearBeforeAuthorize && clearing) await withAbort(clearing, signal);
+    }
     throwIfAborted(signal);
+    if (this.generations.get(sourceId) !== generation) throw new DriveError("disconnected");
     const grant = await withAbort(this.provider.authorize(signal), signal);
     throwIfAborted(signal);
     if (this.generations.get(sourceId) !== generation) throw new DriveError("disconnected");
@@ -33,6 +39,7 @@ export class DriveAuthorization {
     if (grant.expiresAt <= Date.now() + 30000) { this.invalidate(sourceId); throw new DriveError("expired"); }
     return grant.accessToken;
   }
+  connected(sourceId: string): boolean { try { this.token(sourceId); return true; } catch { return false; } }
   invalidate(sourceId: string): void {
     const grant = this.grants.get(sourceId);
     this.grants.delete(sourceId);

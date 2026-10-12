@@ -1,6 +1,14 @@
 
 USER LIBRARY SYNC — item3 IMPLEMENTADO / VALIDADO CONTROLADO, 11/10/2026: biblioteca privada por conta, local primeiro, offline/outbox, upload após import, metadata-only no outro dispositivo, download/validação ao abrir, progresso/entidades de leitura, conflitos explícitos, tombstones, remoções distintas e adoção selecionada de legados. Duas bases reais + Web real controlado PASS. PENDENTE EXTERNO: aplicar as duas novas migrations após inventário, validar Supabase/RLS/Storage HTTP com duas contas e testar Android físico. APKs por commit no ledger ignorado artifacts/apk/checkpoint.jsonl; SDK reparado por ferramentas oficiais. Documentos LIBRARY_SYNC_IMPLEMENTATION.md, LIBRARY_SYNC_DEPLOYMENT.md e LIBRARY_SYNC_FINAL_REPORT.md. Próxima etapa do caderno: capa personalizada; ainda fora do escopo. Registros de item3 não iniciado abaixo são históricos.
-# Roadmap funcional — atualizado em 2026-10-11
+# Roadmap funcional — atualizado em 2026-10-12
+
+## Prioridade urgente — Auth Google e Drive Android
+
+**CLIENTE IMPLEMENTADO / GATES CONTROLADOS PASS / BLOQUEIO REMOTO COMPROVADO / ANDROID REAL — PENDENTE.**
+
+Sonda real `audit:auth:redirects -- --expect-native` prova Supabase callback302 → localhost:8081 para native/recovery, com cancelamento Google simulado e state real; Web dev preservado. Não é erro do link da pasta nem fallback GIS no APK: Manifest/DEX/autolinking do baseline confirmam AuthorizationClient nativo. Inventário GOOGLE_REDIRECT_INVENTORY.md; Supabase URL Configuration/Google Web provider e Google Cloud Android/Drive/origins/consentimento em GOOGLE_AUTH_DRIVE_DEPLOYMENT.md. Sem admin conectado, nenhum painel foi alterado.
+
+Código cliente corrigido: fallback SSR removido, origem Web lida somente na Web, contratos e sessão PKCE validados, URLs instrumentadas somente por campos permitidos; Drive discrimina cancelamento/autorização/API/pasta/rede/rate limit, preserva grants em memória/cache local, reconecta por gesto e protege operação nova de callbacks/cancelamentos antigos. Typecheck/Auth/Drive/catalog/import/Kotlin/Web exportado e UI Sources no Chrome PASS controlados. SHA-1 release local `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`, com.aldus.reader, debug.keystore (não SHA garantido EAS/Play). Relatório de 17 itens GOOGLE_AUTH_DRIVE_FINAL_REPORT.md; commit/APK finais em artifacts/auth/urgent/GOOGLE_AUTH_DRIVE_FINAL_REPORT.md e artifacts/apk/checkpoint.jsonl. Sem ADB, os sete casos físicos e recovery exigidos não podem receber PASS. Troca de conta Android não é garantida por clearToken e permanece teste físico pendente. Não avançar outras funcionalidades nesta tarefa.
 
 ## Item 5 — biblioteca permanente por fonte, quarta etapa em andamento
 

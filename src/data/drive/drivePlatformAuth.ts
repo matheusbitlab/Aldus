@@ -2,11 +2,12 @@ import { Platform } from "react-native";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { DriveAuthorizationProvider, DRIVE_SCOPE } from "./DriveAuthorization";
 import { DriveError } from "./DriveErrors";
-import { withAbort } from "@/src/core/utils/cancellation";
+import { throwIfAborted, withAbort } from "@/src/core/utils/cancellation";
+import { driveDiagnostic, driveOperationId } from "@/src/utils/driveDiagnostics";
 
 interface TokenResponse { access_token?: string; expires_in?: number; scope?: string; error?: string; }
 interface GoogleOAuth {
-  initTokenClient(options: { client_id: string; scope: string; include_granted_scopes: boolean; callback: (result: TokenResponse) => void; error_callback: () => void }): { requestAccessToken(options: { prompt: string }): void };
+  initTokenClient(options: { client_id: string; scope: string; include_granted_scopes: boolean; callback: (result: TokenResponse) => void; error_callback: (error: { type?: string }) => void }): { requestAccessToken(options: { prompt: string }): void };
   revoke(token: string, callback: (result: { successful?: boolean }) => void): void;
 }
 function oauth(): GoogleOAuth | undefined {
@@ -14,8 +15,12 @@ function oauth(): GoogleOAuth | undefined {
 }
 let preparation: Promise<void> | undefined;
 export const drivePlatformAuth: DriveAuthorizationProvider = {
+  clearBeforeAuthorize: Platform.OS === "android",
   prepare: async () => {
-    if (Platform.OS !== "web") return;
+    if (Platform.OS !== "web") {
+      if (Platform.OS !== "android" || !requireOptionalNativeModule("AldusDriveAuth")) throw new DriveError("configuration");
+      return;
+    }
     if (!process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID) throw new DriveError("configuration");
     if (oauth()) return;
     if (!preparation) preparation = new Promise<void>((resolve, reject) => {
@@ -30,42 +35,70 @@ export const drivePlatformAuth: DriveAuthorizationProvider = {
     return preparation;
   },
   authorize: signal => {
+    try { throwIfAborted(signal); } catch (error) { return Promise.reject(error); }
+    const operationId = driveOperationId();
+    const implementation = Platform.OS === "web" ? "GIS_WEB" : Platform.OS === "android" ? "AUTHORIZATION_CLIENT" : "UNAVAILABLE";
+    driveDiagnostic({ operationId, implementation, callbackReceived: false, authorizationResult: "started" });
     if (Platform.OS === "web") {
       const api = oauth(), clientId = process.env.EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID;
       // Preload from the modal effect; requestAccessToken must run inside the click.
       if (!api || !clientId) return Promise.reject(new DriveError("configuration"));
-      return withAbort(new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new DriveError("network")), 120000);
-        const finish = () => { clearTimeout(timer); signal?.removeEventListener("abort", finish); };
-        signal?.addEventListener("abort", finish, { once: true });
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (error?: unknown, grant?: { accessToken: string; expiresAt: number }, callbackReceived = false) => {
+          if (settled) return;
+          settled = true; clearTimeout(timer); signal?.removeEventListener("abort", abort);
+          driveDiagnostic({ operationId, implementation, callbackReceived,
+            authorizationResult: error ? (error instanceof DriveError && error.code === "cancelled" || (error as Error)?.name === "AbortError" ? "cancelled" : "error") : "success",
+            category: error instanceof DriveError ? error.category : undefined });
+          if (error) reject(error); else resolve(grant!);
+        };
+        const abort = () => { try { throwIfAborted(signal); } catch (error) { finish(error); } };
+        const timer = setTimeout(() => finish(new DriveError("network")), 120000);
+        signal?.addEventListener("abort", abort, { once: true });
         try {
           const client = api.initTokenClient({ client_id: clientId, scope: DRIVE_SCOPE, include_granted_scopes: false,
             callback: result => {
-              finish();
-              if (result.error || !result.access_token || !result.scope?.split(" ").includes(DRIVE_SCOPE)) reject(new DriveError("permission"));
-              else resolve({ accessToken: result.access_token, expiresAt: Date.now() + Number(result.expires_in ?? 0) * 1000 });
+              if (result.error) finish(new DriveError(result.error === "access_denied" ? "auth-denied" : result.error === "server_error" || result.error === "temporarily_unavailable" ? "network" : result.error === "invalid_client" || result.error === "unauthorized_client" || result.error === "invalid_request" ? "configuration" : "api"), undefined, true);
+              else if (!result.access_token || !result.scope?.split(" ").includes(DRIVE_SCOPE)) finish(new DriveError("auth-denied"), undefined, true);
+              else finish(undefined, { accessToken: result.access_token, expiresAt: Date.now() + Number(result.expires_in ?? 0) * 1000 }, true);
             },
-            error_callback: () => { finish(); reject(new DriveError("disconnected")); },
+            error_callback: error => finish(new DriveError(error?.type === "popup_closed" ? "cancelled" : error?.type === "popup_failed_to_open" ? "popup-blocked" : "api"), undefined, true),
           });
-          client.requestAccessToken({ prompt: "consent" });
-        } catch { finish(); reject(new DriveError("configuration")); }
-      }), signal);
+          client.requestAccessToken({ prompt: "select_account consent" });
+        } catch { finish(new DriveError("configuration")); }
+      });
     }
     const native = Platform.OS === "android" ? requireOptionalNativeModule<{
-      authorize(): Promise<{ accessToken: string; expiresAt: number }>; cancelAuthorization(): Promise<void>;
+      authorize(operationId: string): Promise<{ accessToken: string; expiresAt: number; callbackReceived?: boolean }>;
+      cancelAuthorization(operationId: string): Promise<void>;
+      addListener?(event: string, listener: (result: { operationId?: string; stage?: string }) => void): { remove(): void };
     }>("AldusDriveAuth") : null;
     if (!native) return Promise.reject(new DriveError("configuration"));
     const deadline = new AbortController();
     const forward = () => deadline.abort();
-    const cancel = () => { void native.cancelAuthorization().catch(() => undefined); };
+    const cancel = () => { void native.cancelAuthorization(operationId).catch(() => undefined); };
     signal?.addEventListener("abort", forward, { once: true });
     deadline.signal.addEventListener("abort", cancel, { once: true });
+    let callbackReceived = false;
+    const subscription = native.addListener?.("onAuthorizationState", result => {
+      if (result.operationId !== operationId) return;
+      if (result.stage === "callback") callbackReceived = true;
+      if (result.stage === "resolution") driveDiagnostic({ operationId, implementation, callbackReceived: false, authorizationResult: "resolution" });
+    });
     const timer = setTimeout(forward, 120000);
-    return withAbort(native.authorize(), deadline.signal).catch(error => {
+    let request: Promise<{ accessToken: string; expiresAt: number; callbackReceived?: boolean }>;
+    try { request = native.authorize(operationId); } catch (error) { request = Promise.reject(error); }
+    return withAbort(request, deadline.signal).then(grant => {
+      driveDiagnostic({ operationId, implementation, callbackReceived: callbackReceived || grant.callbackReceived === true, authorizationResult: "success" });
+      return grant;
+    }).catch(error => {
+      const failure = deadline.signal.aborted && !signal?.aborted ? new DriveError("network") : nativeFailure(error);
+      driveDiagnostic({ operationId, implementation, callbackReceived,
+        authorizationResult: signal?.aborted || failure.code === "cancelled" ? "cancelled" : "error", category: failure.category });
       if (signal?.aborted) throw error;
-      if (deadline.signal.aborted) throw new DriveError("network");
-      throw new DriveError("permission");
-    }).finally(() => { clearTimeout(timer); signal?.removeEventListener("abort", forward); deadline.signal.removeEventListener("abort", cancel); });
+      throw failure;
+    }).finally(() => { clearTimeout(timer); signal?.removeEventListener("abort", forward); deadline.signal.removeEventListener("abort", cancel); subscription?.remove(); });
   },
   clearToken: async token => {
     if (Platform.OS !== "android") return;
@@ -96,3 +129,8 @@ export const drivePlatformAuth: DriveAuthorizationProvider = {
     } finally { clearTimeout(timer); }
   },
 };
+
+function nativeFailure(error: unknown): DriveError {
+  const code = (error as { code?: unknown } | null)?.code;
+  return new DriveError(code === "DRIVE_AUTH_CANCELLED" ? "cancelled" : code === "DRIVE_AUTH_REQUIRED" ? "disconnected" : code === "DRIVE_AUTH_DENIED" || code === "DRIVE_SCOPE" ? "auth-denied" : code === "DRIVE_CONFIGURATION" ? "configuration" : code === "DRIVE_NETWORK" ? "network" : code === "DRIVE_BUSY" ? "busy" : "api");
+}

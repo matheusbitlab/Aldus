@@ -12,6 +12,7 @@ import { parseDriveFolder } from "@/src/data/drive/driveFolder";
 import { router } from "expo-router";
 import { sourceCapabilities } from "@/src/domain/types/sourceCatalog";
 import { sourceCatalogs, sourceCatalogAdapter } from "@/src/data/sources/sourceCatalogDependencies";
+import { DriveError } from "@/src/data/drive/DriveErrors";
 
 interface Props {
   visible: boolean;
@@ -34,6 +35,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [driveReady, setDriveReady] = useState(false);
+  const [drivePreparationError, setDrivePreparationError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const operation = useRef<AbortController | null>(null);
 
@@ -46,14 +48,19 @@ export function SourceManagerModal({ visible, onClose }: Props) {
 
   useEffect(() => {
     // A saved Drive source also needs GIS ready for the row's reconnect gesture.
-    if (visible && (kind === "google-drive" || sources.some(source => source.kind === "google-drive"))) void googleDrive.authorization.prepare().then(() => setDriveReady(true)).catch(() => setDriveReady(false));
+    let active = true;
+    if (visible && (kind === "google-drive" || sources.some(source => source.kind === "google-drive"))) void googleDrive.authorization.prepare().then(() => {
+      if (active) { setDriveReady(true); setDrivePreparationError(null); }
+    }).catch(error => { if (active) { setDriveReady(false); setDrivePreparationError(error instanceof DriveError ? error.message : "Não foi possível preparar a autorização Drive. Tente novamente."); } });
+    return () => { active = false; };
   }, [visible, kind, sources]);
 
   const probe = async (source: UserSource, signal: AbortSignal): Promise<ProbeResult> => {
     setBusyId(source.id);
     try {
       if (source.kind === "google-drive") {
-        await googleDrive.connect(source, signal);
+        // Refresh an active grant; an expired/missing grant requires this explicit gesture.
+        if (!googleDrive.authorization.connected(source.id)) await googleDrive.connect(source, signal);
         await googleDrive.list(source, signal, true);
         return { status: "active", error: null };
       }
@@ -67,17 +74,16 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       }
       return { status: "active", error: null };
     } catch (failure) {
-      if (signal.aborted && source.kind === "google-drive") {
-        googleDrive.authorization.invalidate(source.id);
-        googleDrive.clearIndex(source.id);
-      }
+      // connect/list already discard cancelled or stale results. An old modal
+      // cancellation must never invalidate a grant from a newer connection.
       return {
         status: "error",
         error: failure instanceof Error ? failure.message : "Não foi possível testar a fonte.",
       };
-    } finally {
-      if (operation.current?.signal === signal) setBusyId(null);
     }
+  };
+  const finishOperation = (controller: AbortController) => {
+    if (operation.current === controller) { operation.current = null; setBusyId(null); }
   };
 
   const save = async () => {
@@ -114,23 +120,26 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       createdAt: existing?.createdAt ?? Date.now(),
     };
     const controller = operation.current = new AbortController();
-    const result = await probe(candidate, controller.signal);
-    if (controller.signal.aborted) return;
-    if (existing?.kind === "google-drive" && kind !== "google-drive") await googleDrive.disconnect(sourceId);
-    const verified: UserSource = {
-      ...candidate,
-      enabled: result.status === "active",
-      status: result.status,
-      lastError: result.error,
-      lastCheckedAt: Date.now(),
-    };
+    try {
+      const result = await probe(candidate, controller.signal);
+      if (controller.signal.aborted) return;
+      if (existing?.kind === "google-drive" && kind !== "google-drive") await googleDrive.disconnect(sourceId);
+      if (controller.signal.aborted) return;
+      const verified: UserSource = {
+        ...candidate,
+        enabled: result.status === "active",
+        status: result.status,
+        lastError: result.error,
+        lastCheckedAt: Date.now(),
+      };
 
-    if (editingId) {
-      await update(editingId, verified);
-      if (verified.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
-    }
-    else await add(verified);
-    resetForm();
+      if (editingId) {
+        await update(editingId, verified);
+        if (!controller.signal.aborted && verified.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
+      }
+      else await add(verified);
+      if (!controller.signal.aborted && operation.current === controller) resetForm();
+    } finally { finishOperation(controller); }
   };
 
   const resetForm = () => {
@@ -152,34 +161,39 @@ export function SourceManagerModal({ visible, onClose }: Props) {
   const refresh = async (source: UserSource) => {
     if (busyId) return;
     const controller = operation.current = new AbortController();
-    const result = await probe(source, controller.signal);
-    if (controller.signal.aborted) return;
-    await update(source.id, {
-      status: result.status,
-      lastError: result.error,
-      lastCheckedAt: Date.now(),
-      enabled: result.status === "active" ? source.kind === "google-drive" || source.enabled : false,
-    });
-    const verified = useSourceStore.getState().sources.find(item => item.id === source.id);
-    if (verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
+    try {
+      const result = await probe(source, controller.signal);
+      if (controller.signal.aborted) return;
+      await update(source.id, {
+        status: result.status,
+        lastError: result.error,
+        lastCheckedAt: Date.now(),
+        enabled: result.status === "active" ? source.kind === "google-drive" || source.enabled : false,
+      });
+      const verified = useSourceStore.getState().sources.find(item => item.id === source.id);
+      if (!controller.signal.aborted && verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
+    } finally { finishOperation(controller); }
   };
 
   const toggle = async (source: UserSource, enabled: boolean) => {
+    if (busyId) return;
     if (!enabled) {
       await update(source.id, { enabled: false });
       return;
     }
     const controller = operation.current = new AbortController();
-    const result = await probe(source, controller.signal);
-    if (controller.signal.aborted) return;
-    await update(source.id, {
-      enabled: result.status === "active",
-      status: result.status,
-      lastError: result.error,
-      lastCheckedAt: Date.now(),
-    });
-    const verified = useSourceStore.getState().sources.find(item => item.id === source.id);
-    if (verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
+    try {
+      const result = await probe(source, controller.signal);
+      if (controller.signal.aborted) return;
+      await update(source.id, {
+        enabled: result.status === "active",
+        status: result.status,
+        lastError: result.error,
+        lastCheckedAt: Date.now(),
+      });
+      const verified = useSourceStore.getState().sources.find(item => item.id === source.id);
+      if (!controller.signal.aborted && verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
+    } finally { finishOperation(controller); }
   };
 
   const disconnect = async (source: UserSource) => {
@@ -239,7 +253,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
               ))}
             </View>
             {kind !== "google-drive" ? <Text style={[styles.helper, { color: palette.secondaryText }]}>{kind === "json" ? 'URL de catálogo com { "books": [{ "title": "Livro", "author": "Autor", "url": "https://…/livro.epub" }] }. A busca filtra título e autor. Na Web, o servidor precisa permitir CORS.' : 'O endereço será testado antes de ficar ativo. A URL pode usar {query}. Na Web, o servidor precisa permitir CORS.'}</Text> : null}
-            {kind === "google-drive" ? <Text style={[styles.helper, { color: palette.secondaryText }]}>Autorização separada do login: solicita drive.readonly, que permite ler e baixar arquivos de todo o Drive. O Aldus consulta somente a pasta cadastrada e baixa apenas o livro escolhido. O catálogo de metadados permanece localmente entre sessões; remover a fonte elimina seu índice, não os livros importados. Sem subpastas/atalhos. Tokens não são salvos pelo app. Revogar pode afetar outras fontes da mesma conta/projeto Google. {driveReady ? "" : "Autorização Web ainda não pronta ou configuração ausente; consulte GOOGLE_DRIVE_IMPLEMENTATION.md."}</Text> : null}
+            {kind === "google-drive" ? <Text style={[styles.helper, { color: palette.secondaryText }]}>Autorização separada do login: solicita drive.readonly, que permite ler e baixar arquivos de todo o Drive. O Aldus consulta somente a pasta cadastrada e baixa apenas o livro escolhido. O catálogo de metadados permanece localmente entre sessões; remover a fonte elimina seu índice, não os livros importados. Sem subpastas/atalhos. Tokens não são salvos pelo app. Revogar pode afetar outras fontes da mesma conta/projeto Google. {driveReady ? "" : drivePreparationError ?? "Preparando autorização Drive…"}</Text> : null}
             {formError ? <Text accessibilityRole="alert" style={[styles.error, { color: palette.accent }]}>{formError}</Text> : null}
             <View style={styles.formActions}>
               {editingId ? (
@@ -256,8 +270,9 @@ export function SourceManagerModal({ visible, onClose }: Props) {
             {sources.length === 0 ? (
               <Text style={[styles.empty, { color: palette.secondaryText }]}>Nenhuma fonte adicionada.</Text>
             ) : sources.map((source) => {
-              const status = sourceCapabilities(source).requiresAuthorization && sourceCatalogAdapter.authorizationRequired(source) ? "Reconectar" : source.status === "error" ? "Erro" : !source.enabled ? "Desativada" : "Ativa";
-              const statusColor = status === "Erro" || status === "Reconectar" ? palette.accent : status === "Ativa" ? "#39836B" : palette.secondaryText;
+              const needsAuthorization = sourceCapabilities(source).requiresAuthorization && sourceCatalogAdapter.authorizationRequired(source);
+              const status = busyId === source.id ? "Conectando…" : source.status === "error" && source.lastError && !needsAuthorization ? "Erro" : needsAuthorization ? "Reconectar" : !source.enabled ? "Desativada" : source.kind === "google-drive" ? "Conectado" : "Ativa";
+              const statusColor = status === "Erro" || status === "Reconectar" ? palette.accent : status === "Ativa" || status === "Conectado" ? "#39836B" : palette.secondaryText;
               return (
                 <View key={source.id} style={[styles.sourceRow, { borderBottomColor: palette.separator }]}>
                   <View style={styles.sourceDetails}>
@@ -269,7 +284,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
                     {source.lastError && source.enabled === false ? <Text numberOfLines={2} style={[styles.errorHint, { color: palette.accent }]}>{source.lastError}</Text> : null}
                     <View style={styles.actions}>
                       <TextAction label="Editar" color={palette.accent} disabled={busyId !== null} onPress={() => edit(source)} />
-                      <TextAction label={busyId === source.id ? "Testando…" : source.kind === "google-drive" ? "Conectar / Atualizar" : "Atualizar"} color={palette.accent} disabled={busyId !== null} onPress={() => void refresh(source).catch(reportFailure)} />
+                      <TextAction label={busyId === source.id ? "Conectando…" : needsAuthorization ? "Reconectar" : "Atualizar"} color={palette.accent} disabled={busyId !== null} onPress={() => void refresh(source).catch(reportFailure)} />
                       {source.kind === "google-drive" ? <TextAction label="Desconectar" color={palette.accent} disabled={busyId !== null} onPress={() => void disconnect(source).catch(reportFailure)} /> : null}
                       <TextAction label="Remover" color={palette.secondaryText} disabled={busyId !== null} onPress={() => setRemoving(source.id)} />
                     </View>
