@@ -19,7 +19,30 @@ identidade de releitura fornecida por fonte futura confiável. Abrir/fechar não
 FOLLOWERS permanece fechado para terceiros sem relação verificada.
 
 `node scripts/test-community-domain.cjs` cobre os contratos e cálculos.
-Integração, UI, persistência e schema ainda em implementação neste checkpoint.
+Domínio: commit `1ed4496`, push PASS. Typecheck da base e do domínio PASS.
+
+## Checkpoint — dados e aplicação
+
+`LocalCommunityRepository` usa storage injetável, chave por conta e fila compartilhada
+por storage/conta. Serialização v1 valida identidade, versões, privacidade, pontos e
+duplicatas. Falhas/corrupção não apagam nem substituem os dados. Edição rejeita versão antiga.
+O lock opcional permite serialização entre abas Web no adapter de composição.
+
+`CommunityService` recebe ports de identidade, repository e leitura. Não conhece Auth,
+Supabase ou Router. A fonte antiga lê BookRepository, ReadingProgressRepository e a
+organização existente sem escrever. Prioriza progresso persistido e status explícito.
+Biblioteca desta base tem escopo DEVICE; nenhum livro é automaticamente atribuído à conta.
+A inclusão na jornada local é opt-in por conta. Sem opt-in, métricas do dispositivo
+podem ser vistas, mas não geram pontos/atividades. Nenhuma informação é publicada.
+
+Observações sem data preservam `occurredAt: null` e usam apenas `recordedAt` para ordenar
+a timeline. Desativar/reativar a inclusão não elimina as chaves já pontuadas. A fonte
+futura ACCOUNT precisa enviar eventos confiáveis e uma identidade real por releitura;
+não deve aceitar IDs de conclusão arbitrários vindos da interface.
+
+`node scripts/test-community-data.cjs`: reload, duas contas, opt-in, toggles,
+serialização, duas instâncias concorrentes, revisão antiga, corrupção, disco cheio,
+adapter somente leitura e troca de conta. PASS. UI e schema ainda em implementação.
 
 # MERGE MAP
 
