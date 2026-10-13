@@ -77,10 +77,16 @@ Auth flows/auth-only e export:web PASS. Export Web: 2372 módulos.
 Nenhum teste antigo afetado falhou. Reader, Auth, Library repositories e migrations
 históricas permanecem inalterados. UI controlada não é teste físico/navegador autenticado.
 
-`scripts/build-community-apk.ps1` usa o build release local existente, exige a branch,
+`scripts/build-community-apk.ps1` usa o wrapper release local existente, exige a branch,
 salva `artifacts/apk/Aldus-community-<hash>.apk`, verifica assinatura/bundle e produz
 manifesto JSON ignorado. Não instala nem limpa dados. Primeiro APK será gerado após
 este commit de UI; outro após o commit final da Etapa 1.
+
+UI: commit `a40f132`, push PASS. A primeira chamada parou antes da compilação:
+`NoDefaultCurrentDirectoryInExePath=1` impede resolver `gradlew.bat` sem caminho.
+Contraprova: `gradlew.bat --version` FAIL; caminho absoluto `--version` PASS (Gradle
+9.3.1/JDK17). O helper Community passa a invocar o wrapper por caminho absoluto;
+helper histórico, projeto Android, dependências e configuração permanecem intactos.
 
 # MERGE MAP
 

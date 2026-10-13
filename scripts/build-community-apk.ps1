@@ -9,8 +9,22 @@ try {
     $pendingCode = git diff --name-only HEAD -- app src/community scripts/build-community-apk.ps1
     if ($pendingCode) { throw 'Commit o código da Community antes de gerar o APK identificado por hash.' }
     $buildStarted = Get-Date
-    npm.cmd run build:apk:local
-    if ($LASTEXITCODE -ne 0) { throw 'Build Android falhou.' }
+    # Explicit path: this Windows environment excludes cwd from executable lookup.
+    $gradleWrapper = Join-Path $projectPath 'android/gradlew.bat'
+    $previousNodeEnv = $env:NODE_ENV
+    Push-Location -LiteralPath (Join-Path $projectPath 'android')
+    try {
+        if (!$env:NODE_ENV) { $env:NODE_ENV = 'production' }
+        # Native stderr may contain Gradle warnings; the exit code decides success.
+        $ErrorActionPreference = 'Continue'
+        & $gradleWrapper :app:assembleRelease --console=plain
+        $buildExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = 'Stop'
+        $env:NODE_ENV = $previousNodeEnv
+        Pop-Location
+    }
+    if ($buildExit -ne 0) { throw 'Build Android falhou.' }
     if ((git rev-parse HEAD).Trim() -ne $commitHash) { throw 'HEAD mudou durante o build. Não atribuir APK ao hash anterior.' }
     $sourcePath = Join-Path $projectPath 'android/app/build/outputs/apk/release/app-release.apk'
     if (!(Test-Path -LiteralPath $sourcePath)) { throw 'APK release ausente.' }
