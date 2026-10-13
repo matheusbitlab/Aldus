@@ -53,7 +53,7 @@ export function achievements(state: CommunityState): Achievement[] {
 }
 export function activityText(activity: ReadingActivity): string {
   const title = activity.bookTitle ?? "um livro";
-  if (activity.type === "started_book") return activity.occurredAt === null ? `Leitura em andamento registrada: ${title}` : `Você começou ${title}`;
+  if (activity.type === "started_book") return activity.occurredAt === null ? `Leitura registrada: ${title}` : `Você começou ${title}`;
   if (activity.type === "finished_book") return activity.occurredAt === null ? `Conclusão registrada: ${title}` : `Você concluiu ${title}`;
   if (activity.type === "level_reached") return `Você alcançou ${activity.label}`;
   if (activity.type === "reading_streak") return "Mais um dia de leitura registrado";

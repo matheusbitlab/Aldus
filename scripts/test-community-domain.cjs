@@ -45,7 +45,7 @@ state = applyReadingEvents(state, [{ ...completion, completionId: 'trusted-rerea
 assert.throws(() => applyReadingEvents(state, [{ ...event, userId: 'other' }],6));
 assert.throws(() => applyReadingEvents(state, [{ ...event, type: 'READING_STREAK' }],6));
 assert.equal(achievements(state)[0].unlockedAt,3);
-assert.match(activityText(state.activities[0]),/em andamento registrada/);
+assert.match(activityText(state.activities[0]),/Leitura registrada/);
 assert.equal(progression(4000).fraction,1); assert.throws(() => progression(-1));
 for (const invalid of [{status:'invented'},{completedAt:1e30},{readingSeconds:-1},{progress:NaN}]) assert.throws(()=>calculateStats({...snapshot,books:[{...books[2],...invalid}]},'2026-10-13'));
 assert.throws(()=>currentStreak(['2026-02-30'],'2026-10-13'));
@@ -55,4 +55,8 @@ const dayEvent={...event,type:'READING_STREAK',streakDay:'2026-10-13',occurredAt
 const withDay=applyReadingEvents(state,[dayEvent,{...dayEvent,id:'new-id'}],dayEvent.occurredAt);
 assert.equal(withDay.awards.length,state.awards.length+1);
 assert.throws(()=>applyReadingEvents(state,[{...dayEvent,streakDay:'2026-10-12'}],6));
+const empty=calculateStats({...snapshot,books:[]},'2026-10-13');
+for(const field of ['pagesRead','readingSeconds','booksByMonth','booksByYear','mostReadGenres'])assert.equal(empty[field],null,'No instrumentation must not produce invented zeroes');
+const measuredEmpty=calculateStats({...snapshot,books:[],availableMetrics:{completionDates:true,pagesRead:true,readingSeconds:true,genres:true}},'2026-10-13');
+assert.equal(measuredEmpty.pagesRead,0);assert.equal(measuredEmpty.readingSeconds,0);assert.deepEqual(measuredEmpty.booksByYear,{});
 console.log('PASS community domain: profile, privacy, goals, honest metrics, calendar/streak, progression, semantic idempotence, completion revisions, activity, achievement.');

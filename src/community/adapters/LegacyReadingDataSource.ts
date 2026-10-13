@@ -20,6 +20,7 @@ export class LegacyReadingDataSource implements CommunityReadingDataSource {
         // Tags/collections are not genres; updatedAt/lastOpenedDate are not session/completion dates.
         genres: null, startedAt: null, completedAt: null, pagesRead: null, readingSeconds: null };
     }));
-    return { scope: "device", userId: null, books: result, history: [], readingDays: null };
+    return { scope: "device", userId: null, books: result, history: [], readingDays: null,
+      availableMetrics: { completionDates: false, pagesRead: false, readingSeconds: false, genres: false } };
   }
 }

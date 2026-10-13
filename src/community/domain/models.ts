@@ -25,6 +25,8 @@ export interface ReadingSnapshot {
   userId: string | null;
   books: CommunityBook[];
   history: ReadingEvent[];
+  /** Explicit availability lets a measured empty dataset differ from missing instrumentation. */
+  availableMetrics?: Partial<Record<"completionDates" | "pagesRead" | "readingSeconds" | "genres", boolean>>;
   /** A complete session-day history is required to calculate a streak. */
   readingDays: string[] | null;
 }
