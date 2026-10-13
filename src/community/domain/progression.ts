@@ -1,4 +1,5 @@
 import type { Achievement, CommunityState, LiteraryLevel, ReadingActivity, ReadingEvent } from "./models";
+import { localDay, validDay } from "./metrics";
 
 const levels: LiteraryLevel[] = [
   { rank: 1, name: "Primeiras páginas", threshold: 0, nextThreshold: 100 },
@@ -15,11 +16,13 @@ export function progression(points: number) {
 /** Source event IDs alone cannot award repeatedly: a semantic identity is mandatory. */
 export function awardKey(event: ReadingEvent): string {
   if (!event.id || !event.userId) throw Error("Evento sem identidade.");
+  if (!["BOOK_STARTED", "BOOK_COMPLETED", "READING_STREAK"].includes(event.type) ||
+    (event.occurredAt !== null && (!Number.isSafeInteger(event.occurredAt) || event.occurredAt < 0 || !Number.isFinite(new Date(event.occurredAt).getTime())))) throw Error("Evento de leitura inválido.");
   if (event.type === "READING_STREAK") {
-    if (!event.streakDay || !/^\d{4}-\d{2}-\d{2}$/.test(event.streakDay) || event.occurredAt === null) throw Error("Hábito sem dia medido.");
+    if (!event.streakDay || !validDay(event.streakDay) || event.occurredAt === null || localDay(new Date(event.occurredAt)) !== event.streakDay) throw Error("Hábito sem dia medido.");
     return JSON.stringify([event.userId, event.type, event.streakDay]);
   }
-  if (!event.bookId) throw Error("Evento sem livro.");
+  if (!event.bookId || (event.completionId !== null && !event.completionId.trim())) throw Error("Evento sem livro ou conclusão válida.");
   return JSON.stringify([event.userId, event.type, event.bookId, event.type === "BOOK_COMPLETED" ? event.completionId ?? "lifetime" : "lifetime"]);
 }
 export function applyReadingEvents(state: CommunityState, events: ReadingEvent[], now: number): CommunityState {

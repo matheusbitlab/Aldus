@@ -13,6 +13,7 @@ export class LegacyReadingDataSource implements CommunityReadingDataSource {
       const saved = await this.progress.findByBookId(original.id);
       const percentage = saved?.percentage ?? original.progress;
       const reliable = Number.isFinite(percentage) && percentage >= 0 && percentage <= 1 ? percentage : null;
+      if (reliable === null) throw Error("Progresso inválido na biblioteca. As métricas não foram calculadas.");
       const book = applyBookOrganization({ ...original, progress: reliable ?? 0 }, records[original.id]);
       return { id: book.id, title: book.title, author: book.author,
         status: inferredReadingStatus(book, records[original.id]), progress: reliable,

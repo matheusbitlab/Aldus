@@ -47,4 +47,12 @@ assert.throws(() => applyReadingEvents(state, [{ ...event, type: 'READING_STREAK
 assert.equal(achievements(state)[0].unlockedAt,3);
 assert.match(activityText(state.activities[0]),/em andamento registrada/);
 assert.equal(progression(4000).fraction,1); assert.throws(() => progression(-1));
+for (const invalid of [{status:'invented'},{completedAt:1e30},{readingSeconds:-1},{progress:NaN}]) assert.throws(()=>calculateStats({...snapshot,books:[{...books[2],...invalid}]},'2026-10-13'));
+assert.throws(()=>currentStreak(['2026-02-30'],'2026-10-13'));
+assert.throws(()=>currentStreak(['NaN-NaN-NaN'],'bad'));
+assert.throws(()=>applyReadingEvents(state,[{...event,type:'invented'}],6));
+const dayEvent={...event,type:'READING_STREAK',streakDay:'2026-10-13',occurredAt:new Date(2026,9,13,12).getTime()};
+const withDay=applyReadingEvents(state,[dayEvent,{...dayEvent,id:'new-id'}],dayEvent.occurredAt);
+assert.equal(withDay.awards.length,state.awards.length+1);
+assert.throws(()=>applyReadingEvents(state,[{...dayEvent,streakDay:'2026-10-12'}],6));
 console.log('PASS community domain: profile, privacy, goals, honest metrics, calendar/streak, progression, semantic idempotence, completion revisions, activity, achievement.');

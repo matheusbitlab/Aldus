@@ -44,6 +44,11 @@ não deve aceitar IDs de conclusão arbitrários vindos da interface.
 serialização, duas instâncias concorrentes, revisão antiga, corrupção, disco cheio,
 adapter somente leitura e troca de conta. PASS. UI e schema ainda em implementação.
 
+Repository/adapters: commit `03e4ff9`, push PASS, typecheck PASS.
+Hardening de evidência: status/progresso/datas/medidas inválidos rejeitam métricas;
+dia medido deve existir no calendário e corresponder à data do evento.
+Não transformar progresso corrompido em livro não iniciado. Tests domínio/dados PASS.
+
 # MERGE MAP
 
 1. Domínio puro e testes: baixo risco; sem integração central.
