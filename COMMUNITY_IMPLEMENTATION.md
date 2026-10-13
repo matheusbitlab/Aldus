@@ -48,6 +48,39 @@ Repository/adapters: commit `03e4ff9`, push PASS, typecheck PASS.
 Hardening de evidência: status/progresso/datas/medidas inválidos rejeitam métricas;
 dia medido deve existir no calendário e corresponder à data do evento.
 Não transformar progresso corrompido em livro não iniciado. Tests domínio/dados PASS.
+Hardening: commit `a99bfb9`; push verificado antes do checkpoint seguinte.
+
+## Checkpoint — UI navegável
+
+Entrada: **Ajustes → Comunidade literária**. Sem reorganizar tabs.
+Rotas `app/community`: index, profile, edit-profile e `[section]` para clubs/forums/people.
+Home: identidade, progressão, meta, métricas locais, inclusão explícita e timeline.
+Perfil: bio/favoritos, jornada, meta e atividade; prévia para terceiros aplica privacidade.
+Editor: nome de exibição, bio, favoritos, meta/ano e privacidade de perfil/novas atividades.
+Identidade/username/avatar são recebidos por adapter; não há upload novo.
+Perfil privado por padrão. A prévia é local: não equivale a publicação real.
+Sem contadores fictícios de seguidores; destinos futuros têm empty states navegáveis.
+Tema/paleta atual, safe areas, targets de 48, labels e barras acessíveis preservados.
+
+Composição isolada: `adapters/runtime.ts` importa as dependências antigas sem modificá-las;
+`CommunityProvider` lê Auth somente na borda e oculta resultados de outra identidade.
+Web exige Web Locks para read-modify-write entre abas; indisponibilidade falha explicitamente.
+Native usa fila por chave e AsyncStorage existente. Sem SQLite migration/dependência nova.
+
+Arquivos centrais alterados: `app/_layout.tsx` (uma rota dentro de Stack.Protected),
+`app/(tabs)/settings.tsx` (uma seção/entrada), `.gitignore` (artifacts/apk).
+`Href` nas rotas permite checkout com tipos Expo Router gerados anteriormente;
+rotas reais e destinos são cobertos pelos testes controlados e pela exportação.
+
+Gates: typecheck, testes Community domínio/dados/UI, organização de biblioteca,
+Auth flows/auth-only e export:web PASS. Export Web: 2372 módulos.
+Nenhum teste antigo afetado falhou. Reader, Auth, Library repositories e migrations
+históricas permanecem inalterados. UI controlada não é teste físico/navegador autenticado.
+
+`scripts/build-community-apk.ps1` usa o build release local existente, exige a branch,
+salva `artifacts/apk/Aldus-community-<hash>.apk`, verifica assinatura/bundle e produz
+manifesto JSON ignorado. Não instala nem limpa dados. Primeiro APK será gerado após
+este commit de UI; outro após o commit final da Etapa 1.
 
 # MERGE MAP
 

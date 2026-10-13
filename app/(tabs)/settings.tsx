@@ -89,6 +89,19 @@ export default function Settings() {
           </View>
         </Section>
 
+        <Section title="COMUNIDADE" color={palette.secondaryText}>
+          <View style={[styles.group, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <SettingsRow
+              icon="people-outline"
+              title="Comunidade literária"
+              description="Perfil, jornada de leitura e atividade"
+              color={palette.text}
+              secondaryColor={palette.secondaryText}
+              onPress={() => router.push("/community" as never)}
+            />
+          </View>
+        </Section>
+
         <Section title="CONTAS" color={palette.secondaryText}>
           <View style={[styles.group, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <SettingsRow
