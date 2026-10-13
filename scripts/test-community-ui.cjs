@@ -56,7 +56,8 @@ function press(label) { const button=renderer.root.findAllByType('Pressable').fi
   root=await render(Edit);await change('Livros na meta (vazio para remover)','0');await press('Salvar perfil');assert.match(text(renderer.root),/meta deve ser/);assert.equal(saves.length,1);
   root=await render(Edit);context.service.saveProfile=async()=>{throw Error('disk full');};await press('Salvar perfil');assert.match(text(renderer.root),/disk full/);
   mode='dark';root=await render(Home);const page=root.findAllByType('View')[0];assert.equal(page.props.style.backgroundColor,'#12171a');
-  for(const p of root.findAllByType('Pressable'))assert.equal(p.props.accessibilityRole,'button');
+  const scroll=root.findByType('ScrollView');assert.equal(scroll.props.contentContainerStyle[1].paddingTop,28);assert.equal(scroll.props.contentContainerStyle[1].paddingBottom,24);
+  for(const p of root.findAllByType('Pressable')) { assert.equal(p.props.accessibilityRole,'button');const style=typeof p.props.style==='function'?p.props.style({pressed:false}):p.props.style;assert(Object.assign({},...[style].flat()).minHeight>=48); }
   context={...context,view:null,loading:true};root=await render(Home);assert.equal(root.findAllByType('ActivityIndicator').length,1);
   context={...context,error:'Dados corrompidos',loading:false};root=await render(Home);assert.match(text(root),/Dados corrompidos/);await press('Tentar novamente');
   for(const file of ['index','profile','edit-profile','[section]'])assert.equal(typeof load('app/community/'+file).default,'function');
