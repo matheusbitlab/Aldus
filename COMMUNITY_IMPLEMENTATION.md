@@ -277,3 +277,8 @@ foi testado somente em PostgreSQL local e não foi aplicado remotamente. Neste a
 `npm run typecheck` ficou pendente por `@noble/hashes@2.0.1` ausente em `node_modules`,
 embora declarado no `package.json` e no lockfile; a tentativa de sincronização do registry
 não concluiu. Exportação Web e APK dependem da mesma instalação completa de dependências.
+
+O helper `scripts/build-community-apk.ps1` também foi ajustado para aceitar a branch de
+integração e manter a proteção contra builds em branches diferentes. O `assembleRelease`
+foi iniciado com JDK 17, mas terminou sem APK em `:app:createBundleReleaseJsAndAssets` pelo
+mesmo módulo ausente. APK final: pendente até restaurar as dependências declaradas.
