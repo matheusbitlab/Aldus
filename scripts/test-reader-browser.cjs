@@ -26,7 +26,9 @@ function load(file){if(cache.has(file))return cache.get(file);const exports={};c
  if(name==='@expo/vector-icons')return {Ionicons:()=>React.createElement('span',null,'●')};
  if(name.startsWith('@/')||name.startsWith('.')){const base=name.startsWith('@/')?name.slice(2):path.posix.join(path.posix.dirname(file),name);const target=['.ts','.tsx'].map(e=>base+e).find(p=>fs.existsSync(p));return load(target);}return require(name);},exports);return exports;}
 (async()=>{
- const target=(await(await fetch('http://127.0.0.1:9382/json/list')).json()).find(t=>t.type==='page');
+ const endpoint=process.env.READER_CDP_URL ?? 'http://127.0.0.1:9382';
+ const parsedEndpoint=new URL(endpoint);assert.ok(['127.0.0.1','localhost'].includes(parsedEndpoint.hostname),'Use an isolated local Chromium profile');
+ const target=(await(await fetch(endpoint+'/json/list')).json()).find(t=>t.type==='page');
  const ws=new WebSocket(target.webSocketDebuggerUrl);let id=0;const calls=new Map();
  ws.on('message',raw=>{const m=JSON.parse(raw);if(m.id){const c=calls.get(m.id);calls.delete(m.id);m.error?c.reject(m.error):c.resolve(m.result);}});
  await new Promise(r=>ws.on('open',r));

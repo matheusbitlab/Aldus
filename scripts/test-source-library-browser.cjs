@@ -70,7 +70,14 @@ async function cdp(url) {
     await client.command('Page.addScriptToEvaluateOnNewDocument', { source: fixtureScript });
     const text = () => client.evaluate('document.body.innerText');
     const until = async (snippet, timeout = 12000) => { const start = Date.now(); while (Date.now() - start < timeout) { if ((await text()).includes(snippet)) return; await wait(100); } throw Error(`Missing UI: ${snippet}; ` + (await text()).slice(0, 800) + JSON.stringify(await client.evaluate(`({keys:Object.keys(localStorage),requests:window.fixtureRequests})`))); };
-    const click = async label => { assert.ok(await client.evaluate(`(() => { const e = [...document.querySelectorAll('[role="button"]')].find(e => e.textContent.trim() === ${JSON.stringify(label)}); e?.click(); return !!e; })()`), 'Button ' + label); };
+    const click = async label => {
+      const start=Date.now();
+      while(Date.now()-start<12000){
+        const clicked=await client.evaluate(`(() => { const e = [...document.querySelectorAll('[role="button"]')].find(e => e.textContent.trim() === ${JSON.stringify(label)} && !e.disabled && e.getAttribute('aria-disabled') !== 'true'); e?.click(); return !!e; })()`);
+        if(clicked)return;await wait(100);
+      }
+      throw Error('Missing enabled button '+label+'; '+(await text()).slice(0,800));
+    };
     const navigate = async route => { await client.command('Page.navigate', { url: origin + route }); await wait(800); };
     const screenshot = async name => { const r = await client.command('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(screenshots, name + '.png'), Buffer.from(r.data, 'base64')); };
     await navigate('/sources'); await until('Minha biblioteca de teste'); await screenshot('sources');
@@ -121,7 +128,7 @@ async function cdp(url) {
     assert.equal(await client.evaluate(`window.fixtureRequests.filter(path=>path.startsWith('/drive/v3/files')).length`),0,'Navigation/search/open actions do not query Drive or download files');
     await client.evaluate(`document.querySelector('[aria-label="Ir para raiz da fonte"]').click()`); await click('← Fontes'); await until('Minha biblioteca de teste');
     console.log('PASS exported hierarchical Drive snapshot: ROOT/A/B/back/breadcrumbs, source-wide fuzzy from C + path/actions, folder search, shortcut/cycle, offline IndexedDB reopen; no Drive API or media requests');
-    await navigate('/sources/error-source'); fail=true; await click('Atualizar'); await until('Não foi possível carregar esta fonte.'); await screenshot('error-no-snapshot'); fail=false;
+    await navigate('/sources/error-source'); await until('Fonte indisponível'); fail=true; await click('Atualizar'); await until('Não foi possível carregar esta fonte.'); await screenshot('error-no-snapshot'); fail=false;
     await navigate('/sources/browser-source'); await until('20 livros'); books = []; await click('Atualizar'); await until('Nenhum EPUB ou PDF'); await screenshot('empty');
     books = Array.from({ length: 1000 }, (_, i) => ({ id: `remote-${i}`, title: `Livro ${String(i).padStart(4,'0')}`, url: '/fixture.epub', format: 'epub' }));
     delay=500; const start = performance.now(); await click('Atualizar'); await until('Atualizando catálogo'); await screenshot('refreshing'); await until('1000 livros'); delay=0; const indexedMs = performance.now() - start; await wait(1000);

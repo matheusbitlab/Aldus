@@ -1,0 +1,48 @@
+name: Aldus validation
+on:
+  pull_request:
+  push:
+    branches: [main, integration/comunidade-literaria]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: aldus-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      EXPO_PUBLIC_SUPABASE_URL: https://ci-fixture.supabase.co
+      EXPO_PUBLIC_SUPABASE_KEY: sb_publishable_ci_fixture_only
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Isolated test tools (not app dependencies)
+        run: |
+          npm install --prefix .expo/auth-test-tools --no-save --package-lock=false --ignore-scripts react@19.2.3 react-test-renderer@19.2.3
+          npm install --prefix .expo/library-db-test --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.8
+          npm install --prefix .expo/flashcard-db-test --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.8 fake-indexeddb@6.2.5
+      - run: npm run typecheck
+      - run: npx --yes deno@2.9.6 check supabase/functions/username-login/index.ts
+      - run: npm run test:critical
+      - run: npm run export:web
+      - run: node scripts/test-web-build.cjs --exported
+      - run: git diff --check
+      - name: Dependency critical gate (other advisories remain visible)
+        run: npm audit --omit=dev --audit-level=critical
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: web-build-identity-${{ github.sha }}
+          path: dist/build-info.json
+          if-no-files-found: error
+          retention-days: 14
+# No production release and no deployment secrets. Configure protected Vercel checks separately.

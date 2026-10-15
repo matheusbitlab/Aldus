@@ -22,6 +22,7 @@ EXPO_PUBLIC_CATALOG_CONTACT. Nunca colocar secret/service_role no app.
 
 ```powershell
 npm run typecheck
+npm run test:critical
 npm run export:web
 node scripts/test-epub-resources.cjs
 node scripts/test-source-indexing.cjs
@@ -52,6 +53,25 @@ sem acessar livros/contas do usuário. PASS controlado/Web não comprova Android
 - node scripts/audit-library-sync-public.cjs: sonda somente leitura do contrato REST.
 
 Estes são procedimentos humanos, não contextos extras de IA nem prova de implantação.
+
+### Vercel e GitHub
+
+No projeto kindle-reader e equipe corretos, conectar matheusbitlab/Aldus em Settings → Git.
+Revisar a branch de produção (main revisada), sem promover esta integração automaticamente.
+Usar npm ci, npm run build e saída dist, já declarados em vercel.json.
+Configurar as variáveis públicas Supabase; Drive Web e contato de catálogos quando usados;
+produção exige responsável/canal legal verificados. Não colocar tokens administrativos em EXPO_PUBLIC_*.
+
+O workflow Aldus validation é somente CI, sem deployment secrets nem publicação. Habilitar
+branch protection e os Deployment Checks correspondentes ao resultado real desse workflow.
+Conferir dist/build-info.json e /build-info.json do deployment: commit, dirty=false e hash
+devem identificar a fonte testada. Isso não substitui smoke tests nem o ID/commit do deployment.
+
+Para logs403: selecionar a conta/equipe proprietária e pedir ao administrador acesso de
+projeto/observabilidade com menor privilégio necessário; reautorizar a integração nessa equipe.
+Consultar [papéis Vercel](https://vercel.com/docs/rbac/access-roles). Não desativar proteção
+ou tentar outro token para contornar uma negação. Validar Auth/Reader/rotas em preview,
+revisar logs sanitizados e aprovar explicitamente a publicação de produção.
 
 ## Android quando solicitado
 

@@ -3,12 +3,18 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { androidBuildCommand } from "./android-build-command.cjs";
+import { validate } from "./validate-web-env.cjs";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const androidDir = path.join(projectRoot, "android");
 const isWindows = process.platform === "win32";
 const wrapper = path.join(androidDir, isWindows ? "gradlew.bat" : "gradlew");
 const apkPath = path.join(androidDir, "app/build/outputs/apk/release/app-release.apk");
+
+// The same public-env guard runs before either Web export or Android embedding.
+if (existsSync(path.join(projectRoot, '.env.local'))) process.loadEnvFile(path.join(projectRoot, '.env.local'));
+try { validate(process.env); }
+catch { console.error('Unsafe public app configuration; values redacted. Build not started.'); process.exit(1); }
 
 if (!existsSync(wrapper)) {
   console.error("Android project not found. Run npx expo prebuild --platform android first.");
