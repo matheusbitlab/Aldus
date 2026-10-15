@@ -786,3 +786,64 @@ Mantidos além dos dois oficiais: README.md (execução), LIBRARY_SYNC_DEPLOYMEN
 GOOGLE_AUTH_DRIVE_DEPLOYMENT.md (procedimentos humanos), THIRD_PARTY_NOTICES.md (avisos gerados).
 Migrations, scripts operacionais, testes e textos legais do app continuam em seus diretórios.
 Artefatos ignorados são evidência auxiliar, nunca terceira fonte de contexto obrigatória.
+
+## SaaS — Etapa 2: cotas reais de Sync e Storage (15/10/2026)
+
+IMPLEMENTADO LOCALMENTE / ATIVAÇÃO REMOTA E QA AUTENTICADO PENDENTES.
+Por instrução específica desta etapa, desenvolvimento e push somente em
+integration/comunidade-literaria. A branch recebeu main 9cb5a96 por fast-forward,
+preservando Admin 1.5 e todo o histórico. main continua sendo o padrão geral;
+nesta campanha não houve commit nem push nela.
+
+- Catálogo existente continua sendo a autoridade: Free 100 livros / 524288000 bytes
+  (500 MiB), Pro 2000 livros / 10737418240 bytes (10 GiB). Valores não foram duplicados
+  no cliente; alterações confiáveis do catálogo/assinatura são resolvidas no servidor.
+- Incremental nova: 20261015215745_saas_quota_reservations.sql. Nenhuma migration
+  histórica foi editada. Reserva privada por (conta, caminho imutável), token por lease,
+  tamanho declarado limitado e expiração de 15 minutos. Cliente não escreve no ledger.
+- RPCs autenticadas saas_quota_snapshot, saas_reserve_upload e saas_finish_upload;
+  saas_upload_reserved serve à fence restritiva de INSERT do Storage. Auth ativo,
+  propriedade e livro remoto existente continuam obrigatórios. Sem service_role cliente.
+- Medição: livros remotos vivos; objetos reais registrados no Storage, inclusive antigos,
+  órfãos/não publicados e tombstonados; bytes do metadata.size preenchido pelo Storage;
+  bytes/número de reservas válidas ainda sem objeto; capacidade restante desconta ambos.
+  Um objeto é contado uma vez, independentemente de retry/referências de metadados.
+  Isto não é inventário do S3 fora de storage.objects. Tamanho legado desconhecido
+  produz null e bloqueia crescimento até reconciliação confiável, sem apagar o objeto.
+- Reserva, confirmação e trigger de conclusão usam o mesmo lock de linha do perfil.
+  Crescimento exige READ COMMITTED para renovar a visão após esperar o lock. O servidor
+  revalida limite atual e tamanho real exatamente igual à reserva no commit do Storage.
+  Mantido constraint trigger deferred para a sonda de autorização revertida do Storage.
+  RLS impede upload direto sem reserva e UPDATE/upsert imutável continua proibido.
+- Retry do mesmo caminho reaproveita reserva; objeto existente retorna exists, seguido
+  da verificação de integridade já existente. Finalização/cancelamento são idempotentes;
+  token antigo não cancela lease novo. Objeto gravado ganha prioridade sobre cancelamento.
+  Reserva expirada/cancelada não autoriza conclusão tardia. Falhas/abort/rede perdida
+  reconciliam sem DELETE; na ausência de resposta, a reserva expira. Não há limpeza nova.
+- Reuso do LibrarySyncService/Coordinator, outbox durável e SupabaseLibraryAdapter.
+  Recusa de livro não interrompe progresso/notas/grifos/organização de livros existentes;
+  filhos do novo livro recusado ficam pendentes. Upload só ocorre após metadata confirmada.
+  Bloqueios de cota por conta persistem no journal SQLite/IndexedDB, sem tirar dirty ou
+  trocar operationId. Não repetem envio em background com capacidade inalterada; retomam
+  após mudança do snapshot confiável ou ação explícita Sincronizar agora. UI mostra uso,
+  reserva, disponibilidade, excesso e motivo. Nenhum gate novo em leitura/importação local.
+- Compatibilidade progressiva: RPC de medição ausente não inventa plano nem interrompe
+  o RPC existente de metadados. Arquivos novos sempre exigem reserva, falhando fechado
+  até implantação. Troca de conta descarta resposta tardia e mantém JWT da operação.
+- Downgrade: nenhum dado excluído/ocultado. Livros locais, dados remotos existentes,
+  downloads/retry de objeto existente e alterações de leitura continuam disponíveis;
+  somente crescimento acima da franquia é recusado. Upgrade preserva e retoma a fila.
+- Validação: matriz crítica 62/62 PASS; 19 cenários SQL PGlite, testes de cliente com
+  SQLite real e driver HTTP controlado PASS, além de regressões de Sync/coordenador/
+  cancelamento/transferência e UI. Typecheck e export Web PASS. Limites de fronteira
+  usam catálogo reduzido em fixtures; os valores Free/Pro iniciais também são verificados.
+- PGlite usa PostgreSQL em WASM e serializa conexões: solicitações sobrepostas foram
+  testadas, mas isso não comprova disputa de locks entre sessões independentes. PostgreSQL
+  nativo e Docker não estavam disponíveis no PATH. Concorrência multi-sessão e Storage
+  HTTP autenticado real permanecem pendentes. Não inferir prova Android dos testes locais.
+- Inventário remoto somente leitura reconfirmou ledger com 20261015144958,
+  20261015145012 e 20261015145018. Antes de implantação autorizada: reconciliar schema,
+  ledger e RLS/ACL/Storage da instância com os pré-requisitos incrementais (incluindo
+  perfis ativos, SaaS 1 e Admin quando aplicável), testar A/B/disabled e probe/conclusão,
+  tamanho real, reservas concorrentes, cancelamento/expiração e downgrade reais.
+  Nenhuma migration remota, deploy, cobrança, limpeza destrutiva ou APK desta etapa.

@@ -323,3 +323,29 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   alcançabilidade. Não aplicar downgrade Expo44 ou major upgrades só para zerar contador.
 - Arquivos: package-lock.json; CI mantém avisos visíveis e bloqueia novos críticos.
 - Não regredir: SDK57/RN0.86, build Web/Android e notices/licenças.
+
+### SaaS Etapa 2 — quotas de Sync/Storage e validação remota pendente
+
+- Status: IMPLEMENTADO LOCALMENTE / VALIDAÇÃO REMOTA AUTENTICADA PENDENTE.
+- Incremental 20261015215745_saas_quota_reservations.sql: reserva transacional por objeto,
+  fence RLS contra upload sem reserva, conferência deferred de bytes reais e reconciliação
+  idempotente. Catálogo backend conserva Free 100/500 MiB e Pro 2000/10 GiB configuráveis.
+- Livros, bytes de objetos existentes/órfãos e uploads reservados são medidos separadamente;
+  objeto concluído não soma também a reserva. Tamanho desconhecido permanece null e exige
+  reconciliação confiável; não usar fileSize/metadados do aplicativo como uso real.
+- Recusas de cota preservam outbox/operationId e deixam notas/progresso/organização de livros
+  existentes sincronizarem. Background não repete envios bloqueados com snapshot inalterado;
+  mudança de capacidade ou Sincronizar agora retoma. Leitura/importação local e recuperação
+  de arquivos existentes continuam. Downgrade acima da cota não exclui nem oculta dados.
+- Evidência local: matriz crítica 62/62 PASS; 19 cenários SQL PGlite, SQLite/outbox e driver
+  com HTTP controlado PASS; typecheck/export Web PASS. PGlite serializa solicitações:
+  concorrência em sessões PostgreSQL independentes não foi validada. PostgreSQL nativo/
+  Docker ausentes no PATH. Testes locais não comprovam Storage HTTP/Supabase autenticado.
+- Ledger remoto reconfirmado somente leitura: 20261015144958/20261015145012/20261015145018.
+  Não aplicar a nova SQL diretamente sem reconciliar schema real, ledger, pré-requisitos,
+  RLS/ACL e versão do Storage. Pendente autorização/implantação e validação real de A/B,
+  disabled, bypass direto, probes, tamanho real, disputa de capacidade, cancelamento,
+  conclusão tardia, objeto órfão, downgrade e recuperação da fila.
+- Nenhum bug físico anterior foi encerrado por estes testes; nenhuma produção alterada.
+  Nenhum APK foi iniciado nesta etapa e nenhum pagamento ativado. Campanha somente na
+  integration/comunidade-literaria, preservando o padrão geral main e seus commits.
