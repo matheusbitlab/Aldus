@@ -148,9 +148,13 @@ EPUB/PDF, teto cliente 512 MiB sujeito ao plano. Sem URL pública/upsert; RLS ow
 escrita via RPC e fences de Storage. Funções SECURITY DEFINER usam search_path vazio e auth.uid.
 Migrations 202610110001 e 202610110002 são históricas e não devem ser editadas/reaplicadas por hipótese.
 
-Estado remoto conferido em 15/10: tabelas esperadas retornam HTTP404/PGRST205 no schema cache.
-Ausência física de migration/projeto/schema/cache e bucket não foram discriminados por admin.
-Sem conexão administrativa legítima, nenhum SQL remoto foi executado; outbox preservada.
+Evolução remota em 15/10: a sonda inicial de 10:58 BRT retornava HTTP404/PGRST205.
+Na missão integrada, às 12:58 BRT, items/operations passaram a HTTP401/42501 ao anônimo.
+O usuário informou aplicação remota 20261015145012=private_account_library e
+20261015145018=private_library_file_recovery, equivalentes aos arquivos locais 202610110001/002;
+bucket privado e sete policies já existentes. NÃO reaplicar nem reparar ledger por hipótese.
+O inventário administrativo e sessões reais A/B continuam pendentes; a sonda pública não os substitui.
+Nenhum SQL remoto foi executado pelo agente nesta missão; outbox preservada.
 Sonda: node scripts/audit-library-sync-public.cjs, somente GET/limit=0 e chave pública.
 Procedimento humano: [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md), inventários
 supabase/audit/01_inventory.sql e 02_library_sync_inventory.sql antes de decidir 001→002.
@@ -226,7 +230,19 @@ abrir navegador; troca PKCE é única e requer sessão. Erros query/hash/cancela
 sem code/token/verifier/secret na UI ou logs. Email confirmado/perfil são distintos de senha.
 
 Username depende da Edge Function supabase/functions/username-login/index.ts; resolução
-de email fica no servidor. Implantação/proteção contra abuso e testes reais continuam externos.
+de email fica no servidor. handler.ts implementa limite Redis/Upstash atômico compartilhado:
+300/min global, 30/min origem e 8/15min username, sem reset no sucesso; HMAC nos identificadores.
+Origem encaminhada é apenas suplementar, não identidade confiável. Falha/config ausente do
+limitador fecha com 503 antes de consultar perfis. JSON até 8192 bytes, password até 1024 caracteres,
+erros de credenciais uniformes e perfil ativo reconferido antes de devolver tokens. Não promete
+tempo constante. verify_jwt=false é necessário ao login público; não é a defesa antiabuso.
+Secrets exclusivos da função: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN e
+USERNAME_LOGIN_HMAC_KEY (aleatório >=32 caracteres), além dos secrets Supabase de servidor.
+Não implantar sem configurar/testar Redis. node scripts/test-username-login.cjs cobre o contrato
+e concorrência com Redis/Auth controlados, não serviço real nem proteção DDoS de infraestrutura.
+Supabase/Vercel aparecem instalados no catálogo de plugins nesta sessão, mas não expõem
+ferramentas administrativas utilizáveis; isso supera a nota antiga de plugin não instalado.
+Implantação da função e testes reais continuam pendentes.
 Signup/recovery e RLS efetivos precisam de teste remoto/logs, sem presumir que arquivo SQL
 foi aplicado. Cache offline do mesmo usuário não cria sessão; o cache de perfil ainda
 não tem TTL e não certifica status remoto atual. Não afrouxar guard/RLS para resolver conexão.
@@ -317,7 +333,8 @@ Retomada consulta partida; polling de 3s só na tela ativa/foreground. Deck de b
 500 cartões/16 MB; gabarito/explicação não são enviados antes da resposta aceita.
 
 Migration 202610090001_flashcard_battles.sql e supabase/tests/flashcard_battles_manual.sql
-passaram historicamente em PostgreSQL isolado; deploy e duas contas reais continuam pendentes.
+passaram historicamente em PostgreSQL isolado; usuário informou deploy real como versão
+20261015144958=flashcard_battles. Não reaplicar. Duas sessões reais continuam pendentes.
 Verificar Auth/ledger antes de aplicar. O projeto doador C:/Flashcards não é o backend do Aldus:
 JWT distinto, gateway com isCorrect do cliente e regras de HP/velocidade não são reutilizados.
 Nenhuma geração por IA/cobrança/serviço doador deve ser anunciada como concluída.

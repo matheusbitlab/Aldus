@@ -29,17 +29,18 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 - Dependências externas: arquivo original e validação no próximo build consolidado.
 - Não regredir: metadata, spine, CSS/fontes/imagens, links, rollback, conta e EPUBs saudáveis.
 
-## BUG 02 — Library Sync sem contrato disponível no servidor
+## BUG 02 — Library Sync implantado, validação autenticada pendente
 
-- Prioridade: ALTA. Status: BLOQUEADO EXTERNAMENTE.
+- Prioridade: ALTA. Status: BLOQUEADO EXTERNAMENTE / VALIDAÇÃO REMOTA PENDENTE.
 - Sintoma/reprodução: “37 operações pendentes”, último sync ausente e servidor indisponível.
   37 é relato do aparelho; a UI soma entidades dirty e arquivos pendentes.
-- Evidência: sonda de 15/10/2026, 10:58 BRT: user_library_items e user_library_operations
-  HTTP404/PGRST205; profiles controle 401/42501. Bucket público: 400/NoSuchBucket.
-- Primeira divergência: REST esperado não aparece no schema cache; pull inicial antecede RPC/upload.
-- Causa: contrato REST indisponível CONFIRMADO; backend não deployado PROVÁVEL.
-  Sem inventário admin não distinguir migration ausente, schema/projeto e cache; não provar
-  ausência física de bucket privado pela invisibilidade anônima.
+- Evidência histórica: 10:58 BRT HTTP404/PGRST205; após deploy informado, nova sonda de
+  12:58 BRT retornou HTTP401/42501 nas duas tabelas. Usuário informou versions remotas
+  20261015145012/20261015145018, bucket privado e sete policies. NÃO reaplicar 001/002.
+- Primeira divergência atual: fluxo autenticado não executado neste ambiente; sem nova
+  tentativa do aparelho não atribuir as 37 pendências ao antigo contrato ausente.
+- Causa atual: INCONCLUSIVA. A causa histórica de contrato ausente foi superada pelo deploy
+  informado e pela mudança na sonda; invisibilidade anônima não prova bucket ausente.
 - Arquivos: SupabaseLibraryAdapter.ts, migrations 202610110001/002, supabase/audit/01_inventory.sql,
   02_library_sync_inventory.sql e scripts/audit-library-sync-public.cjs.
 - Correção: sonda read-only reproduzível e inventário completado; engine/outbox preservados.
@@ -50,8 +51,8 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 - Testes pendentes: inventário admin, deploy compatível, HTTP autenticado A/B/anon e dois aparelhos.
 - Dependências externas: plugin Supabase disponível mas desconectado; sem credencial admin/CLI/
   Postgres neste ambiente. Operador autorizado deve seguir [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md):
-  comparar ledger/objetos/ACL/RLS/bucket; aplicar 001→002 somente se ausentes e compatíveis;
-  repetir inventário e testes. Não editar migrations históricas.
+  comparar ledger/objetos/ACL/RLS/bucket; reconhecer o mapeamento remoto 20261015145012/018;
+  repetir inventário e testes autenticados. Não reaplicar nem editar migrations históricas.
 - Não regredir: USER A != USER B, Storage privado, CAS/recibos/tombstones, offline e fila durável.
 
 ## BUG 03 — Drive real preso em conectar/indexar
@@ -140,8 +141,12 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
   HTTP404/NOT_FOUND novamente em 15/10/2026, sem autenticar/criar conta.
 - Causa: endpoint esperado indisponível CONFIRMADO; estado administrativo final não inventariado.
 - Arquivos: supabase/functions/username-login/index.ts e src/data/remote/authService.ts.
-- Correção: cliente preparado; implantação não executada sem conexão administrativa.
-- Testes realizados: conferência endpoint read-only e contratos Auth controlados.
+- Correção: handler público com Redis/Upstash atômico global/origem/username, HMAC,
+  fail-closed, body limitado e rechecagem de perfil ativo. verify_jwt=false preservado.
+- Testes realizados: node scripts/test-username-login.cjs PASS: credenciais erradas,
+  inexistente/disabled, perfil desativado durante login, session owner, corpo inválido/grande,
+  falha do limitador, 24 pedidos concorrentes em 4 workers (8 aceitos) e canários de segredo.
+  Redis REST/Auth são controlados; Redis e Auth reais continuam pendentes.
 - Testes pendentes: deploy, rate limit/abuso, usuário inexistente/senha errada com mesma resposta,
   login válido sem devolver email ou credencial privada ao cliente.
 - Dependências externas: conferir projeto/ledger e Auth; operador pode executar
