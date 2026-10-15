@@ -6,6 +6,24 @@ O usuário relatou Google funcionando após a sonda histórica abaixo. Não alte
 para tratar indexação sem uma nova evidência de falha de autorização/callback.
 Nenhum painel foi alterado nesta campanha; migrations da biblioteca têm roteiro próprio.
 
+## Evolução verificada na missão integrada de 15/10
+
+Nova execução de `node scripts/audit-google-redirects.cjs --expect-native`:
+Native e recovery preservados (PASS); Web dev localhost:8081 retornou para aldus;
+aldus://auth/unapproved-callback foi aceito (gate de controle FAIL externo).
+O retorno incorreto Native para localhost foi superado nessa sonda, não em login físico.
+Conferir allowlist sem padrão amplo e callbacks Web exatos no roteiro abaixo.
+O arquivo de evidência ignorado é snapshot da última execução; o resultado histórico de
+12/10 está preservado no texto seguinte e não deve ser apresentado como situação atual.
+
+Authentication → Security and Protection: conferir e habilitar proteção contra senhas
+vazadas se disponível no plano (Pro ou superior conforme documentação consultada),
+rever política de senha/rate limits e testar cadastro/recovery com contas de teste.
+O estado desse ajuste não pôde ser lido nesta sessão. Referência:
+[Password security](https://supabase.com/docs/guides/auth/password-security).
+Rever também a rotação do Google Client Secret historicamente exposto, sem copiá-lo
+para Git, cliente ou logs. Não presumir que a rotação já aconteceu.
+
 ## Referência histórica para investigar uma falha de callback
 
 `npm run audit:auth:redirects` inicia OAuth Google/PKCE com a configuração pública do projeto e devolve ao callback Supabase o `state` real junto de um cancelamento simulado. Não entra em conta, envia email ou troca código. Estado/cookies/verifier/tokens não são registrados.

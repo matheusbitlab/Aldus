@@ -1,7 +1,8 @@
 # Aldus Reader — Bugs Atuais
 
 Atualizado em 15/10/2026. Branch integration/comunidade-literaria.
-HEAD de referência funcional: 30b24dc; baseline da campanha: 2f98b7937d6ea2b47e30d99e03ac1bec0f0d5a9a.
+HEAD de referência funcional: f9b918b; baseline desta missão: 7f50a9048876aec350186b594006c24f2bc73a22.
+Baseline da campanha anterior: 2f98b7937d6ea2b47e30d99e03ac1bec0f0d5a9a.
 Somente problemas ativos. Contexto permanente: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validação física nova.
 
@@ -49,8 +50,8 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
   fronteiras controladas; library-rls PASS em PostgreSQL/PGlite A/B/anon e fences Storage.
   App Web com dois IndexedDB/HTTP fixture passou upload/download/remoções/rollback/conta.
 - Testes pendentes: inventário admin, deploy compatível, HTTP autenticado A/B/anon e dois aparelhos.
-- Dependências externas: plugin Supabase disponível mas desconectado; sem credencial admin/CLI/
-  Postgres neste ambiente. Operador autorizado deve seguir [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md):
+- Dependências externas: plugins instalados sem ferramentas administrativas expostas e CLI
+  sem access token. Operador autorizado deve seguir [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md):
   comparar ledger/objetos/ACL/RLS/bucket; reconhecer o mapeamento remoto 20261015145012/018;
   repetir inventário e testes autenticados. Não reaplicar nem editar migrations históricas.
 - Não regredir: USER A != USER B, Storage privado, CAS/recibos/tombstones, offline e fila durável.
@@ -186,3 +187,31 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 - Pendente: inventário admin do projeto cmivracxuihtmsbmtuec, comparação de definições e
   implantação somente da migration NOVA, seguida de HTTP A/B/disabled/anon e Storage.
 - Não regredir: recibos/CAS/idempotência, livros locais offline e dados de produção.
+
+## BUG 12 — Configuração e snapshot Sources persistidos ainda são do dispositivo
+
+- Prioridade: ALTA. Status: PARCIAL / ABERTO.
+- Causa CONFIRMADA: UserSourceRepository usa chave global kindle-reader.user-sources.v1,
+  e snapshots/vínculos não têm owner. Outra conta no mesmo dispositivo pode ver metadados
+  locais da fonte. Não implica acesso a bytes privados Drive sem nova autorização.
+- Correção desta missão: grants/índices em memória são limpos sincronicamente ao trocar
+  conta; consentimento pendente e resposta antiga são rejeitados. Snapshots preservados.
+- Testes: test-google-drive.cjs PASS para clearSession e callback antigo; não certifica
+  isolamento persistido de Sources (que continua ausente por contrato DEVICE).
+- Pendente: ownership por conta e adoção explícita dos legados, sem inferir dono, ocultar
+  definitivamente fontes existentes nem apagar livros/catálogos. Exige migração/UI próprias.
+- Arquivos: UserSourceRepository, sourceStore, repositories de SourceCatalog e driveDependencies.
+- Não regredir: raiz, árvore, snapshots offline e biblioteca pessoal; não atribuir legado automaticamente.
+
+## BUG 13 — Avisos de dependências sem atualização compatível validada
+
+- Prioridade: ALTA. Status: PARCIAL / ABERTO.
+- Evidência: npm audit --omit=dev de 15/10 13:17 BRT: 70 registros propagados,
+  0 críticos/58 altos/12 moderados, com causas em braces, decode-uri-component,
+  node-forge, postcss-selector-parser e uuid. Versão em advisories não prova explorabilidade.
+- Correção: quatro transitivas atualizadas dentro das faixas existentes; shell-quote
+  rejeita o caso de newline após comentário; matriz crítica/export passou após atualização.
+- Pendente: patches upstream/compatibilidade da cadeia Tailwind/Router/Expo e análise de
+  alcançabilidade. Não aplicar downgrade Expo44 ou major upgrades só para zerar contador.
+- Arquivos: package-lock.json; CI mantém avisos visíveis e bloqueia novos críticos.
+- Não regredir: SDK57/RN0.86, build Web/Android e notices/licenças.

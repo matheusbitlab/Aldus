@@ -12,12 +12,38 @@ Um operador autorizado deve executar `supabase/audit/01_inventory.sql` e `supaba
 
 As duas novas migrations pressupõem schemas Supabase `auth`/`storage`, papéis `anon`/`authenticated` e sessão JWT. Se já houver tabelas/functions/policies com esses nomes, analisar a divergência antes de executar; não apagar dados nem improvisar um reset. Backup/recuperação operacional devem ser conferidos pelo operador.
 
-## Aplicação incremental e conferência
+## Migrações existentes — NÃO reaplicar
 
-Aplicar pela infraestrutura administrativa aprovada do projeto, na ordem:
+O operador informou aplicação em 15/10/2026 no projeto cmivracxuihtmsbmtuec:
 
-1. `supabase/migrations/202610110001_private_account_library.sql`.
-2. `supabase/migrations/202610110002_private_library_file_recovery.sql`.
+| Versão remota | Arquivo local equivalente |
+| --- | --- |
+| 20261015144958 | 202610090001_flashcard_battles.sql |
+| 20261015145012 | 202610110001_private_account_library.sql |
+| 20261015145018 | 202610110002_private_library_file_recovery.sql |
+
+Não executar `db push` indiscriminado: versões diferentes não significam migrations ausentes.
+Não reparar/apagar entradas do ledger, recriar tabelas ou reaplicar esses três arquivos.
+O inventário deve preservar esse mapeamento; comparar definições, não somente números.
+
+## Hardening incremental novo — pendente de implantação
+
+`supabase/migrations/20261015160539_library_active_account_fences.sql` foi gerada por
+`supabase migration new` e validada em PostgreSQL/PGlite, não no projeto remoto.
+Ela requer a biblioteca já implantada e cria schema library_private; verificar antes se
+o nome está livre e se library_apply ainda corresponde à implementação auditada.
+
+Operador autorizado: executar 01_inventory.sql e 02_library_sync_inventory.sql; conferir
+ledger/definitions/ACL/RLS/bucket e backup operacional; revisar a migration NOVA; aplicar
+somente seu conteúdo transacional pela infraestrutura aprovada; registrar essa versão
+no ledger adotado pelo projeto e repetir inventário/testes HTTP A/B/disabled/anon.
+Não usar service_role para representar os usuários nos testes de RLS.
+
+A migration move a implementação CAS intacta para schema privado e mantém assinatura
+pública em wrapper que exige perfil ativo; acrescenta fences restritivas sem alterar
+dados ou policies de outros buckets. Teste local: node scripts/test-integrated-security.cjs.
+library_object_allowed(text,boolean) mantém EXECUTE para anon porque fences públicas a
+avaliam; ela retorna false a anônimos e paths alheios. Não remover o grant isoladamente.
 
 Cada arquivo é transacional. A migration1 recusa bucket preexistente público; não contornar esse erro tornando a biblioteca pública. Após sucesso, registrar aplicação no histórico adotado pelo projeto e repetir os inventários. Conferir bucket `aldus-private-library`, `public=false`, limite preparado de 536870912 bytes e MIME `application/epub+zip` / `application/pdf`. Conferir limites efetivos do plano; o cliente aceita até512MiB, mas isso não promete que o plano aceite esse tamanho.
 

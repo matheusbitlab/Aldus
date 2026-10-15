@@ -1,8 +1,10 @@
 # Aldus Reader — Contexto do Projeto
 
 Atualizado em 15/10/2026. Fonte única de contexto permanente para IA.
-Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código funcional de referência: 30b24dc.
+Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código funcional de referência: f9b918b.
 Campanha na branch integration/comunidade-literaria, iniciada no HEAD 2f98b7937d6ea2b47e30d99e03ac1bec0f0d5a9a.
+Missão integrada posterior iniciada em 7f50a9048876aec350186b594006c24f2bc73a22,
+com evolução do servidor informada pelo operador e sem reaplicar migrations históricas.
 APK: PENDENTE DE BUILD CONSOLIDADO; nenhum APK gerado nesta campanha.
 
 ## 1. Visão geral
@@ -156,13 +158,23 @@ EPUB/PDF, teto cliente 512 MiB sujeito ao plano. Sem URL pública/upsert; RLS ow
 escrita via RPC e fences de Storage. Funções SECURITY DEFINER usam search_path vazio e auth.uid.
 Migrations 202610110001 e 202610110002 são históricas e não devem ser editadas/reaplicadas por hipótese.
 
+Hardening incremental NOVO 20261015160539_library_active_account_fences.sql, validado
+somente em PGlite: move a implementação CAS intacta para library_private (sem acesso cliente),
+mantém assinatura pública num wrapper com perfil ativo e adiciona fences restritivas em
+SELECT e Storage. Dados/recibos preservados; não aplicado remotamente. Inventariar definições
+e schema livre antes do deploy. Grant anon do helper de fence não é vazamento por si só.
+
 Evolução remota em 15/10: a sonda inicial de 10:58 BRT retornava HTTP404/PGRST205.
 Na missão integrada, às 12:58 BRT, items/operations passaram a HTTP401/42501 ao anônimo.
 O usuário informou aplicação remota 20261015145012=private_account_library e
 20261015145018=private_library_file_recovery, equivalentes aos arquivos locais 202610110001/002;
 bucket privado e sete policies já existentes. NÃO reaplicar nem reparar ledger por hipótese.
 O inventário administrativo e sessões reais A/B continuam pendentes; a sonda pública não os substitui.
-Nenhum SQL remoto foi executado pelo agente nesta missão; outbox preservada.
+Nenhuma migration/DDL ou SQL administrativo remoto foi aplicado pelo agente; outbox preservada.
+Sonda anônima real às13:23 BRT negou flashcard_battle/get e library_apply nulo (401/42501),
+e library_object_allowed retornou200/false para path sintético. Não enviou conteúdo pessoal
+ou operação válida; não é teste autenticado A/B nem aplicação de SQL/migration de produção.
+Executar node scripts/audit-private-rpc-anon.cjs para repetir esse contrato público.
 Sonda: node scripts/audit-library-sync-public.cjs, somente GET/limit=0 e chave pública.
 Procedimento humano: [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md), inventários
 supabase/audit/01_inventory.sql e 02_library_sync_inventory.sql antes de decidir 001→002.
@@ -232,6 +244,8 @@ perfil e recuperação. Rotas privadas exigem sessão, profile do mesmo UUID, us
 account_status=active. Tickets/generation revogam A→B→A, eventos e respostas antigas.
 Master amplia features do produto; nunca concede leitura da biblioteca de outra pessoa.
 role/status/overrides não são editáveis pelo cliente.
+AuthProvider rejeita profile remoto cujo UUID difere da sessão antes de publicar/cachear;
+AuthGuard e canUse repetem a igualdade, inclusive durante transições de conta.
 Provisionamento humano: supabase/admin/provision_master_and_test.sql exige dois UUIDs reais
 e distintos de auth.users; supabase/tests/rls_manual.sql testa A/B/anon e autopromoção com
 rollback. Executar somente depois do inventário e com acesso autorizado; não provisionar
@@ -398,6 +412,8 @@ automaticamente dados privados com o novo. Versão/code genéricos não identifi
 Infra local: android/ versionado, JDK 17 e SDK/build-tools/NDK declarados no Gradle.
 Comandos existentes: npm run build:apk:local, build:apk:archive e build:apk (EAS preview APK).
 Somente executar quando solicitado; não gerar APK por commit automaticamente.
+O guard de variáveis públicas é compartilhado entre export Web e wrapper Android,
+antes de embutir JS; configuração insegura impede build sem imprimir valores.
 
 Release local usa a debug.keystore existente para testes; produção/EAS/Play exigem certificado
 apropriado e fingerprint do artefato efetivo. Não atribuir SHA de debug a Play.
@@ -406,6 +422,13 @@ tamanho, assinatura, package e fonte/bundle correspondente. Compilar não compro
 ou funcionamento. Atualização física preserva dados; não desinstalar/limpar como diagnóstico.
 JS pode usar Metro em development build compatível; APK release requer build consolidado
 futuro para incluir o novo bundle. Esta campanha explicitamente não gera APK.
+
+Wrapper local Windows usa caminho absoluto de gradlew.bat, com quoting para espaços e
+windowsVerbatimArguments. Corrigido lookup quando NoDefaultCurrentDirectoryInExePath=1;
+test-android-build-command.cjs reproduz o defeito e executa somente um .bat temporário de
+echo, nunca Gradle. Package, keystore, versionCode=1 e versionName=1.0.0 não mudaram.
+Antes de publicação futura, comparar versionCode com Play/instalação e escolher inteiro
+maior; preservar certificado da linha instalada ou planejar migração. Não trocar por debug.
 
 ## 16. Git e fluxo de trabalho
 
@@ -416,13 +439,28 @@ stash ou descarte em massa. Nesta campanha, somente origin/integration/comunidad
 main permanece intocada. Migrations históricas são imutáveis; incrementais só após inventário.
 Nunca commitar .env.local, tokens, secrets, keystores privados, APKs ou livros pessoais.
 
+Web/CI: npm run build delega a export:web. Antes do Expo, validate-web-env.cjs rejeita
+chaves privadas/public env insegura; Vercel produção exige configuração legal real.
+Depois do export, write-build-metadata.cjs gera dist/build-info.json com commit, dirty,
+data, ambiente não sensível e SHA-256 dos arquivos JS/HTML/CSS (não de livros/contas).
+VERCEL_GIT_COMMIT_SHA/GITHUB_SHA precisam corresponder ao HEAD. dirty=true nunca é
+prova de build limpa. O metadata não inclui env, JWT, host privado ou dados de usuário.
+vercel.json fixa build/output/install e headers compatíveis com o iframe do Reader.
+.github/workflows/validate.yml: Node24, npm ci, ferramentas de teste isoladas, typecheck,
+Deno check, 48 suites críticas, export/metadata, diff check e audit crítico. Actions pinadas
+por SHA, contents:read, checkout sem persistir credencial. Sem segredo/deploy automático.
+Workflow preparado/localmente validado; só execução Actions real comprova CI remoto.
+Vercel Git integration/checks/permissões/logs dependem do operador; não presumir deploy
+com base no último commit. README contém roteiro humano; não publicar produção sozinho.
+
 ## 17. Funcionalidades implementadas
 
 Reader EPUB/PDF Original/Reflow, estudo EPUB, organização, importação determinística,
 Sources e Drive hierárquico, OCR Android local, Auth/conta/permissões, engine privado de
 Library Sync, Flashcards/Study/Battle preparado e Community v0.1 estão conectados no código.
-Validação de um módulo não prova os demais: servidor Library está bloqueado; Battle/Community
-remotos e novos fluxos Native não têm validação física nesta campanha.
+Validação de um módulo não prova os demais: Library/Battle foram implantados segundo o
+operador, mas ainda faltam sessões reais; Community remota e novos fluxos Native não têm
+validação física nesta campanha. Migração nova de perfil ativo ainda não foi implantada.
 
 15/10: testes EPUB/catálogos/importação, estados/árvore/Drive/Sources, Library SQLite/restart/
 files/coordinator/leitura/RLS PGlite, Auth e Community domínio/dados/provider/UI/schema passaram.
@@ -489,6 +527,9 @@ Para bugs, ler também BUGS_ATUAIS.md. Estes são os únicos dois contextos ofic
 Arquitetura/decisão/feature atualiza este documento; bug novo atualiza BUGS_ATUAIS.md.
 Bug validado resolvido sai da lista ativa; fica somente sua decisão permanente aqui.
 Não criar outros arquivos de contexto, diagnóstico, handoff, checkpoint, correções ou equivalentes.
+Exceção explícita da missão integrada: RELATORIO_CORRECOES_INTEGRADAS.md é snapshot de
+entrega solicitado pelo usuário, não terceira fonte obrigatória de contexto ou regra para
+criar novos relatórios a cada alteração. Os dois contextos oficiais continuam estes.
 
 Consolidação de 15/10 inventariou 33 Markdown técnicos/operacionais/gerados iniciais.
 Conteúdo útil de contextos, roadmap, Flashcards, Auth, Reader, Drive, Community e diagnósticos
