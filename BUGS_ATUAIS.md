@@ -19,7 +19,7 @@ CONFIRMADA para a amplificação sintética; INCONCLUSIVA para a primeira chamad
 ### Arquivos envolvidos e correção
 EpubParserService.ts, EpubTypes.ts, ImportEpubUseCase.ts: cache por parse, fontes compartilhadas no documento, capítulos sequenciais, yield cooperativo e signal até o parser. Sem mudança de schema nem de posição/controles do Reader.
 ### Testes realizados
-Fixture de 91 capítulos: HTML 127.262.661 → 1.422.540 bytes; leituras de fontes 182 → 2; CSS 91 → 1; leituras simultâneas 182 → 1. Parse 25.767 → 1.339 ms nesta execução desktop concorrente; não é benchmark Android. Freud: 26 capítulos, 897 ms. CSS aninhado/ciclos, SVG/imagens, links, serialização e cancelamento PASS. test-book-import, test-catalogs, typecheck e export:web PASS.
+Fixture de 91 capítulos: HTML 127.262.661 → 1.422.501 bytes; leituras de fontes 182 → 2; CSS 91 → 1; leituras simultâneas 182 → 1. Baseline 25.767 ms e primeira revisão 1.339 ms sob carga concorrente; revisão final 318 ms e Freud com 26 capítulos em 402 ms, em outra carga desktop. Não é benchmark Android. CSS aninhado/ciclos/ordem de fontes e condições, SVG/imagens, links, serialização e cancelamento PASS. test-book-import, test-catalogs, typecheck e export:web PASS.
 ### Testes pendentes e dependências externas
 Mesmo Amêndoas real; Android, fontes/imagens em WebView, cancelamento e reopen no aparelho. APK PENDENTE DE BUILD CONSOLIDADO.
 ### Não regredir

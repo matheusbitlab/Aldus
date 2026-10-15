@@ -21,6 +21,9 @@ alterada produz terminal de erro; cancelamento conserva snapshot e não publica 
 tardia. Escritas nativas iniciadas continuam na fila para não ultrapassar a geração nova.
 O gerenciador mostra o erro do catálogo e oferece Cancelar indexação. Árvore, autorização,
 busca local e download sob demanda permanecem os existentes.
+Fontes EPUB idênticas são mantidas uma vez, em sua última posição original no CSS do
+documento combinado; condições @media e ordem de cascata não são deslocadas para o início.
+Cancelamento também é verificado entre leituras ZIP do validador, container, OPF e recursos.
 
 ## Adendo atual — Drive com pastas navegáveis, 12/10/2026
 

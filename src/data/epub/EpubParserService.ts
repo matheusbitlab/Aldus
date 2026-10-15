@@ -11,13 +11,13 @@ export class EpubParserService implements EpubParser {
   constructor(private readonly validator = new EpubValidatorService()) {}
   async parse(bytes: Uint8Array, signal?: AbortSignal): Promise<ParsedEpub> {
     throwIfAborted(signal);
-    const zip = await withAbort(this.validator.openAndValidate(bytes), signal);
+    const zip = await withAbort(this.validator.openAndValidate(bytes, signal), signal);
     try {
       const resources = new ResourceContext(signal);
-      const container = xmlParser.parse(await zip.file("META-INF/container.xml")!.async("string"));
+      const container = xmlParser.parse(await resources.read(zip.file("META-INF/container.xml")!, "string"));
       const opfPath = normalizePath(String(container.container.rootfiles.rootfile["@_full-path"]));
       const opfDirectory = directoryOf(opfPath);
-      const opf = xmlParser.parse(await zip.file(opfPath)!.async("string")).package;
+      const opf = xmlParser.parse(await resources.read(zip.file(opfPath)!, "string")).package;
       const metadata = opf.metadata ?? {};
       const title = textValue(metadata.title) || "Sem título";
       const author = textValue(metadata.creator) || "Autor desconhecido";
@@ -35,7 +35,7 @@ export class EpubParserService implements EpubParser {
         const chapterPath = resolveResourcePath(opfPath, String(item["@_href"]), opfDirectory);
         const file = zip.file(chapterPath);
         if (!file) continue;
-        const rawHtml = normalizeHtml(await file.async("string"));
+        const rawHtml = normalizeHtml(await resources.read(file, "string"));
         const text = extractText(rawHtml);
         if (!text.trim()) continue;
         chapters.push({
@@ -66,16 +66,9 @@ export class EpubParserService implements EpubParser {
         const { path: _path, ...storedChapter } = chapter;
         resolvedChapters.push({ ...storedChapter, html });
       }
-      // The reader combines all chapters into one document. Font declarations
-      // belong to that document, rather than N copies of the same Base64 data.
-      const fonts = [...resources.fontFaces.keys()].join("\n");
-      if (fonts) {
-        const style = `<style data-epub-shared-fonts>${fonts.replace(/<\/style/gi, "<\\/style")}</style>`;
-        const first = resolvedChapters[0];
-        first.html = /<head\b[^>]*>/i.test(first.html)
-          ? first.html.replace(/<head\b[^>]*>/i, match => match + style)
-          : `<head>${style}</head>${first.html}`;
-      }
+      // Combined-document reader: retain each identical font rule only at its
+      // last original location, preserving cascade order and media conditions.
+      for (const chapter of resolvedChapters) chapter.html = resources.restoreFonts(chapter.html);
       throwIfAborted(signal);
       return { title, author, opfPath, coverImagePath: null, chapters: resolvedChapters };
     } catch (error) {
@@ -91,9 +84,17 @@ class ResourceContext {
   readonly dataUris = new Map<string, Promise<string | null>>();
   readonly stylesheets = new Map<string, Promise<string>>();
   readonly splitStyles = new Map<string, { css: string; fonts: string[] }>();
-  readonly fontFaces = new Map<string, true>();
+  private readonly fontFaces = new Map<string, { id: number; rule: string; last: number }>();
+  private readonly fonts: Array<{ id: number; rule: string; last: number }> = [];
+  private fontReference = 0;
   private lastYield = Date.now();
   constructor(readonly signal?: AbortSignal) {}
+  async read(file: JSZip.JSZipObject, type: "string" | "base64"): Promise<string> {
+    throwIfAborted(this.signal);
+    const result = await withAbort(file.async(type), this.signal);
+    throwIfAborted(this.signal);
+    return result;
+  }
   async checkpoint(): Promise<void> {
     throwIfAborted(this.signal);
     if (Date.now() - this.lastYield >= 8) {
@@ -121,7 +122,7 @@ class ResourceContext {
         if (char === "}") {
           depth--;
           if (depth === 0 && start >= 0) {
-            pieces.push(css.slice(previous, start));
+            pieces.push(css.slice(previous, start), `/*aldus-font-rule:${fonts.length}*/`);
             fonts.push(css.slice(start, i + 1));
             previous = i + 1; start = -1;
           }
@@ -131,9 +132,22 @@ class ResourceContext {
       split = { css: pieces.join(""), fonts };
       this.splitStyles.set(css, split);
     }
-    // Last occurrence preserves the ordering of competing font declarations.
-    for (const font of split.fonts) { this.fontFaces.delete(font); this.fontFaces.set(font, true); }
-    return split.css;
+    return split.css.replace(/\/\*aldus-font-rule:(\d+)\*\//g, (_marker, index) => {
+      const rule = split.fonts[Number(index)];
+      let font = this.fontFaces.get(rule);
+      if (!font) {
+        font = { id: this.fonts.length, rule, last: 0 };
+        this.fontFaces.set(rule, font); this.fonts.push(font);
+      }
+      font.last = ++this.fontReference;
+      return `/*aldus-font-ref:${font.id}:${font.last}*/`;
+    });
+  }
+  restoreFonts(html: string): string {
+    return html.replace(/\/\*aldus-font-ref:(\d+):(\d+)\*\//g, (marker, id, reference) => {
+      const font = this.fonts[Number(id)];
+      return font ? font.last === Number(reference) ? font.rule : "" : marker;
+    });
   }
 }
 
@@ -242,7 +256,7 @@ function readStylesheet(path: string, zip: JSZip, packageDirectory: string,
   const key = `${path}\n${[...visited].sort().join("\n")}`;
   let pending = resources.stylesheets.get(key);
   if (!pending) {
-    pending = zip.file(path)!.async("string").then(css => inlineCssResources(css, path, zip, packageDirectory, manifest, visited, resources));
+    pending = resources.read(zip.file(path)!, "string").then(css => inlineCssResources(css, path, zip, packageDirectory, manifest, visited, resources));
     resources.stylesheets.set(key, pending);
   }
   return withAbort(pending, resources.signal);
@@ -309,11 +323,11 @@ async function getResourceDataUri(
     if (svgResource) {
       const nextVisited = new Set(visited).add(path);
       const svg = await inlineSvgResources(
-        await file!.async("string"), path, zip, directoryOf(path), manifestByPath, nextVisited, resources
+        await resources.read(file!, "string"), path, zip, directoryOf(path), manifestByPath, nextVisited, resources
       );
       return `data:image/svg+xml;base64,${encodeBase64(svg)}`;
     }
-    return `data:${mimeType};base64,${await file!.async("base64")}`;
+    return `data:${mimeType};base64,${await resources.read(file!, "base64")}`;
   }
 }
 

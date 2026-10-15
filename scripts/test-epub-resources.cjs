@@ -85,6 +85,16 @@ function measured(zip) {
   const svg = Buffer.from(nestedHtml.match(/data:image\/svg\+xml;base64,([^"']+)/)[1], 'base64').toString();
   assert.ok(svg.includes('data:image/png;base64,'));
 
+  const cascade = await fixture(2);
+  const common = '@font-face{font-family:Same;src:url(../fonts/one.ttf)}';
+  cascade.file('OEBPS/css/main.css', common);
+  cascade.file('OEBPS/c1.xhtml','<html><head><style>@media print{@font-face{font-family:Same;src:url(fonts/two.ttf)}}</style><link rel="stylesheet" href="css/main.css"/></head><body><p>Last font wins</p></body></html>');
+  const cascadeParsed = await new EpubParserService().parse(await cascade.generateAsync({type:'uint8array'}));
+  const cascadeHtml = cascadeParsed.chapters.map(c=>c.html).join('');
+  assert.equal((cascadeHtml.match(/font-family:Same/g)||[]).length,2);
+  assert.ok(cascadeHtml.indexOf('@media print')<cascadeHtml.lastIndexOf('@font-face'),'shared unconditional font keeps its last location after conditional declarations');
+  assert.doesNotMatch(cascadeHtml,/aldus-font-ref|aldus-font-rule/,'internal references must not reach storage');
+
   const controller = new AbortController(); let readsAfterAbort = 0;
   const cancelZip = await fixture();
   for (const entry of Object.values(cancelZip.files)) {
