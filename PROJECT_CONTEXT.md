@@ -3,9 +3,11 @@
 Atualizado em 15/10/2026. Fonte única de contexto permanente para IA.
 Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código: HEAD atual da branch,
 identificado pelo Git e pelo build-info.json do export, sem hash autorreferente inventado.
-Campanha na branch integration/comunidade-literaria, iniciada no HEAD 2f98b7937d6ea2b47e30d99e03ac1bec0f0d5a9a.
-Missão integrada posterior iniciada em 7f50a9048876aec350186b594006c24f2bc73a22,
-com evolução do servidor informada pelo operador e sem reaplicar migrations históricas.
+Branch única de integração: integration/comunidade-literaria. Reconciliação por Git após
+fetch confirmou 7f50a9048876aec350186b594006c24f2bc73a22 como ancestral de
+ea30fabe26405db6e1cf9f9870814ad903c3b9f3, ambos já publicados nessa branch.
+Community integrada e origin/main (52456d9) também são ancestrais; nenhum merge adicional
+necessário. As duas campanhas estão preservadas, sem reescrever história ou alterar main.
 APK: PENDENTE DE BUILD CONSOLIDADO; nenhum APK gerado nesta campanha.
 
 ## 1. Visão geral
@@ -178,7 +180,17 @@ ou operação válida; não é teste autenticado A/B nem aplicação de SQL/migr
 Executar node scripts/audit-private-rpc-anon.cjs para repetir esse contrato público.
 Sonda: node scripts/audit-library-sync-public.cjs, somente GET/limit=0 e chave pública.
 Procedimento humano: [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md), inventários
-supabase/audit/01_inventory.sql e 02_library_sync_inventory.sql antes de decidir 001→002.
+supabase/audit/01_inventory.sql e 02_library_sync_inventory.sql para comparar ledger,
+definições/ACL/RLS e bucket já implantados. Considerar somente o hardening incremental
+20261015160539 após esse inventário; nunca reaplicar 001/002 ou reparar versões por hipótese.
+
+Reconferência pública de 15/10 às 14:22 BRT: items/operations HTTP401/42501, sem PGRST205;
+flashcard_battle/get e library_apply nulo HTTP401/42501, helper de Storage HTTP200/false.
+Bucket retornou HTTP400/NoSuchBucket ao anônimo: isso não contradiz o bucket privado
+informado nem comprova existência/ausência administrativa. Níveis atuais: IMPLEMENTADO
+LOCALMENTE e VALIDADO ANÔNIMO; APLICADO REMOTAMENTE segundo o operador para 001/002.
+VALIDADO AUTENTICADO, A/B, CONTA DESATIVADA, STORAGE real e ANDROID continuam pendentes.
+O hardening incremental só tem prova local; não houve aplicação remota nesta reconciliação.
 
 Limites: snapshot/outbox JSON por conta e full pull até 100×500 entidades; upload padrão,
 sem TUS/resume persistente; parsers/Blob ainda podem usar memória proporcional ao livro.
@@ -282,7 +294,9 @@ Não implantar sem configurar/testar Redis. node scripts/test-username-login.cjs
 e concorrência com Redis/Auth controlados, não serviço real nem proteção DDoS de infraestrutura.
 Supabase/Vercel aparecem instalados no catálogo de plugins nesta sessão, mas não expõem
 ferramentas administrativas utilizáveis; isso supera a nota antiga de plugin não instalado.
-Implantação da função e testes reais continuam pendentes.
+OPTIONS username-login reconferido em 15/10 às 14:22 BRT: HTTP404/NOT_FOUND.
+Implantação da função e testes reais continuam pendentes. Redis está implementado/testado
+com contrato controlado; configuração, conectividade e limites do serviço remoto não verificados.
 Signup/recovery e RLS efetivos precisam de teste remoto/logs, sem presumir que arquivo SQL
 foi aplicado. Cache offline do mesmo usuário não cria sessão; o cache de perfil ainda
 não tem TTL e não certifica status remoto atual. Não afrouxar guard/RLS para resolver conexão.
@@ -457,6 +471,9 @@ vercel.json fixa build/output/install e headers compatíveis com o iframe do Rea
 Deno check, 49 suites críticas, export/metadata, diff check e audit crítico. Actions pinadas
 por SHA, contents:read, checkout sem persistir credencial. Sem segredo/deploy automático.
 Workflow preparado/localmente validado; só execução Actions real comprova CI remoto.
+Reconciliação local: typecheck, export:web, verificação do metadata exportado e todas as
+49 suítes de test:critical passaram novamente. Apenas os dois contextos oficiais foram
+ajustados; nenhum código, migration, APK ou deploy foi produzido por esta reconciliação.
 Vercel Git integration/checks/permissões/logs dependem do operador; não presumir deploy
 com base no último commit. README contém roteiro humano; não publicar produção sozinho.
 

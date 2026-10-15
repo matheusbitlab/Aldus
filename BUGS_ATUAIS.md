@@ -2,8 +2,10 @@
 
 Atualizado em 15/10/2026. Branch integration/comunidade-literaria.
 Referência funcional: HEAD da branch/commit que contém esta atualização.
-Baseline desta missão: 7f50a9048876aec350186b594006c24f2bc73a22.
-Baseline da campanha anterior: 2f98b7937d6ea2b47e30d99e03ac1bec0f0d5a9a.
+Reconciliação Git: 7f50a9048876aec350186b594006c24f2bc73a22 é ancestral de
+ea30fabe26405db6e1cf9f9870814ad903c3b9f3; ambos já presentes no remoto da integração.
+Oito incidentes originais mantidos, além dos três problemas ativos adicionais 11–13;
+nenhum encerramento é inferido de merge, export ou teste controlado.
 Somente problemas ativos. Contexto permanente: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validação física nova.
 
@@ -33,12 +35,17 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 
 ## BUG 02 — Library Sync implantado, validação autenticada pendente
 
-- Prioridade: ALTA. Status: BLOQUEADO EXTERNAMENTE / VALIDAÇÃO REMOTA PENDENTE.
+- Prioridade: ALTA. Status: PARCIAL / IMPLANTAÇÃO INFORMADA / VALIDAÇÃO AUTENTICADA PENDENTE.
 - Sintoma/reprodução: “37 operações pendentes”, último sync ausente e servidor indisponível.
   37 é relato do aparelho; a UI soma entidades dirty e arquivos pendentes.
 - Evidência histórica: 10:58 BRT HTTP404/PGRST205; após deploy informado, nova sonda de
   12:58 BRT retornou HTTP401/42501 nas duas tabelas. Usuário informou versions remotas
   20261015145012/20261015145018, bucket privado e sete policies. NÃO reaplicar 001/002.
+- Reconferência real em 15/10 às 14:22 BRT: as duas tabelas seguem HTTP401/42501;
+  library_apply nulo negado (401/42501), helper Storage retorna false ao anônimo.
+  Bucket HTTP400/NoSuchBucket ao anônimo não comprova ausência de bucket privado.
+  IMPLEMENTADO LOCALMENTE / VALIDADO ANÔNIMO; APLICADO REMOTAMENTE conforme operador.
+  VALIDADO AUTENTICADO / A-B / CONTA DESATIVADA / STORAGE real / ANDROID: PENDENTES.
 - Primeira divergência atual: fluxo autenticado não executado neste ambiente; sem nova
   tentativa do aparelho não atribuir as 37 pendências ao antigo contrato ausente.
 - Causa atual: INCONCLUSIVA. A causa histórica de contrato ausente foi superada pelo deploy
@@ -53,7 +60,8 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 - Testes realizados: library-sync/files/reading-sync/coordinator/restart PASS em SQLite/
   fronteiras controladas; library-rls PASS em PostgreSQL/PGlite A/B/anon e fences Storage.
   App Web com dois IndexedDB/HTTP fixture passou upload/download/remoções/rollback/conta.
-- Testes pendentes: inventário admin, deploy compatível, HTTP autenticado A/B/anon e dois aparelhos.
+- Testes pendentes: inventário admin, comparar implantação existente e avaliar somente a nova
+  migration de hardening (BUG 11); HTTP autenticado A/B/disabled, Storage e dois aparelhos.
 - Dependências externas: plugins instalados sem ferramentas administrativas expostas e CLI
   sem access token. Operador autorizado deve seguir [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md):
   comparar ledger/objetos/ACL/RLS/bucket; reconhecer o mapeamento remoto 20261015145012/018;
@@ -146,7 +154,7 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 - Prioridade: MÉDIA. Status: BLOQUEADO EXTERNAMENTE.
 - Sintoma/reprodução: login por username chama Edge Function username-login.
 - Evidência/primeira divergência: OPTIONS /functions/v1/username-login retornou
-  HTTP404/NOT_FOUND novamente em 15/10/2026, sem autenticar/criar conta.
+  HTTP404/NOT_FOUND reconfirmado em 15/10/2026 às 14:22 BRT, sem autenticar/criar conta.
 - Causa: endpoint esperado indisponível CONFIRMADO; estado administrativo final não inventariado.
 - Arquivos: supabase/functions/username-login/index.ts e src/data/remote/authService.ts.
 - Correção: handler público com Redis/Upstash atômico global/origem/username, HMAC,
