@@ -121,6 +121,9 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
   operacionais. Não existe prova de acesso sem sessão. A sonda de callback de 12/10 foi de
   cancelamento OAuth; usuário relatou Google funcionando depois, o que supera a antiga
   generalização de “Google sempre bloqueado”, sem validar cadastro/recovery.
+  Nova sonda real desta missão preservou Native/recovery exatos; porém callback Web dev
+  virou aldus e caminho Native não aprovado foi aceito. Ajuste remoto pendente, não defeito
+  comprovado na construção do callback cliente.
 - Causa: INCONCLUSIVA para os incidentes atuais; configuração/policy/logs exigem acesso autorizado.
 - Arquivos: app/auth/, AuthContext.tsx, authService.ts, authRedirect.ts e inventário Auth.
 - Correção: nenhuma expansão Auth nesta campanha; preservados os guardas/correções existentes.
@@ -167,3 +170,19 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 - Testes realizados: inspeção atual do bloqueio declarado; regressões anteriores de fontes.
 - Testes pendentes/dependências externas: acesso/documentação oficial que permita consulta e aquisição.
 - Não regredir: não tratar DocReader/página HTML como EPUB/PDF nem bloquear fontes funcionais.
+
+## BUG 11 — Conta desativada ainda pode usar o contrato remoto da Library
+
+- Prioridade: ALTA. Status: IMPLEMENTADO / DEPLOY INCREMENTAL PENDENTE.
+- Causa CONFIRMADA no PostgreSQL local: library_apply original valida auth.uid mas não
+  account_status; RLS/Storage próprios também não exigem perfil ativo. Remoto não explorado.
+- Correção: migration 20261015160539_library_active_account_fences.sql move implementação
+  CAS intacta para schema privado, publica wrapper com perfil ativo e fences restritivas.
+  Não altera registros, grants de outros buckets ou migrations históricas. Helper anon
+  library_object_allowed é necessário às fences e retorna false para anon/paths alheios;
+  grant anon por si só não é vazamento confirmado.
+- Testes: node scripts/test-integrated-security.cjs PASS em PostgreSQL/PGlite real;
+  reproduz baseline, preserva linhas, bloqueia disabled/A-B/anon e autopromoção/overrides.
+- Pendente: inventário admin do projeto cmivracxuihtmsbmtuec, comparação de definições e
+  implantação somente da migration NOVA, seguida de HTTP A/B/disabled/anon e Storage.
+- Não regredir: recibos/CAS/idempotência, livros locais offline e dados de produção.

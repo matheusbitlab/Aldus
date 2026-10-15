@@ -31,6 +31,10 @@ export class GoogleDriveService {
     this.indexes.delete(sourceId);
     this.generations.set(sourceId, (this.generations.get(sourceId) ?? 0) + 1);
   }
+  clearSession(): void {
+    for (const sourceId of new Set([...this.generations.keys(), ...this.indexes.keys()])) this.clearIndex(sourceId);
+    this.authorization.clearSession();
+  }
   async disconnect(sourceId: string): Promise<boolean> {
     this.clearIndex(sourceId);
     return this.authorization.disconnect(sourceId);

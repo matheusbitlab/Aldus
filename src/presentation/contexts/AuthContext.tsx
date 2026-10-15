@@ -56,6 +56,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         throw profileResult.error ?? overrideResult.error ?? new Error("Perfil indisponível.");
       }
       const found = profileResult.data as AccountProfile;
+      if (found.id !== next.user.id) throw new Error("Perfil não corresponde à sessão.");
       const features: FeatureOverrides = {};
       for (const row of overrideResult.data ?? []) if (row.feature_key === "flashcards") features.flashcards = row.enabled;
       if (run !== revision.current) return;
@@ -116,7 +117,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (formerUserId) await AsyncStorage.removeItem(cacheKey(formerUserId)).catch(() => undefined);
     if(libraryAccountScope.userId===null)await resolve(null);
   }, [resolve, session?.user.id]);
-  const canUse = useCallback((feature: FeatureKey) => canUseFeature(profile, overrides, feature), [profile, overrides]);
+  const canUse = useCallback((feature: FeatureKey) => !!session && profile?.id === session.user.id
+    && canUseFeature(profile, overrides, feature), [session, profile, overrides]);
   const value = useMemo<AuthState>(() => ({ loading, session, user: session?.user ?? null, profile, overrides, error, refreshProfile, signOut, canUse }), [loading, session, profile, overrides, error, refreshProfile, signOut, canUse]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

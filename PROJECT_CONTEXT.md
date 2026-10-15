@@ -212,6 +212,11 @@ continua sem trace. Não reabrir OAuth sem evidência nova. [GOOGLE_AUTH_DRIVE_D
 é roteiro operacional de configuração/teste, não checkpoint do estado atual.
 Página pública de pasta não comprova files.list autenticado nem importação no Aldus.
 
+Missão integrada: mudança síncrona do LibraryAccountScope limpa todos os grants e índices
+Drive em memória, incluindo consentimentos pendentes; retorno antigo não pode autorizar B.
+Snapshots/configuração Sources continuam DEVICE-scoped, não são promessa de isolamento
+persistido por conta; não atribuir automaticamente os legados a uma identidade.
+
 ## 9. Auth
 
 Supabase SDK persistSession/autoRefresh, email/senha, cadastro, username, Google PKCE,
@@ -228,6 +233,12 @@ Callback Native: aldus://auth/callback; recovery: aldus://auth/callback?next=res
 Web usa origin real; SSR sem browser falha explicitamente. Authorize é validado antes de
 abrir navegador; troca PKCE é única e requer sessão. Erros query/hash/cancelamento têm terminal,
 sem code/token/verifier/secret na UI ou logs. Email confirmado/perfil são distintos de senha.
+
+Nova sonda real de cancelamento OAuth na missão integrada: Native e recovery exatos PASS,
+superando o fallback localhost de 12/10. Web localhost:8081 foi redirecionado para aldus,
+e aldus://auth/unapproved-callback foi aceito: allowlist/Site URL precisam de revisão admin.
+Não equivale a login consentido, recovery por email ou execução Android. Preservar histórico
+sanitizado em artifacts/auth/urgent/redirect-probe.json; detalhes operacionais no deployment.
 
 Username depende da Edge Function supabase/functions/username-login/index.ts; resolução
 de email fica no servidor. handler.ts implementa limite Redis/Upstash atômico compartilhado:
@@ -331,6 +342,12 @@ Cada um avança independentemente; primeiro a terminar espera; maior pontuação
 por igualdade. Sem derrota por desconexão, expiração ou abandono presumido.
 Retomada consulta partida; polling de 3s só na tela ativa/foreground. Deck de batalha até
 500 cartões/16 MB; gabarito/explicação não são enviados antes da resposta aceita.
+
+Cliente Battle congela UUID/epoch/JWT para toda operação upload→join, usa HTTP autenticado
+com cancelamento ao trocar conta e rejeita resposta A→B→A. UI remonta somente o conteúdo
+da batalha ao mudar UUID e ignora load/resultado após blur. Não altera estudo/SRS local.
+Testes test-battle-account.cjs e PostgreSQL real test-flashcard-battles.cjs não equivalem
+a duas sessões Supabase autenticadas independentes.
 
 Migration 202610090001_flashcard_battles.sql e supabase/tests/flashcard_battles_manual.sql
 passaram historicamente em PostgreSQL isolado; usuário informou deploy real como versão

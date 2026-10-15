@@ -18,6 +18,7 @@ node_modules/
 /debug-reflow-scan.js
 *.apk
 artifacts/
+supabase/.temp/
 modules/*/android/.gradle/
 modules/*/android/build/
 modules/*/android/.cxx/

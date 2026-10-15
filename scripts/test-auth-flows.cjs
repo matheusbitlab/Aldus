@@ -247,6 +247,12 @@ async function run() {
     const oldProfile=deferred();h=harness({initialSession:session,profileById:id=>id===uuid?oldProfile.promise:profileFor(id)});await h.mount();await h.emitSessions([secondSession]);oldProfile.resolve(profileFor(uuid));await h.settle();assert.equal(h.state().profile.id,secondUuid,'late A profile cannot replace B');await h.unmount();
     h=harness({initialEvent:secondSession,initialSession:session,profileById:profileFor});await h.mount();await h.settle();assert.equal(h.state().session.user.id,secondUuid,'synchronous INITIAL_SESSION invalidates stale restore');await h.emitSessions([session,secondSession,session]);assert.equal(h.state().session.user.id,uuid);assert.equal(h.state().profile.id,uuid);await h.unmount();
     console.log('PASS account races: queued A/B/ABA events, stale getSession/profile, synchronous INITIAL_SESSION cannot restore a revoked account');
+    h=harness({initialSession:session,profile:{...account,id:secondUuid,role:'master'}});
+    await h.mount();await h.settle();assert.equal(h.allowed(),false);
+    assert.equal(h.state().profile,null);assert.equal(h.state().canUse('flashcards'),false);
+    assert.equal(h.storage.has(`@kindle/auth-profile.v1:${uuid}`),false,'Foreign profile must never be cached under this session');
+    await h.unmount();
+    console.log('PASS mismatched session/profile UUID is denied before route, feature access or cache publication');
     const migration=fs.readFileSync('supabase/migrations/202610060001_profiles_and_features.sql','utf8');
     assert.match(migration,/references auth\.users\(id\)/);
     assert.match(migration,/grant update \(username, display_name, avatar_url\) on public\.profiles to authenticated/);

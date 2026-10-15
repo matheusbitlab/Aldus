@@ -40,6 +40,10 @@ export class DriveAuthorization {
     return grant.accessToken;
   }
   connected(sourceId: string): boolean { try { this.token(sourceId); return true; } catch { return false; } }
+  clearSession(): void {
+    // Includes authorize calls still pending, not only completed grants.
+    for (const sourceId of new Set([...this.generations.keys(), ...this.grants.keys()])) this.invalidate(sourceId);
+  }
   invalidate(sourceId: string): void {
     const grant = this.grants.get(sourceId);
     this.grants.delete(sourceId);

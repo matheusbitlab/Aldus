@@ -1,0 +1,40 @@
+const assert = require('node:assert/strict');
+const { loader } = require('./library-test-utils.cjs');
+const { LibraryAccountScope } = loader()('src/data/library/LibraryAccountScope.ts');
+const scope = new LibraryAccountScope();
+let session = { user: { id: 'a' }, access_token: 'jwt-a' };
+const load = loader({ './supabase': { requireSupabase: () => ({ auth: { getSession: async () => ({ data: { session }, error: null }) } }) },
+  '@/src/data/library/LibraryAccountScope': { libraryAccountScope: scope } });
+const { RemoteFlashcardBattleRepository } = load('src/data/remote/FlashcardBattleRepository.ts');
+const repo = new RemoteFlashcardBattleRepository(), calls = [];
+const oldFetch = global.fetch;
+const card = i => ({ id: String(i), deckId: 'deck', title: 'Test', statement: 'Question', isTrue: true, explanation: 'Why', status: 'approved', imageUrl: null, drawing: null });
+const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { resolve, promise }; };
+(async () => {
+  scope.set('a');
+  global.fetch = async (_url, init) => { calls.push(init); return Response.json({ status: 'idle' }); };
+  await repo.join({ id: 'deck', title: 'Deck' }, [0, 1, 2].map(card), 3);
+  assert.deepEqual(calls.map(c => JSON.parse(c.body).action), ['upload', 'join']);
+  assert.ok(calls.every(c => c.headers.Authorization === 'Bearer jwt-a'));
+  calls.length = 0;
+  global.fetch = async (_url, init) => {
+    calls.push(init); scope.set('b'); session = { user: { id: 'b' }, access_token: 'jwt-b' };
+    return Response.json({ status: 'idle' });
+  };
+  await assert.rejects(() => repo.join({ id: 'deck', title: 'Deck' }, [0, 1, 2].map(card), 3));
+  assert.equal(calls.length, 1, 'Account switch after upload must prevent join under B');
+  scope.set('a'); session = { user: { id: 'a' }, access_token: 'jwt-a' };
+  const gate = deferred(); global.fetch = () => gate.promise;
+  const late = repo.get(); await new Promise(r => setImmediate(r));
+  scope.set('b'); scope.set('a');
+  await assert.rejects(late, /cancelada|conta mudou/);
+  gate.resolve(Response.json({ status: 'active', me: { id: 'a' } }));
+  global.fetch = async () => Response.json({ status: 'active', me: { id: 'b' } });
+  await assert.rejects(() => repo.get(), /inválida/);
+  global.fetch = async () => Response.json({ code: '42501', message: 'SECRET_CANARY' }, { status: 403 });
+  await assert.rejects(() => repo.get(), e => !e.message.includes('SECRET_CANARY') && /conta/.test(e.message));
+  global.fetch = async () => Response.json({ code: 'PGRST202' }, { status: 404 });
+  await assert.rejects(() => repo.get(), /não está disponível/);
+  scope.set(null); await assert.rejects(() => repo.get(), /Entre/);
+  console.log('PASS battle client: frozen JWT across upload/join, A/B/ABA and ignored-abort response rejection, owner validation and sanitized errors. No remote multiplayer claim.');
+})().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { global.fetch = oldFetch; });

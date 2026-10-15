@@ -32,8 +32,9 @@ import { FlashcardSessionView } from "@/src/presentation/components/flashcards/F
 
 export default function Battle() {
   const { allowed } = useFeatureAccess("flashcards");
+  const { user } = useAuth();
   return (
-    <AuthGuard>{allowed ? <BattleContent /> : <FeatureDenied />}</AuthGuard>
+    <AuthGuard>{allowed ? <BattleContent key={user?.id ?? "signed-out"} /> : <FeatureDenied />}</AuthGuard>
   );
 }
 function BattleContent() {
@@ -87,15 +88,16 @@ function BattleContent() {
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
+      const version = revision.current;
       void repository
         .load()
         .then((s) => {
-          if (mounted.current) {
+          if (mounted.current && version === revision.current) {
             setSnapshot(s);
             setDeckId((id) => id || s.decks[0]?.id || "");
           }
         })
-        .catch((e) => setError(e.message));
+        .catch((e) => { if (mounted.current && version === revision.current) setError(e.message); });
       void refresh();
       return () => {
         setFocused(false);
@@ -132,13 +134,14 @@ function BattleContent() {
     }
     locked.current = true;
     revision.current++;
+    const version = revision.current;
     setBusy(true);
     setError("");
     try {
       const next = await job();
-      if (mounted.current) setState(next);
+      if (mounted.current && version === revision.current) setState(next);
     } catch (e) {
-      if (mounted.current)
+      if (mounted.current && version === revision.current)
         setError(
           e instanceof Error
             ? e.message

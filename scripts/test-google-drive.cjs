@@ -25,6 +25,22 @@ const response = data => new Response(JSON.stringify(data),{headers:{'Content-Ty
   let cleared = 0, revoked = 0;
   const provider={prepare:async()=>{},authorize:async()=>({accessToken:'fixture-token',expiresAt:Date.now()+3600000}),clearToken:async()=>{cleared++;},revoke:async()=>{revoked++;}};
   const auth=new DriveAuthorization(provider); assert.throws(()=>auth.token(source.id),e=>e.code==='disconnected');
+  {
+    const gate=deferred(), sessionAuth=new DriveAuthorization({...provider,authorize:()=>gate.promise});
+    const pending=sessionAuth.connect('pending'); await tick(); sessionAuth.clearSession();
+    gate.resolve({accessToken:'old-account-token',expiresAt:Date.now()+3600000});
+    await assert.rejects(pending,e=>e.code==='disconnected');
+    await sessionAuth.connect('new'); sessionAuth.clearSession();
+    assert.throws(()=>sessionAuth.token('new'),e=>e.code==='disconnected');
+    const sessionService=new GoogleDriveService(sessionAuth); sessionService.clearSession();
+    let revoked=0;
+    const {LibraryAccountScope}=loader()('src/data/library/LibraryAccountScope.ts'); const accountScope=new LibraryAccountScope();
+    loader({'./DriveAuthorization':{DriveAuthorization:class{}},'./drivePlatformAuth':{drivePlatformAuth:{}},
+      './GoogleDriveService':{GoogleDriveService:class{clearSession(){revoked++;}}},
+      '@/src/data/library/LibraryAccountScope':{libraryAccountScope:accountScope}})('src/data/drive/driveDependencies.ts');
+    accountScope.set('a'); accountScope.set('b'); accountScope.set(null); assert.equal(revoked,3);
+    console.log('PASS Auth account scope synchronously clears Drive grants and rejects old pending consent');
+  }
   await auth.connect(source.id); assert.equal(auth.token(source.id),'fixture-token');
   const requests=[];
   const service = new GoogleDriveService(auth,async (url,options) => {
