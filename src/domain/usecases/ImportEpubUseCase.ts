@@ -13,7 +13,7 @@ import { BookImportPhaseUpdate } from "@/src/domain/types/bookImport";
 
 export class ImportEpubUseCase {
   constructor(private readonly parser: EpubParser, private readonly books: BookRepository, private readonly chapters: ChapterRepository) {}
-  async validateBytes(bytes: Uint8Array, signal?: AbortSignal): Promise<void> { await withAbort(this.parser.parse(bytes), signal); }
+  async validateBytes(bytes: Uint8Array, signal?: AbortSignal): Promise<void> { await withAbort(this.parser.parse(bytes, signal), signal); }
   async execute(
     input: { bytes: Uint8Array; fileName: string; filePath: string; fileSize: number; fileHash?: string | null; bookId?: string },
     options: { signal?: AbortSignal; onPhase?: (update: BookImportPhaseUpdate) => void } = {}
@@ -25,7 +25,7 @@ export class ImportEpubUseCase {
       fileName: input.fileName,
       fileSizeBytes: input.fileSize || input.bytes.byteLength,
     });
-    const parsed = await withAbort(this.parser.parse(input.bytes), options.signal);
+    const parsed = await withAbort(this.parser.parse(input.bytes, options.signal), options.signal);
     markEpubOpenSpanEnd("parse_and_validation", parseStartedAt, {
       chapterCount: parsed.chapters.length,
       plainTextCharacters: parsed.chapters.reduce((total, chapter) => total + chapter.characterCount, 0),

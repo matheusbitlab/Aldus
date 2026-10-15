@@ -3,14 +3,17 @@ import { XMLParser } from "fast-xml-parser";
 import { EpubParser, ParsedEpub } from "@/src/data/epub/EpubTypes";
 import { EpubParsingError } from "@/src/data/epub/EpubErrors";
 import { EpubValidatorService } from "@/src/data/epub/EpubValidatorService";
+import { throwIfAborted, withAbort, cancellableWait } from "@/src/core/utils/cancellation";
 
 const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_", removeNSPrefix: true });
 
 export class EpubParserService implements EpubParser {
   constructor(private readonly validator = new EpubValidatorService()) {}
-  async parse(bytes: Uint8Array): Promise<ParsedEpub> {
-    const zip = await this.validator.openAndValidate(bytes);
+  async parse(bytes: Uint8Array, signal?: AbortSignal): Promise<ParsedEpub> {
+    throwIfAborted(signal);
+    const zip = await withAbort(this.validator.openAndValidate(bytes), signal);
     try {
+      const resources = new ResourceContext(signal);
       const container = xmlParser.parse(await zip.file("META-INF/container.xml")!.async("string"));
       const opfPath = normalizePath(String(container.container.rootfiles.rootfile["@_full-path"]));
       const opfDirectory = directoryOf(opfPath);
@@ -20,9 +23,13 @@ export class EpubParserService implements EpubParser {
       const author = textValue(metadata.creator) || "Autor desconhecido";
       const manifestItems = asArray(opf.manifest?.item) as Array<Record<string, unknown>>;
       const manifest = new Map(manifestItems.map((item) => [String(item["@_id"]), item]));
+      const manifestByPath = new Map(manifestItems.filter(item => item["@_href"]).map(item => [
+        resolveResourcePath(opfPath, String(item["@_href"]), opfDirectory), item,
+      ]));
       const spineItems = asArray(opf.spine?.itemref);
       const chapters: ChapterDraft[] = [];
       for (let index = 0; index < spineItems.length; index += 1) {
+        await resources.checkpoint();
         const item = manifest.get(String(spineItems[index]["@_idref"]));
         if (!item?.["@_href"]) continue;
         const chapterPath = resolveResourcePath(opfPath, String(item["@_href"]), opfDirectory);
@@ -44,23 +51,89 @@ export class EpubParserService implements EpubParser {
       }
       if (!chapters.length) throw new EpubParsingError("O EPUB não possui capítulos legíveis.");
       const chapterIndexByPath = new Map(chapters.map((chapter) => [chapter.path, chapter.chapterIndex]));
-      const resolvedChapters = await Promise.all(chapters.map(async (chapter) => {
+      const resolvedChapters: ParsedEpub["chapters"] = [];
+      for (const chapter of chapters) {
+        await resources.checkpoint();
         let html = await inlineChapterResources(
           chapter.html,
           chapter.path,
           zip,
           opfDirectory,
-          manifestItems
+          manifestByPath,
+          resources
         );
         html = rewriteChapterLinks(html, chapter.path, opfDirectory, chapterIndexByPath);
         const { path: _path, ...storedChapter } = chapter;
-        return { ...storedChapter, html };
-      }));
+        resolvedChapters.push({ ...storedChapter, html });
+      }
+      // The reader combines all chapters into one document. Font declarations
+      // belong to that document, rather than N copies of the same Base64 data.
+      const fonts = [...resources.fontFaces.keys()].join("\n");
+      if (fonts) {
+        const style = `<style data-epub-shared-fonts>${fonts.replace(/<\/style/gi, "<\\/style")}</style>`;
+        const first = resolvedChapters[0];
+        first.html = /<head\b[^>]*>/i.test(first.html)
+          ? first.html.replace(/<head\b[^>]*>/i, match => match + style)
+          : `<head>${style}</head>${first.html}`;
+      }
+      throwIfAborted(signal);
       return { title, author, opfPath, coverImagePath: null, chapters: resolvedChapters };
     } catch (error) {
+      throwIfAborted(signal);
       if (error instanceof EpubParsingError) throw error;
       throw new EpubParsingError("Não foi possível interpretar a estrutura do EPUB.", error);
     }
+  }
+}
+
+/** Caches are owned by a single parse; no content survives a cancelled import. */
+class ResourceContext {
+  readonly dataUris = new Map<string, Promise<string | null>>();
+  readonly stylesheets = new Map<string, Promise<string>>();
+  readonly splitStyles = new Map<string, { css: string; fonts: string[] }>();
+  readonly fontFaces = new Map<string, true>();
+  private lastYield = Date.now();
+  constructor(readonly signal?: AbortSignal) {}
+  async checkpoint(): Promise<void> {
+    throwIfAborted(this.signal);
+    if (Date.now() - this.lastYield >= 8) {
+      // A macrotask gives touch/cancel events a turn, unlike resolved Promises.
+      await cancellableWait(0, this.signal);
+      this.lastYield = Date.now();
+    }
+  }
+  shareFonts(css: string): string {
+    let split = this.splitStyles.get(css);
+    if (!split) {
+      const fonts: string[] = [];
+      // Only top-level rules can be shared without dropping @media conditions.
+      let depth = 0, quote = "", comment = false, start = -1;
+      const pieces: string[] = [];
+      let previous = 0;
+      for (let i = 0; i < css.length; i++) {
+        const char = css[i], next = css[i + 1];
+        if (comment) { if (char === "*" && next === "/") { comment = false; i++; } continue; }
+        if (quote) { if (char === "\\") i++; else if (char === quote) quote = ""; continue; }
+        if (char === "/" && next === "*") { comment = true; i++; continue; }
+        if (char === '"' || char === "'") { quote = char; continue; }
+        if (depth === 0 && char === "@" && /^@font-face\s*\{/i.test(css.slice(i, i + 32))) start = i;
+        if (char === "{") depth++;
+        if (char === "}") {
+          depth--;
+          if (depth === 0 && start >= 0) {
+            pieces.push(css.slice(previous, start));
+            fonts.push(css.slice(start, i + 1));
+            previous = i + 1; start = -1;
+          }
+        }
+      }
+      pieces.push(css.slice(previous));
+      split = { css: pieces.join(""), fonts };
+      this.splitStyles.set(css, split);
+    }
+    // Last occurrence preserves the ordering of competing font declarations.
+    for (const font of split.fonts) { this.fontFaces.delete(font); this.fontFaces.set(font, true); }
+    return split.css;
   }
 }
 
@@ -100,66 +173,79 @@ async function inlineChapterResources(
   chapterPath: string,
   zip: JSZip,
   packageDirectory: string,
-  manifestItems: Array<Record<string, unknown>>
+  manifestByPath: Map<string, Record<string, unknown>>,
+  resources: ResourceContext
 ): Promise<string> {
-  const manifestByPath = new Map(
-    manifestItems
-      .filter((item) => item["@_href"])
-      .map((item) => [
-        resolveResourcePath(`${packageDirectory}/content.opf`, String(item["@_href"]), packageDirectory),
-        item,
-      ])
-  );
   let output = html;
-
-  for (const match of [...output.matchAll(/<link\b[^>]*>/gi)].reverse()) {
-    const tag = match[0];
-    const rel = readAttribute(tag, "rel") ?? "";
-    const href = readAttribute(tag, "href");
-    if (!/\bstylesheet\b/i.test(rel) || !href || isExternalResource(href)) continue;
-    const path = resolveResourcePath(chapterPath, href, packageDirectory);
-    const file = zip.file(path);
-    if (!file) continue;
-    const styles = await inlineCssResources(await file.async("string"), path, zip, packageDirectory, manifestByPath, new Set([path]));
-    output = replaceAt(output, match.index ?? 0, tag.length, `<style>${styles.replace(/<\/style/gi, "<\\/style")}</style>`);
-  }
 
   const tags = [...output.matchAll(/<(?:img|image|source|video|audio|track)\b[^>]*>/gi)].reverse();
   for (const match of tags) {
+    await resources.checkpoint();
     const tag = match[0];
     let updatedTag = tag;
     for (const attribute of ["src", "href", "xlink:href", "poster", "data-src"]) {
       const resource = readAttribute(updatedTag, attribute);
       if (!resource || isExternalResource(resource)) continue;
       const path = resolveResourcePath(chapterPath, resource, packageDirectory);
-      const dataUri = await getResourceDataUri(path, zip, manifestByPath);
+      const dataUri = await getResourceDataUri(path, zip, manifestByPath, resources);
       if (dataUri) updatedTag = replaceAttribute(updatedTag, attribute, dataUri);
     }
     const srcSet = readAttribute(updatedTag, "srcset");
     if (srcSet && !/^data:/i.test(srcSet)) {
-      const candidates = await Promise.all(srcSet.split(",").map(async (candidate) => {
+      const candidates: string[] = [];
+      for (const candidate of srcSet.split(",")) {
         const [source, ...descriptors] = candidate.trim().split(/\s+/);
-        if (!source || isExternalResource(source)) return candidate.trim();
+        if (!source || isExternalResource(source)) { candidates.push(candidate.trim()); continue; }
         const path = resolveResourcePath(chapterPath, source, packageDirectory);
-        const dataUri = await getResourceDataUri(path, zip, manifestByPath);
-        return dataUri ? [dataUri, ...descriptors].join(" ") : candidate.trim();
-      }));
+        const dataUri = await getResourceDataUri(path, zip, manifestByPath, resources);
+        candidates.push(dataUri ? [dataUri, ...descriptors].join(" ") : candidate.trim());
+      }
       updatedTag = replaceAttribute(updatedTag, "srcset", candidates.join(", "));
     }
     output = replaceAt(output, match.index ?? 0, tag.length, updatedTag);
   }
 
   for (const match of [...output.matchAll(/\sstyle\s*=\s*(["'])([\s\S]*?)\1/gi)].reverse()) {
-    const styleText = await inlineCssResources(match[2], chapterPath, zip, packageDirectory, manifestByPath, new Set());
+    const styleText = await inlineCssResources(match[2], chapterPath, zip, packageDirectory, manifestByPath, new Set(), resources);
     output = replaceAt(output, match.index ?? 0, match[0].length, ` style=${match[1]}${styleText}${match[1]}`);
   }
 
-  for (const match of [...output.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].reverse()) {
-    const styles = await inlineCssResources(match[1], chapterPath, zip, packageDirectory, manifestByPath, new Set());
-    output = replaceAt(output, match.index ?? 0, match[0].length, match[0].replace(match[1], styles));
+  // Process style/link nodes in source order, once; don't rescan expanded CSS.
+  const styles = [...output.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>|<link\b[^>]*>/gi)];
+  const replacements: Array<{ start: number; length: number; html: string }> = [];
+  for (const match of styles) {
+    await resources.checkpoint();
+    let css: string;
+    if (match[1] !== undefined) {
+      css = await inlineCssResources(match[1], chapterPath, zip, packageDirectory, manifestByPath, new Set(), resources);
+    } else {
+      const href = readAttribute(match[0], "href");
+      if (!/\bstylesheet\b/i.test(readAttribute(match[0], "rel") ?? "") || !href || isExternalResource(href)) continue;
+      const path = resolveResourcePath(chapterPath, href, packageDirectory);
+      if (!zip.file(path)) continue;
+      css = await readStylesheet(path, zip, packageDirectory, manifestByPath, new Set([path]), resources);
+    }
+    const media = readAttribute(match[0], "media");
+    if (!media) css = resources.shareFonts(css);
+    replacements.push({ start: match.index ?? 0, length: match[0].length,
+      html: `<style${media ? ` media="${media.replace(/"/g, "&quot;")}"` : ""}>${css.replace(/<\/style/gi, "<\\/style")}</style>` });
+  }
+  for (const replacement of replacements.reverse()) {
+    output = replaceAt(output, replacement.start, replacement.length, replacement.html);
   }
 
   return output;
+}
+
+function readStylesheet(path: string, zip: JSZip, packageDirectory: string,
+  manifest: Map<string, Record<string, unknown>>, visited: Set<string>, resources: ResourceContext): Promise<string> {
+  const key = `${path}\n${[...visited].sort().join("\n")}`;
+  let pending = resources.stylesheets.get(key);
+  if (!pending) {
+    pending = zip.file(path)!.async("string").then(css => inlineCssResources(css, path, zip, packageDirectory, manifest, visited, resources));
+    resources.stylesheets.set(key, pending);
+  }
+  return withAbort(pending, resources.signal);
 }
 
 async function inlineCssResources(
@@ -168,10 +254,12 @@ async function inlineCssResources(
   zip: JSZip,
   packageDirectory: string,
   manifestByPath: Map<string, Record<string, unknown>>,
-  visited: Set<string>
+  visited: Set<string>,
+  resources: ResourceContext
 ): Promise<string> {
   let output = css;
   for (const match of [...output.matchAll(/@import\s+(?:url\(\s*)?(["']?)([^"')\s;]+)\1\s*\)?\s*([^;]*);/gi)].reverse()) {
+    await resources.checkpoint();
     const href = match[2];
     if (isExternalResource(href)) continue;
     const path = resolveResourcePath(cssPath, href, packageDirectory);
@@ -181,17 +269,18 @@ async function inlineCssResources(
       continue;
     }
     const nextVisited = new Set(visited).add(path);
-    let imported = await inlineCssResources(await file.async("string"), path, zip, packageDirectory, manifestByPath, nextVisited);
+    let imported = await readStylesheet(path, zip, packageDirectory, manifestByPath, nextVisited, resources);
     const media = match[3].trim();
     if (media) imported = `@media ${media}{${imported}}`;
     output = replaceAt(output, match.index ?? 0, match[0].length, imported);
   }
 
   for (const match of [...output.matchAll(/url\(\s*(["']?)(.*?)\1\s*\)/gi)].reverse()) {
+    await resources.checkpoint();
     const href = match[2].trim();
     if (!href || isExternalResource(href)) continue;
     const path = resolveResourcePath(cssPath, href, packageDirectory);
-    const dataUri = await getResourceDataUri(path, zip, manifestByPath, visited);
+    const dataUri = await getResourceDataUri(path, zip, manifestByPath, resources, visited);
     if (dataUri) output = replaceAt(output, match.index ?? 0, match[0].length, `url("${dataUri}")`);
   }
   return output;
@@ -201,25 +290,31 @@ async function getResourceDataUri(
   path: string,
   zip: JSZip,
   manifestByPath: Map<string, Record<string, unknown>>,
+  resources: ResourceContext,
   visited = new Set<string>()
 ): Promise<string | null> {
+  await resources.checkpoint();
   if (visited.has(path)) return null;
   const file = zip.file(path);
   if (!file) return null;
   const mimeType = String(manifestByPath.get(path)?.["@_media-type"] ?? mimeTypeForPath(path));
-  if (mimeType === "image/svg+xml" || path.toLowerCase().endsWith(".svg")) {
-    const nextVisited = new Set(visited).add(path);
-    const svg = await inlineSvgResources(
-      await file.async("string"),
-      path,
-      zip,
-      directoryOf(path),
-      manifestByPath,
-      nextVisited
-    );
-    return `data:image/svg+xml;base64,${encodeBase64(svg)}`;
+  const svgResource = mimeType === "image/svg+xml" || path.toLowerCase().endsWith(".svg");
+  const key = svgResource ? `${path}\n${[...visited].sort().join("\n")}` : path;
+  const cached = resources.dataUris.get(key);
+  if (cached) return withAbort(cached, resources.signal);
+  const pending = resolveDataUri();
+  resources.dataUris.set(key, pending);
+  return withAbort(pending, resources.signal);
+  async function resolveDataUri(): Promise<string> {
+    if (svgResource) {
+      const nextVisited = new Set(visited).add(path);
+      const svg = await inlineSvgResources(
+        await file!.async("string"), path, zip, directoryOf(path), manifestByPath, nextVisited, resources
+      );
+      return `data:image/svg+xml;base64,${encodeBase64(svg)}`;
+    }
+    return `data:${mimeType};base64,${await file!.async("base64")}`;
   }
-  return `data:${mimeType};base64,${await file.async("base64")}`;
 }
 
 async function inlineSvgResources(
@@ -228,16 +323,17 @@ async function inlineSvgResources(
   zip: JSZip,
   packageDirectory: string,
   manifestByPath: Map<string, Record<string, unknown>>,
-  visited: Set<string>
+  visited: Set<string>,
+  resources: ResourceContext
 ): Promise<string> {
-  let output = await inlineCssResources(svg, svgPath, zip, packageDirectory, manifestByPath, visited);
+  let output = await inlineCssResources(svg, svgPath, zip, packageDirectory, manifestByPath, visited, resources);
   for (const match of [...output.matchAll(/<image\b[^>]*>/gi)].reverse()) {
     let updatedTag = match[0];
     for (const attribute of ["href", "xlink:href"]) {
       const href = readAttribute(updatedTag, attribute);
       if (!href || isExternalResource(href)) continue;
       const path = resolveResourcePath(svgPath, href, packageDirectory);
-      const dataUri = await getResourceDataUri(path, zip, manifestByPath, visited);
+      const dataUri = await getResourceDataUri(path, zip, manifestByPath, resources, visited);
       if (dataUri) updatedTag = replaceAttribute(updatedTag, attribute, dataUri);
     }
     output = replaceAt(output, match.index ?? 0, match[0].length, updatedTag);

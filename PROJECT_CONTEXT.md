@@ -2,6 +2,17 @@
 USER LIBRARY SYNC — checkpoint final 11/10/2026: ownership por conta, SQLite v5/IndexedDB v6, adoção explícita de legados, outbox durável/CAS/recibos/tombstones, arquivos privados SHA256, download sob demanda, dados de leitura e UI implementados. VALIDADO CONTROLADO em duas bases SQLite reais, PostgreSQL/PGlite e app Web/Chrome com dois IndexedDB. Supabase/RLS/Storage HTTP real NÃO VALIDADOS; duas migrations CRIADAS/NÃO APLICADAS, sem acesso admin. Android físico NÃO TESTADO. SDK legítimo reparado; APKs dos sete commits iniciais PASS, incluindo recuperação dos dois primeiros em checkout isolado. Bloco8/último APK registrados no ledger pós-commit. Documentos canônicos: LIBRARY_SYNC_IMPLEMENTATION.md, LIBRARY_SYNC_DEPLOYMENT.md, LIBRARY_SYNC_FINAL_REPORT.md; resultado pós-commit em artifacts/apk/checkpoint.jsonl e artifacts/LIBRARY_SYNC_FINAL_REPORT.md. Textos públicos0.5. Próxima etapa funcional: capa personalizada, ainda não implementada. Os checkpoints abaixo são históricos quando divergirem deste estado.
 # PROJECT CONTEXT
 
+## Campanha atual — 15/10/2026
+
+Branch `integration/comunidade-literaria`, baseline `2f98b79`; worktree inicial limpo.
+Community v0.1 integrada e preservada. As dependências foram restauradas antes desta
+campanha. Nenhum APK será gerado: PENDENTE DE BUILD CONSOLIDADO.
+Somente PROJECT_CONTEXT.md e BUGS_ATUAIS.md serão fontes oficiais de contexto para IA.
+EPUB agora usa cache por importação, fontes compartilhadas no documento combinado,
+processamento sequencial e yield/cancelamento cooperativo; schema e posição do Reader
+permanecem iguais. Evidências, limites e próximos bugs estão em BUGS_ATUAIS.md.
+Os adendos históricos abaixo serão absorvidos e removidos na consolidação documental.
+
 ## Adendo atual — Drive com pastas navegáveis, 12/10/2026
 
 IMPLEMENTADO / VALIDADO CONTROLADO E WEB: SourceCatalog schemaVersion2 mantém folders+books em um único snapshot JSON SQLite/IndexedDB, sem migration nova. IDs reais, raiz delimitada, BFS paginada por pasta e atalhos externos alcançados, visitedFolderIds/ciclos, renomear/mover/remover/adicionar e publicação atômica. SourceLibraryScreen mostra pastas e BookCard juntos, breadcrumbs/pai/raiz/Back Android; pesquisa padrão em toda a fonte com caminho e ações diretas, incluindo nomes de pastas. Motor fuzzy original prepara índice uma vez por snapshot; Search Drive também usa snapshot local, sem API/refazer árvore por consulta. Download/import existentes só por escolha. Testes ROOT/A/B/back, busca Dom Casmuro estando em C, atalhos/ciclos/homônimos, offline/reopen/rollback e 500 pastas/5000 livros PASS controlados. Política0.6 descreve subpastas/atalhos e caminhos locais.

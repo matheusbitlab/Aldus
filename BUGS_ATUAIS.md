@@ -1,0 +1,106 @@
+# Aldus Reader — Bugs Atuais
+
+Atualizado em 15/10/2026. Branch `integration/comunidade-literaria`.
+Baseline da campanha: `2f98b7937d6ea2b47e30d99e03ac1bec0f0d5a9a`.
+Somente problemas ativos; remover após validação de resolução. Contexto permanente em PROJECT_CONTEXT.md.
+
+## BUG 01 — Importação EPUB Amêndoas congela
+
+### Prioridade
+CRÍTICA.
+### Status
+IMPLEMENTADO / VALIDAÇÃO ANDROID PENDENTE.
+### Sintoma e reprodução
+Importar Amêndoas mantém “Lendo arquivo…”; Cancelar não responde. Outro EPUB funciona.
+### Evidência e primeira divergência
+Mecanismo confirmado no parser: CSS/fontes repetidos por capítulo, concorrência sem limite e ausência de cancelamento interno. O arquivo Amêndoas não foi localizado nesta máquina; causa física PROVÁVEL, não confirmada.
+### Causa
+CONFIRMADA para a amplificação sintética; INCONCLUSIVA para a primeira chamada física bloqueada.
+### Arquivos envolvidos e correção
+EpubParserService.ts, EpubTypes.ts, ImportEpubUseCase.ts: cache por parse, fontes compartilhadas no documento, capítulos sequenciais, yield cooperativo e signal até o parser. Sem mudança de schema nem de posição/controles do Reader.
+### Testes realizados
+Fixture de 91 capítulos: HTML 127.262.661 → 1.422.540 bytes; leituras de fontes 182 → 2; CSS 91 → 1; leituras simultâneas 182 → 1. Parse 25.767 → 1.339 ms nesta execução desktop concorrente; não é benchmark Android. Freud: 26 capítulos, 897 ms. CSS aninhado/ciclos, SVG/imagens, links, serialização e cancelamento PASS. test-book-import, test-catalogs, typecheck e export:web PASS.
+### Testes pendentes e dependências externas
+Mesmo Amêndoas real; Android, fontes/imagens em WebView, cancelamento e reopen no aparelho. APK PENDENTE DE BUILD CONSOLIDADO.
+### Não regredir
+Metadados, spine, CSS/fontes offline, imagens/SVG/srcset, links, rollback e isolamento por conta.
+
+## BUG 02 — Library Sync sem contrato remoto
+
+### Prioridade
+ALTA.
+### Status
+EM CORREÇÃO.
+### Sintoma e reprodução
+“37 operações pendentes” e servidor indisponível; contador soma entidades dirty e arquivos.
+### Evidência e primeira divergência
+Diagnóstico de 12/10: pull user_library_items retorna 404/PGRST205 antes de RPC/upload. Estado remoto atual ainda será conferido.
+### Causa
+Contrato indisponível CONFIRMADO naquele diagnóstico; migration ausente PROVÁVEL. Bucket privado não visível anon não prova ausência.
+### Arquivos envolvidos e correção
+SupabaseLibraryAdapter, migrations 202610110001/002 e supabase/audit/02_library_sync_inventory.sql. Comparar inventário antes de qualquer SQL; manter outbox intacta.
+### Testes realizados
+Pendente conferência atual.
+### Testes pendentes e dependências externas
+Inventário administrativo, aplicação incremental se necessária, HTTP A/B/anon e dois dispositivos.
+### Não regredir
+RLS, Storage privado, CAS/recibos/tombstones, ownership e outbox durável; nenhum segredo no cliente.
+
+## BUG 03 — Drive conectando/indexando sem conclusão
+
+### Prioridade
+ALTA.
+### Status
+ABERTO.
+### Sintoma e reprodução
+Conectar/indexar a raiz 1PwrGP2UiCNGhyhvhDUpszZZwFjfkjaw4 pode não terminar no Android.
+### Evidência e primeira divergência
+Diagnóstico controlado: source ausente na fila deixa loading; signal do modal não chega ao refresh; falha do catálogo não aparece no modal. Tentativa física sem trace.
+### Causa
+Estados auxiliares CONFIRMADOS; causa física INCONCLUSIVA.
+### Arquivos envolvidos e correção
+SourceCatalogService, sourceStore e SourceManagerModal. Correção localizada ainda pendente.
+### Testes realizados
+Pendente conferência atual.
+### Testes pendentes e dependências externas
+API Drive autorizada e operação física; Google login relatado funcional, sem evidência para reabrir OAuth.
+### Não regredir
+Raiz, árvore/breadcrumbs, atalhos/ciclos, busca fuzzy local source-wide, snapshot offline e download só por escolha.
+
+## BUG 04 — Backup da organização na Biblioteca
+
+### Prioridade
+MÉDIA.
+### Status
+ABERTO.
+### Sintoma, reprodução, evidência e primeira divergência
+Library monta o botão/modal de backup na barra de coleções; CONFIRMADO no JSX atual.
+### Causa
+CONFIRMADA: entrada de UX permanece ativa.
+### Arquivos envolvidos e correção
+library.tsx, OrganizationBackupModal e legal/data.tsx. Retirar da Biblioteca; preservar portabilidade em Ajustes → Privacidade e Dados.
+### Testes realizados / pendentes
+Implementação e testes pendentes; conferir isolamento/revisões e organização após reload.
+### Dependências externas
+Nenhuma para correção controlada.
+### Não regredir
+Organizar/filtros/coleções/tags/favoritos, armazenamento e journal; exportação manual não é requisito de sync.
+
+## BUG 05 — Botão grande de opções em cada livro
+
+### Prioridade
+MÉDIA.
+### Status
+ABERTO.
+### Sintoma, reprodução, evidência e primeira divergência
+BookCloudControls repete “Opções de <título>” em cada card; CONFIRMADO no JSX.
+### Causa
+CONFIRMADA: botão usa texto longo sem limite e padding amplo.
+### Arquivos envolvidos e correção
+LibrarySyncControls e library.tsx. Manter remoção do dispositivo/conta e confirmações em menu discreto.
+### Testes realizados / pendentes
+Implementação e testes pendentes; preservar cenários de remoção da suíte Web.
+### Dependências externas
+Nenhuma para correção controlada; fluxo remoto real depende do BUG 02.
+### Não regredir
+Guardas de transferência/conta, bundled protegido, tombstone e verificação remota antes de evicção.
