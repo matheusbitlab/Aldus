@@ -4,6 +4,7 @@ import { UserSource } from "@/src/domain/types/sources";
 import { SourceCatalog, SourceCatalogItem, SourceCatalogListing, SourceCatalogView, SourceFolder, SourceImportLink, sourceCapabilities, sourceIdentity } from "@/src/domain/types/sourceCatalog";
 import { createCatalogSearchIndex, normalizeCatalogText } from "@/src/domain/search/catalogRanking";
 import { DriveError } from "@/src/data/drive/DriveErrors";
+import { throwIfAborted, withAbort } from "@/src/core/utils/cancellation";
 
 export interface SourceCatalogAdapter {
   list(source: UserSource, signal: AbortSignal): Promise<ScrapedLink[]>;
@@ -34,48 +35,69 @@ export class SourceCatalogService {
     void next.finally(() => { if (this.writes.get(id) === next) this.writes.delete(id); }).catch(() => undefined);
     return next;
   }
-  async load(source: UserSource): Promise<void> {
+  async load(source: UserSource, signal?: AbortSignal): Promise<void> {
     if (this.removed.has(source.id) || this.controllers.has(source.id)) return;
     const generation = this.generation(source.id);
     try {
-      const stored = await this.repository.get(source.id);
+      const stored = await withAbort(this.repository.get(source.id), signal);
       if (generation !== this.generation(source.id)) return;
       const catalog = stored?.sourceIdentity === sourceIdentity(source) ? { ...stored, sourceName: source.name } : null;
       if (catalog) querySourceCatalog(catalog.items, "", "az");
       if (this.controllers.has(source.id)) return;
       this.publish(source.id, { catalog, status: this.adapter.authorizationRequired(source) ? "auth_required" : typeof navigator !== "undefined" && navigator.onLine === false ? "offline" : catalog ? "stale" : "empty", error: null });
-    } catch { if (generation === this.generation(source.id)) this.publish(source.id, { ...initial(), status: "error", error: "Não foi possível ler o catálogo persistido desta fonte." }); }
+    } catch {
+      if (generation !== this.generation(source.id) || this.controllers.has(source.id)) return;
+      if (signal?.aborted) {
+        const previous = this.view(source.id);
+        this.publish(source.id, { ...previous, status: previous.catalog ? "stale" : "empty", error: null });
+      } else this.publish(source.id, { ...initial(), status: "error", error: "Não foi possível ler o catálogo persistido desta fonte." });
+    }
   }
-  async refresh(source: UserSource): Promise<void> {
+  async refresh(source: UserSource, signal?: AbortSignal): Promise<void> {
     if (this.removed.has(source.id)) return;
     if (!sourceCapabilities(source).supportsCatalog) throw new Error("Esta fonte oferece somente pesquisa.");
     const generation = this.invalidate(source.id), controller = new AbortController();
     this.controllers.set(source.id, controller);
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
     const previous = this.view(source.id);
     this.publish(source.id, { ...previous, status: previous.catalog ? "refreshing" : "loading", error: null });
     try {
+      throwIfAborted(controller.signal);
       if (!source.enabled) throw new Error("Ative ou reconecte esta fonte em Gerenciar fontes.");
-      const listing = this.adapter.catalog ? await this.adapter.catalog(source, controller.signal) : { items: await this.adapter.list(source, controller.signal) };
+      const listing = this.adapter.catalog ? await withAbort(this.adapter.catalog(source, controller.signal), controller.signal) : { items: await withAbort(this.adapter.list(source, controller.signal), controller.signal) };
       const tree = catalogFolders(source, listing);
       const catalog: SourceCatalog = { sourceId: source.id, sourceName: source.name, sourceType: source.kind, sourceIdentity: sourceIdentity(source), items: catalogItems(source, listing.items), ...tree, lastUpdated: Date.now() };
       const parentIds = new Set(tree.folders.map(folder => folder.remoteFolderId));
       if (tree.rootFolderId && catalog.items.some(item => !item.parentFolderId || !parentIds.has(item.parentFolderId))) throw new Error("Pasta de livro fora da árvore.");
       querySourceCatalog(catalog.items, "", "az");
-      await this.write(source.id, async () => {
+      await withAbort(this.write(source.id, async () => {
         if (generation !== this.generation(source.id) || controller.signal.aborted) return;
-        const current = await this.findSource(source.id);
-        if (!current || !current.enabled || sourceIdentity(current) !== catalog.sourceIdentity || generation !== this.generation(source.id)) return;
+        const current = await withAbort(this.findSource(source.id), controller.signal);
+        if (generation !== this.generation(source.id)) return;
+        throwIfAborted(controller.signal);
+        if (!current || !current.enabled || sourceIdentity(current) !== catalog.sourceIdentity) throw new Error("A fonte mudou durante a atualização.");
+        // Keep the underlying write in the queue even if the caller cancels.
+        // A newer snapshot must never be overtaken by a late native save.
         await this.repository.save(catalog);
-        if (generation === this.generation(source.id)) this.publish(source.id, { catalog, status: catalog.items.length || (catalog.folders?.length ?? 0) > 1 ? "ready" : "empty", error: null });
-      });
+        if (generation === this.generation(source.id) && !controller.signal.aborted) this.publish(source.id, { catalog, status: catalog.items.length || (catalog.folders?.length ?? 0) > 1 ? "ready" : "empty", error: null });
+      }), controller.signal);
     } catch (error) {
       if (generation !== this.generation(source.id)) return;
+      if (controller.signal.aborted) {
+        this.publish(source.id, { catalog: previous.catalog, status: previous.catalog ? "stale" : "empty", error: null });
+        return;
+      }
       const code = (error as { code?: string })?.code;
       const auth = code === "expired" || code === "disconnected" || this.adapter.authorizationRequired(source);
       const offline = code === "network" || (typeof navigator !== "undefined" && navigator.onLine === false);
       // No raw provider/URL errors persisted or exposed (may contain credentials).
       this.publish(source.id, { catalog: previous.catalog, status: auth ? "auth_required" : offline ? "offline" : previous.catalog ? "stale" : "error", error: error instanceof DriveError ? error.message : auth ? "Reconecte o Google Drive para atualizar esta fonte." : "Não foi possível atualizar. Exibindo a última atualização disponível, quando houver. Confira rede e permissões; aguarde se o limite de consultas foi atingido." });
-    } finally { if (this.controllers.get(source.id) === controller) this.controllers.delete(source.id); }
+    } finally {
+      signal?.removeEventListener("abort", abort);
+      if (this.controllers.get(source.id) === controller) this.controllers.delete(source.id);
+    }
   }
   async remove(id: string): Promise<void> {
     this.removed.add(id);

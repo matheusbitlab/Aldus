@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { sourceCapabilities } from "@/src/domain/types/sourceCatalog";
 import { sourceCatalogs, sourceCatalogAdapter } from "@/src/data/sources/sourceCatalogDependencies";
 import { DriveError } from "@/src/data/drive/DriveErrors";
+import { withAbort } from "@/src/core/utils/cancellation";
 
 interface Props {
   visible: boolean;
@@ -38,6 +39,8 @@ export function SourceManagerModal({ visible, onClose }: Props) {
   const [drivePreparationError, setDrivePreparationError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const operation = useRef<AbortController | null>(null);
+  const [, redrawCatalog] = useState(0);
+  useEffect(() => sourceCatalogs.subscribe(() => redrawCatalog(value => value + 1)), []);
 
   useEffect(() => {
     if (visible) {
@@ -134,12 +137,16 @@ export function SourceManagerModal({ visible, onClose }: Props) {
       };
 
       if (editingId) {
-        await update(editingId, verified);
-        if (!controller.signal.aborted && verified.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
+        await withAbort(update(editingId, verified), controller.signal);
+        if (!controller.signal.aborted && verified.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified, controller.signal);
       }
-      else await add(verified);
-      if (!controller.signal.aborted && operation.current === controller) resetForm();
-    } finally { finishOperation(controller); }
+      else await withAbort(add(verified, controller.signal), controller.signal);
+      if (!controller.signal.aborted && operation.current === controller) {
+        const catalogError = sourceCapabilities(verified).supportsCatalog ? sourceCatalogs.view(verified.id).error : null;
+        if (catalogError) setFormError(catalogError); else resetForm();
+      }
+    } catch (error) { if (!controller.signal.aborted) throw error; }
+    finally { finishOperation(controller); }
   };
 
   const resetForm = () => {
@@ -164,15 +171,16 @@ export function SourceManagerModal({ visible, onClose }: Props) {
     try {
       const result = await probe(source, controller.signal);
       if (controller.signal.aborted) return;
-      await update(source.id, {
+      await withAbort(update(source.id, {
         status: result.status,
         lastError: result.error,
         lastCheckedAt: Date.now(),
         enabled: result.status === "active" ? source.kind === "google-drive" || source.enabled : false,
-      });
+      }), controller.signal);
       const verified = useSourceStore.getState().sources.find(item => item.id === source.id);
-      if (!controller.signal.aborted && verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
-    } finally { finishOperation(controller); }
+      if (!controller.signal.aborted && verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified, controller.signal);
+    } catch (error) { if (!controller.signal.aborted) throw error; }
+    finally { finishOperation(controller); }
   };
 
   const toggle = async (source: UserSource, enabled: boolean) => {
@@ -185,15 +193,16 @@ export function SourceManagerModal({ visible, onClose }: Props) {
     try {
       const result = await probe(source, controller.signal);
       if (controller.signal.aborted) return;
-      await update(source.id, {
+      await withAbort(update(source.id, {
         enabled: result.status === "active",
         status: result.status,
         lastError: result.error,
         lastCheckedAt: Date.now(),
-      });
+      }), controller.signal);
       const verified = useSourceStore.getState().sources.find(item => item.id === source.id);
-      if (!controller.signal.aborted && verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified);
-    } finally { finishOperation(controller); }
+      if (!controller.signal.aborted && verified?.enabled && sourceCapabilities(verified).supportsCatalog) await sourceCatalogs.refresh(verified, controller.signal);
+    } catch (error) { if (!controller.signal.aborted) throw error; }
+    finally { finishOperation(controller); }
   };
 
   const disconnect = async (source: UserSource) => {
@@ -264,6 +273,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
               <Pressable accessibilityRole="button" disabled={busyId !== null} onPress={() => void save().catch((error) => setFormError(error instanceof Error ? error.message : "Não foi possível salvar a fonte."))} style={[styles.primaryButton, { backgroundColor: palette.accent, opacity: busyId ? 0.6 : 1 }]}>
                 <Text style={styles.primaryText}>{busyId ? "Conectando / indexando…" : kind === "google-drive" ? "Conectar e salvar pasta" : editingId ? "Salvar alterações" : "Adicionar fonte"}</Text>
               </Pressable>
+              {busyId && operation.current ? <TextAction label="Cancelar indexação" color={palette.accent} onPress={() => operation.current?.abort()} /> : null}
             </View>
 
             <Text style={[styles.sectionTitle, { color: palette.secondaryText, marginTop: 24 }]}>FONTES CADASTRADAS</Text>
@@ -271,7 +281,8 @@ export function SourceManagerModal({ visible, onClose }: Props) {
               <Text style={[styles.empty, { color: palette.secondaryText }]}>Nenhuma fonte adicionada.</Text>
             ) : sources.map((source) => {
               const needsAuthorization = sourceCapabilities(source).requiresAuthorization && sourceCatalogAdapter.authorizationRequired(source);
-              const status = busyId === source.id ? "Conectando…" : source.status === "error" && source.lastError && !needsAuthorization ? "Erro" : needsAuthorization ? "Reconectar" : !source.enabled ? "Desativada" : source.kind === "google-drive" ? "Conectado" : "Ativa";
+              const catalogError = sourceCapabilities(source).supportsCatalog ? sourceCatalogs.view(source.id).error : null;
+              const status = busyId === source.id ? "Conectando…" : catalogError || source.status === "error" && source.lastError && !needsAuthorization ? "Erro" : needsAuthorization ? "Reconectar" : !source.enabled ? "Desativada" : source.kind === "google-drive" ? "Conectado" : "Ativa";
               const statusColor = status === "Erro" || status === "Reconectar" ? palette.accent : status === "Ativa" || status === "Conectado" ? "#39836B" : palette.secondaryText;
               return (
                 <View key={source.id} style={[styles.sourceRow, { borderBottomColor: palette.separator }]}>
@@ -282,6 +293,7 @@ export function SourceManagerModal({ visible, onClose }: Props) {
                     </View>
                     <Text numberOfLines={1} style={[styles.sourceUrl, { color: palette.secondaryText }]}>{source.url}</Text>
                     {source.lastError && source.enabled === false ? <Text numberOfLines={2} style={[styles.errorHint, { color: palette.accent }]}>{source.lastError}</Text> : null}
+                    {catalogError ? <Text style={[styles.errorHint, { color: palette.accent }]}>{catalogError}</Text> : null}
                     <View style={styles.actions}>
                       <TextAction label="Editar" color={palette.accent} disabled={busyId !== null} onPress={() => edit(source)} />
                       <TextAction label={busyId === source.id ? "Conectando…" : needsAuthorization ? "Reconectar" : "Atualizar"} color={palette.accent} disabled={busyId !== null} onPress={() => void refresh(source).catch(reportFailure)} />

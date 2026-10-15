@@ -51,7 +51,7 @@ RLS, Storage privado, CAS/recibos/tombstones, ownership e outbox durável; nenhu
 ### Prioridade
 ALTA.
 ### Status
-ABERTO.
+IMPLEMENTADO / VALIDAÇÃO ANDROID PENDENTE.
 ### Sintoma e reprodução
 Conectar/indexar a raiz 1PwrGP2UiCNGhyhvhDUpszZZwFjfkjaw4 pode não terminar no Android.
 ### Evidência e primeira divergência
@@ -59,9 +59,9 @@ Diagnóstico controlado: source ausente na fila deixa loading; signal do modal n
 ### Causa
 Estados auxiliares CONFIRMADOS; causa física INCONCLUSIVA.
 ### Arquivos envolvidos e correção
-SourceCatalogService, sourceStore e SourceManagerModal. Correção localizada ainda pendente.
+SourceCatalogService, sourceStore e SourceManagerModal: signal propagado do modal/store ao catálogo; espera por rede/leitura/lookup responde a abort; fonte ausente/alterada termina em erro; cancelamento preserva snapshot anterior. Escrita nativa já iniciada permanece serializada até terminar, sem publicação tardia. Gerenciador oferece Cancelar indexação e mostra erro real do catálogo. Não alterado OAuth/crawler/árvore.
 ### Testes realizados
-Pendente conferência atual.
+test-source-indexing/source-catalog/drive-tree/google-drive PASS: fonte desaparecida, cancelamento externo, Promise ignorando abort, leitura/lookup/save pendentes, writes tardias, snapshots, ciclos, paginação, busca e 500 pastas/5000 livros. Typecheck/export:web PASS. test-source-library-browser PASS no app exportado/IndexedDB real: árvore/breadcrumbs, fuzzy source-wide, importação, reload/offline/erro/rollback, com identidade e HTTP fixtures.
 ### Testes pendentes e dependências externas
 API Drive autorizada e operação física; Google login relatado funcional, sem evidência para reabrir OAuth.
 ### Não regredir

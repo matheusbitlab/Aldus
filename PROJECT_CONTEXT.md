@@ -16,6 +16,11 @@ Sync remoto novamente indisponível em 15/10: duas tabelas esperadas com 404/PGR
 Sem acesso administrativo conectado; nenhum deploy ou descarte da outbox. Sonda somente
 leitura: `node scripts/audit-library-sync-public.cjs`; implantação humana em
 LIBRARY_SYNC_DEPLOYMENT.md após inventário/ledger. Bucket físico permanece inconclusivo.
+Indexação de Sources recebe o cancelamento da operação até o catálogo. Fonte ausente ou
+alterada produz terminal de erro; cancelamento conserva snapshot e não publica resposta
+tardia. Escritas nativas iniciadas continuam na fila para não ultrapassar a geração nova.
+O gerenciador mostra o erro do catálogo e oferece Cancelar indexação. Árvore, autorização,
+busca local e download sob demanda permanecem os existentes.
 
 ## Adendo atual — Drive com pastas navegáveis, 12/10/2026
 
