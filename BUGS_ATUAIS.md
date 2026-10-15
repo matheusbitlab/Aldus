@@ -62,6 +62,11 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
   Na missão integrada, engine.cancel passou a encerrar running; coordinator ganhou lifecycle
   para impedir rede após stop e permitir restart da mesma conta sem reutilizar Promise antiga.
   Causa desses caminhos CONFIRMADA em teste controlado; não atribuída ao relato físico de37 operações.
+  Nova causa de implementação CONFIRMADA: adapter aguardava sessão SDK/fetch/corpo sem
+  corrida de cancelamento; podia manter a Promise pendente após cancelar. Agora usa withAbort
+  nas três fronteiras e rejeita retorno de sessão tardio antes da rede; outbox não é alterada.
+  test-library-remote --baseline falha em getSession pendente; corrigido passa sessão/rede/
+  corpo/prazo de I/O/retry e separa contrato, sessão, autorização (42501) e rede.
 - Testes realizados: library-sync/files/reading-sync/coordinator/restart PASS em SQLite/
   fronteiras controladas; library-rls PASS em PostgreSQL/PGlite A/B/anon e fences Storage.
   App Web com dois IndexedDB/HTTP fixture passou upload/download/remoções/rollback/conta.

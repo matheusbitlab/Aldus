@@ -216,6 +216,11 @@ outbox. Coordinator usa lifecycle próprio além do epoch de conta: stop invalid
 pendente, impede fases de rede posteriores e restart da mesma conta cria execução nova.
 Retorno/finally antigo não sobrescreve o estado novo. test-library-cancellation.cjs reproduz
 o baseline em --baseline e cobre cancelamento/stop/retomada sem alterar a fila.
+O adapter REST propaga cancelamento também ao aguardar sessão SDK, fetch e corpo JSON:
+uma Promise externa que não observa AbortSignal não mantém o chamador pendente nem inicia
+rede depois do cancelamento. Prazo de I/O encerra a chamada sem tocar na outbox.
+Erros distinguem contrato ausente, sessão, autorização/42501 e rede; não recomendar novo
+login como solução automática para RLS/ACL negada. test-library-remote cobre essas fronteiras.
 
 ## 7. Sources
 
