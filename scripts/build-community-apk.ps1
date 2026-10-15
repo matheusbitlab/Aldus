@@ -3,7 +3,7 @@ $projectPath = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Push-Location -LiteralPath $projectPath
 try {
     $branchName = (git branch --show-current).Trim()
-    if ($branchName -ne 'feature/comunidade-literaria') { throw 'Build Community exige feature/comunidade-literaria.' }
+    if ($branchName -ne 'integration/comunidade-literaria') { throw 'Build Community exige integration/comunidade-literaria.' }
     $commitHash = (git rev-parse HEAD).Trim()
     $shortHash = (git rev-parse --short HEAD).Trim()
     $pendingCode = git diff --name-only HEAD -- app src/community scripts/build-community-apk.ps1
