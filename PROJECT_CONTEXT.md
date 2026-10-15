@@ -24,6 +24,12 @@ busca local e download sob demanda permanecem os existentes.
 Fontes EPUB idênticas são mantidas uma vez, em sua última posição original no CSS do
 documento combinado; condições @media e ordem de cascata não são deslocadas para o início.
 Cancelamento também é verificado entre leituras ZIP do validador, container, OPF e recursos.
+Biblioteca: removida a entrada Backup da organização e o botão extenso de opções; menu
+de reticências de 44px conserva as duas remoções/guardas/confirmações, e Organizar permanece.
+Portabilidade opcional fica em Ajustes → Privacidade e Dados → Exportar meus dados,
+limitada à organização e aos livros da conta atual, sem requisito manual para trocar
+de aparelho. Testes React e app Web exportado/IndexedDB real PASS, incluindo isolamento
+por conta e remoção/reabertura. Validação Android fica para o build consolidado futuro.
 
 ## Adendo atual — Drive com pastas navegáveis, 12/10/2026
 

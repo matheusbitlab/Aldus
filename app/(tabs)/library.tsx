@@ -18,7 +18,6 @@ import { useLibrary } from "@/src/presentation/hooks/useLibrary";
 import { useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { libraryOrganization } from "@/src/presentation/services/dependencies";
 import { BookOrganizationModal, readingStatusLabels } from "@/src/presentation/components/BookOrganizationModal";
-import { OrganizationBackupModal } from "@/src/presentation/components/OrganizationBackupModal";
 import { inferredReadingStatus, normalizeLibraryText, OrganizationRecords } from "@/src/domain/types/libraryOrganization";
 import { BookCard as SharedBookCard } from "@/src/presentation/components/BookCard";
 import { Book, MOCK_BOOKS } from "@/src/constants/mockBooks";
@@ -67,7 +66,6 @@ export default function Library() {
   const [organization, setOrganization] = useState<OrganizationRecords>({});
   const [organizationError, setOrganizationError] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState<LibraryBook | null>(null);
-  const [backupVisible, setBackupVisible] = useState(false);
   const [collection, setCollection] = useState("");
   const loadOrganization = async () => {
     try { setOrganization(await libraryOrganization.list()); setOrganizationError(null); }
@@ -291,7 +289,6 @@ export default function Library() {
       ) : null}
 
       <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }} contentContainerStyle={{ gap: 8 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Backup da organização" onPress={() => setBackupVisible(true)} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text }}>Backup da organização</Text></Pressable>
         {collections.length ? ["", ...collections].map(name => <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected: collection === name }} onPress={() => setCollection(name)} style={[styles.collectionChip, { borderColor: collection === name ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{name || "Todas as coleções"}</Text></Pressable>) : null}
       </ScrollView>
       {organizationError ? <View><Text accessibilityRole="alert" style={{ color: palette.accent }}>{organizationError}</Text><Pressable onPress={() => void loadOrganization()}><Text style={{ color: palette.text }}>Recarregar organização</Text></Pressable></View> : null}
@@ -370,7 +367,6 @@ export default function Library() {
         />
       ) : null}
       {organizing ? <BookOrganizationModal book={organizing} record={organization[organizing.id]} onClose={() => setOrganizing(null)} onSaved={refreshOrganization} /> : null}
-      {backupVisible ? <OrganizationBackupModal records={organization} bookIds={books.map(book => book.id)} onClose={() => setBackupVisible(false)} onSaved={refreshOrganization} /> : null}
       <BookImportModal
         state={bookImport.state}
         onCancel={bookImport.cancel}
