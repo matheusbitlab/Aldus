@@ -35,7 +35,7 @@ for (const expected of ["Supabase", "Google", "Gutendex", "Project Gutenberg", "
   assert.match(publicLegalText, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `conteúdo esperado ausente: ${expected}`);
 }
 assert.doesNotMatch(publicLegalText, /flashcard|batalha|deck/i, "dados de Flashcards preparados, mas fora desta implantação funcional, não devem ser anunciados publicamente");
-assert.match(read("LEGAL_IMPLEMENTATION_NOTES.md"), /Batalha[\s\S]*Supabase/i, "o inventário interno deve manter o tratamento técnico de batalha");
+assert.match(read("PROJECT_CONTEXT.md"), /Batalha[\s\S]*Supabase/i, "o contexto único deve manter o tratamento técnico de batalha");
 for (const forbidden of [/\bTODO\b/, /100% segur[oa]/i, /totalmente (em )?conformidade/i, /garantimos? conformidade/i, /inventou o livro de bolso/i]) {
   assert.doesNotMatch(publicLegalText, forbidden, `afirmação pública proibida: ${forbidden}`);
 }

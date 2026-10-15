@@ -1,10 +1,12 @@
-# Google Auth e Drive — configuração e teste físico, 12/10/2026
+# Google Auth e Drive — procedimento de configuração e teste físico
 
-**Native ainda bloqueado por redirect remoto. ANDROID REAL — PENDENTE.**
-Sem acesso administrativo Supabase/Google Cloud confirmado; nenhum painel alterado.
-Este documento trata somente Auth/Drive e não autoriza reaplicar migrations da biblioteca.
+Procedimento humano; estado atual somente em [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)
+e [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Atualizado em 15/10/2026.
+O usuário relatou Google funcionando após a sonda histórica abaixo. Não alterar OAuth
+para tratar indexação sem uma nova evidência de falha de autorização/callback.
+Nenhum painel foi alterado nesta campanha; migrations da biblioteca têm roteiro próprio.
 
-## Causa reproduzida no servidor
+## Referência histórica para investigar uma falha de callback
 
 `npm run audit:auth:redirects` inicia OAuth Google/PKCE com a configuração pública do projeto e devolve ao callback Supabase o `state` real junto de um cancelamento simulado. Não entra em conta, envia email ou troca código. Estado/cookies/verifier/tokens não são registrados.
 
@@ -49,7 +51,9 @@ Fingerprint confirmado por `apksigner verify --print-certs` no APK `Aldus-eab97e
 
 ## Roteiro obrigatório no aparelho
 
-ADB atual sem dispositivos: todos os casos abaixo **ANDROID REAL — PENDENTE**. Quando houver dispositivo autorizado, instalar o APK do commit correspondente sem desinstalar/limpar dados. Nunca marcar estes casos PASS por typecheck/mocks.
+Na próxima validação com aparelho autorizado, identificar o APK do commit correspondente
+e preservar dados. A campanha de 15/10 não gera/instala APK. Estes cenários são um roteiro,
+não resultados físicos atuais; nunca marcar PASS por typecheck/mocks.
 
 | Caso | Evidência exigida |
 | --- | --- |

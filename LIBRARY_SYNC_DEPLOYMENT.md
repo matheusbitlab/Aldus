@@ -1,6 +1,10 @@
-# Implantação da biblioteca privada — 11/10/2026
+# Implantação da biblioteca privada — procedimento operacional
 
-Estado: **MIGRATIONS CRIADAS — NÃO APLICADAS REMOTAMENTE**. **VALIDADO CONTROLADO**; **RLS REMOTO PENDENTE**, **STORAGE REMOTO PENDENTE**, Android físico **NÃO TESTADO**. O ambiente possui configuração pública, sem acesso administrativo ou sessões reais A/B. A sonda pública Auth200/OpenAPI401/username-login404 não comprova schema/RLS/Storage. Nenhum SQL foi aplicado por hipótese.
+Procedimento humano atualizado em 15/10/2026. Estado e bugs atuais somente em
+[PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) e [BUGS_ATUAIS.md](BUGS_ATUAIS.md).
+As migrations locais não provam aplicação remota. A sonda read-only
+`node scripts/audit-library-sync-public.cjs` verifica visibilidade REST, sem linhas,
+RPC ou escrita, mas não substitui inventário administrativo de schema/RLS/Storage.
 
 ## Inventário antes de qualquer aplicação
 
@@ -50,7 +54,9 @@ RPC: repetir o mesmo operationId/request deve devolver recibo sem nova revision;
 7. A/logout/B não expõe livros/progresso/Blob/status da conta A; login A retorna dados. Revogar conta durante download/upload/profile/pull descarta resultado tardio. Repetir A→B→A.
 8. Escolher explicitamente apenas um legado preserva IDs/notas/progresso; os demais permanecem sem dono. Bundled confiável não gera upload; bundled tombstoned não reaparece.
 
-Usar o APK final descrito em `artifacts/LIBRARY_SYNC_FINAL_REPORT.md`. APK compilado não comprova instalação, renderização, FileSystem, OCR ou comportamento físico; registrar os resultados do aparelho separadamente.
+Quando uma build consolidada for solicitada, identificar o artefato/hash correspondente
+ao código testado. A campanha de 15/10 não gera APK. Build não comprova instalação,
+renderização, FileSystem, OCR ou comportamento físico; registrar resultados separadamente.
 
 ## Operação e limites a definir
 
@@ -66,4 +72,8 @@ Full pull limitado a100 páginas de500 entidades; snapshot/outbox JSON por conta
 
 O teste RLS executa PostgreSQL/PGlite real em ambiente isolado: instalar a ferramenta de teste se ausente com `npm install --ignore-scripts --package-lock=false --no-save --prefix .expo/library-db-test @electric-sql/pglite`. Não é dependência runtime do app. Web requer Chrome e export; usa dois origins/IndexedDB reais e fixtures de HTTP/Auth/Storage. Os testes SQLite exigem o Node com `node:sqlite` disponível. Ver scripts para requisitos. Estes testes não aplicam migrations no projeto remoto.
 
-Depois de cada novo commit desta etapa, gerar `npm run build:apk:archive`: wrapper do pipeline oficial `npm run build:apk:local`, source/staging limpos, HEAD antes/depois, APK ignorado/hash/bytes/log no ledger. `node scripts/report-library-sync-artifacts.mjs` valida cada commit desde o baseline e gera relatório final local. Não versionar APKs, ledger, screenshots, bancos de teste ou credenciais.
+Não gerar APK automaticamente após commits. Somente quando autorizado, usar o pipeline
+oficial `npm run build:apk:local` ou seu wrapper `build:apk:archive`, com fonte/staging
+identificados e hash/bytes/log no ledger ignorado. O verificador de artefatos é uma
+ferramenta opcional para uma faixa de commits que realmente possua builds registrados;
+não é gate de campanhas sem APK. Não versionar binários, ledger, screenshots, bancos ou credenciais.

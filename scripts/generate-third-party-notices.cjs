@@ -76,7 +76,7 @@ writeOrCheck(path.join(root, "src", "legal", "thirdPartyNotices.generated.ts"), 
 function writeOrCheck(target, contents) {
   if (process.argv.includes("--check")) {
     const current = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : "";
-    if (current !== contents) {
+    if (current.replace(/\r\n/g, "\n") !== contents) {
       console.error(`${path.relative(root, target)} está desatualizado. Execute npm run legal:notices.`);
       process.exitCode = 1;
     }
