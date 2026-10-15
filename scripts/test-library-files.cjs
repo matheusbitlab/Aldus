@@ -9,6 +9,12 @@ const clone=x=>structuredClone(x);
  global.fetch=async(url,options={})=>{
    if(offline)throw Error('offline'); if(hold)await hold;
    assert.equal(options.headers.Authorization,`Bearer jwt-${A}`,'JWT stays frozen to the operation owner');
+   if(url.includes('/rpc/')){
+     const request=JSON.parse(options.body),token='00000000-0000-4000-8000-000000000001';
+     if(url.endsWith('/saas_reserve_upload'))return Response.json({state:'reserved',token,bytes:request.p_bytes});
+     if(url.endsWith('/saas_finish_upload'))return Response.json(objects.has(request.p_path)?{state:'committed',bytes:objects.get(request.p_path).size}:{state:'cancelled'});
+     throw Error('Unexpected quota RPC');
+   }
    const path=decodeURIComponent(new URL(url).pathname.split('/aldus-private-library/')[1]??'');
    assert.ok(path.startsWith(A+'/'),'private own prefix');
    if(options.method==='POST'){if(objects.has(path))return new Response(duplicateBody,{status:duplicateStatus});objects.set(path,options.body);if(lost){lost=false;throw Error('lost response');}return new Response('',{status:200});}

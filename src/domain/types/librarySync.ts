@@ -12,12 +12,15 @@ export interface LibrarySyncEntry {
   /** Preserve rejected local intent; never silently destroy concurrent edits. */
   conflict?: { payload: Record<string, any>; deleted: boolean };
 }
-export interface LibrarySyncState { id: string; entries: Record<string, LibrarySyncEntry>; lastSync: number | null; }
+export interface LibrarySyncState { id: string; entries: Record<string, LibrarySyncEntry>; lastSync: number | null;
+  quotaBlocks?: Record<string, import('../saas/quota').QuotaBlock>;
+}
 export interface LibrarySyncPersistence {
   read(owner: string): Promise<LibrarySyncState>;
   mutate(owner: string, change: (state: LibrarySyncState) => void): Promise<void>;
 }
 export interface LibraryRemoteAdapter {
+  quota?(owner: string, signal: AbortSignal): Promise<import('../saas/quota').QuotaSnapshot>;
   pull(owner: string, signal: AbortSignal): Promise<RemoteLibraryRow[]>;
   apply(owner: string, entry: LibrarySyncEntry, signal: AbortSignal): Promise<{ accepted: boolean; row: RemoteLibraryRow }>;
 }

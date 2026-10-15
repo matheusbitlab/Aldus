@@ -1,3 +1,4 @@
+import { parseQuota, QuotaError } from '@/src/domain/saas/quota';
 import { supabase } from '@/src/data/remote/supabase';
 import { LibraryRemoteAdapter, LibrarySyncEntry, RemoteLibraryRow, validateRemoteRow } from '@/src/domain/types/librarySync';
 import { throwIfAborted, withAbort } from '@/src/core/utils/cancellation';
@@ -23,8 +24,10 @@ export class SupabaseLibraryAdapter implements LibraryRemoteAdapter {
       throwIfAborted(controller.signal);
       const response=await withAbort(fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1/${url}`,{headers,signal:controller.signal,method:body?'POST':'GET',...(body?{body:JSON.stringify(body)}:{})}),controller.signal);
       if(!response.ok) {
-        let code: unknown;
-        try { code=(await withAbort(response.json(),controller.signal))?.code; } catch { throwIfAborted(controller.signal); }
+        let code: unknown, message: unknown;
+        try {const error=await withAbort(response.json(),controller.signal);code=error?.code;message=error?.message;} catch { throwIfAborted(controller.signal); }
+        if(code==='PQL01' || (code==='P0001' && message==='synced book quota exceeded'))throw new QuotaError('books');
+        if(code==='PQL02' || (code==='P0001' && message==='private storage quota exceeded or usage unknown'))throw new QuotaError('storage');
         if(response.status===404 || code==='PGRST205' || code==='PGRST202')throw new LibraryRemoteError('contract','A sincronização da biblioteca ainda não está disponível no servidor.');
         if(response.status===403 || code==='42501')throw new LibraryRemoteError('authorization','O servidor negou acesso à sincronização. As permissões da conta precisam ser verificadas.');
         if(response.status===401)throw new LibraryRemoteError('session','Entre novamente para sincronizar.');
@@ -33,9 +36,12 @@ export class SupabaseLibraryAdapter implements LibraryRemoteAdapter {
       return await withAbort(response.json(),controller.signal);
     } catch(error) {
       throwIfAborted(signal);
-      if(error instanceof LibraryRemoteError)throw error;
+      if(error instanceof LibraryRemoteError || error instanceof QuotaError)throw error;
       throw new LibraryRemoteError('network',controller.signal.aborted?'O servidor não respondeu no prazo. A fila foi preservada; tente novamente.':'Não foi possível acessar o servidor de sincronização. A fila foi preservada.');
     } finally {clearTimeout(timeout);signal.removeEventListener('abort',abort);}
+  }
+  async quota(owner: string, signal: AbortSignal) {
+    return parseQuota(await this.request('rpc/saas_quota_snapshot',await this.headers(owner,signal),signal,{}),owner);
   }
   async pull(owner: string, signal: AbortSignal): Promise<RemoteLibraryRow[]> {
     const headers=await this.headers(owner,signal), rows:RemoteLibraryRow[]=[];let cursor=0;

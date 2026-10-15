@@ -1,3 +1,4 @@
+import { isQuotaError } from '@/src/domain/saas/quota';
 import { LibraryBook } from '@/src/domain/entities/LibraryBook';
 import { LibrarySyncState, syncKey } from '@/src/domain/types/librarySync';
 import { AccountBookRepository } from './AccountBookRepository';
@@ -43,6 +44,7 @@ export class LibrarySyncCoordinator {
     if(book.syncUnjournaled || entries.some(e=>e.dirty||e.conflict) || this.needsFile(book))return 'SYNC_PENDING';
     return this.state?.entries[syncKey('book',book.id)]?.shadow ? 'SYNCED':'LOCAL';
   }
+  async retryQuota(){await this.engine.retryQuota();return this.syncNow();}
   syncNow():Promise<void>{
     if(!this.enabled||!this.scope.userId)return Promise.resolve();
     const generation=this.scope.generation,lifecycle=this.lifecycle;if(this.active?.generation===generation&&this.active.lifecycle===lifecycle)return this.active.promise;
@@ -55,11 +57,21 @@ export class LibrarySyncCoordinator {
     try {
       await this.replica.seed(this.engine);check();await this.engine.sync();check();
       const books=await this.books.listOwned();check();
+      const uploadState=await this.engine.snapshot();check();
       let fileError:string|null=null;
       for(const book of books){
         check();
         if(book.localEvictionPath)await this.files.finishEviction(book);check();
-        if(this.needsFile(book))try{await this.files.upload(book.id);}catch(error){check();fileError=error instanceof Error?error.message:'Falha no envio do arquivo.';}
+        const parent=uploadState?.entries[syncKey('book',book.id)];
+        if(this.needsFile(book)){
+          if(!parent?.shadow || parent.shadow.deleted_at)continue;
+          const blocked=await this.engine.quotaBlock('file:'+book.id,uploadState);check();
+          if(blocked){fileError=blocked;continue;}
+          try{await this.files.upload(book.id);}catch(error){
+            check();fileError=error instanceof Error?error.message:'Falha no envio do arquivo.';
+            if(isQuotaError(error))await this.engine.blockQuota('file:'+book.id,fileError);
+          }
+        }
       }
       // Publish remotePath only after successful upload. Metadata never auto-downloads bytes.
       check();await this.engine.sync();check();

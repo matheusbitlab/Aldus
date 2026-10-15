@@ -26,7 +26,14 @@ export function LibrarySyncControls(){
     <Text style={{color:palette.secondaryText,fontSize:12}}>Última sincronização: {sync.engine.status.lastSync?new Date(sync.engine.status.lastSync).toLocaleString('pt-BR'):'—'}</Text>
     <Text style={{color:palette.secondaryText,fontSize:12}}>Livros e dados de leitura são sincronizados privadamente com sua conta. Sem conexão, alterações ficam pendentes; arquivos de outro dispositivo são baixados ao abrir.</Text>
     {(error||sync.status.error||sync.engine.status.error||libraryMutationEvents.error)?<Text accessibilityRole="alert" style={{color:palette.accent}}>{error||sync.status.error||sync.engine.status.error||libraryMutationEvents.error}</Text>:null}
-    <Action label="Sincronizar agora" disabled={busy||sync.status.running} onPress={()=>void operate(()=>sync.syncNow())}/>
+    {sync.engine.quota?<Text style={{color:palette.secondaryText,fontSize:12}}>
+      {'Plano '+sync.engine.quota.effectivePlan+': '+sync.engine.quota.usage.syncedBooks+'/'+sync.engine.quota.limits.syncedBooks+' livros. '}
+      {sync.engine.quota.usage.storageBytes===null?'Uso em reconcilia\u00e7\u00e3o':(sync.engine.quota.usage.storageBytes/1048576).toFixed(1)+' MiB usados'}
+      {'. '+(sync.engine.quota.usage.reservedBytes/1048576).toFixed(1)+' MiB reservados em '+sync.engine.quota.usage.reservedUploads+' envios. '}
+      {sync.engine.quota.remaining.storageBytes===null?'Disponibilidade desconhecida':(sync.engine.quota.remaining.storageBytes/1048576).toFixed(1)+' MiB dispon\u00edveis'}
+      {sync.engine.quota.overLimit?'. Acima da franquia: dados preservados; novos envios ficam pendentes.':''}
+    </Text>:null}
+    <Action label="Sincronizar agora" disabled={busy||sync.status.running} onPress={()=>void operate(()=>sync.retryQuota())}/>
     <Action label="Adicionar livros locais à minha conta" disabled={busy} onPress={()=>void operate(async()=>{setSelected([]);setLegacy(await appDependencies.bookRepository.listLegacy());})}/>
     {sync.engine.status.conflicts?<Action label="Revisar conflitos" disabled={busy} onPress={()=>void operate(async()=>setConflicts(await sync.conflicts()))}/>:null}
     {legacy?<Dialog onClose={()=>{if(!busy)setLegacy(null);}}><Text style={{color:palette.text,fontWeight:'600'}}>Vincular livros antigos à conta atual</Text><Text style={{color:palette.secondaryText}}>Escolha os livros deste dispositivo que devem pertencer à sua conta. O vínculo preserva IDs, progresso e anotações e permite o envio privado. Nenhum livro é atribuído automaticamente.</Text>{legacy.length===0?<Text style={{color:palette.text}}>Não há livros locais sem conta.</Text>:legacy.map(book=><Action key={book.id} label={`${selected.includes(book.id)?'✓ ':''}${book.title} · ${book.author}`} disabled={busy} onPress={()=>setSelected(ids=>ids.includes(book.id)?ids.filter(id=>id!==book.id):[...ids,book.id])}/>)}<Action label={`Confirmar vínculo de ${selected.length} livros`} disabled={busy||!selected.length} onPress={()=>void operate(async()=>{await appDependencies.bookRepository.claimLegacy(selected);await useLibraryStore.getState().refresh();setLegacy(null);sync.schedule(0);})}/></Dialog>:null}

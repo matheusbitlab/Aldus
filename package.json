@@ -37,7 +37,8 @@
     "test:library:reading": "node scripts/test-library-reading-sync.cjs",
     "test:library:coordinator": "node scripts/test-library-coordinator.cjs",
     "test:library:restart": "node scripts/test-library-restart.cjs",
-    "test:library:web": "node scripts/test-library-web.cjs"
+    "test:library:web": "node scripts/test-library-web.cjs",
+    "test:saas:quotas": "node scripts/test-saas-quotas.cjs && node scripts/test-saas-quota-client.cjs && node scripts/test-saas-quota-driver.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

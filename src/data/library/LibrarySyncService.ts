@@ -1,9 +1,12 @@
+import { QuotaSnapshot, isQuotaError, quotaSignature } from '@/src/domain/saas/quota';
 import { newLibraryId } from '@/src/domain/entities/libraryId';
 import { LibraryAccountScope, libraryAccountScope } from './LibraryAccountScope';
-import { equalSyncPayload, LibraryEntityKind, LibraryRemoteAdapter, LibrarySyncEntry, LibrarySyncPersistence, RemoteLibraryRow, syncKey, validateRemoteRow } from '@/src/domain/types/librarySync';
+import { equalSyncPayload, LibraryEntityKind, LibraryRemoteAdapter, LibrarySyncEntry, LibrarySyncPersistence, LibrarySyncState, RemoteLibraryRow, syncKey, validateRemoteRow } from '@/src/domain/types/librarySync';
 
 export interface LibrarySyncStatus { running: boolean; pending: number; conflicts: number; lastSync: number | null; error: string | null; }
 export class LibrarySyncService {
+  quota: QuotaSnapshot | null = null;
+  private quotaKey = 'unavailable';
   private active: { owner: string; controller: AbortController; promise: Promise<void> } | null = null;
   private listeners = new Set<() => void>();
   private localQueue: Promise<unknown> = Promise.resolve();
@@ -13,7 +16,7 @@ export class LibrarySyncService {
   status: LibrarySyncStatus = { running: false, pending: 0, conflicts: 0, lastSync: null, error: null };
   constructor(private readonly persistence: LibrarySyncPersistence, private remote: LibraryRemoteAdapter,
     private applyLocal: (owner: string, entry: LibrarySyncEntry) => Promise<void>, private scope: LibraryAccountScope = libraryAccountScope) {
-    scope.subscribe(() => { this.active?.controller.abort(); this.status = { running: false, pending: 0, conflicts: 0, lastSync: null, error: null }; this.emit(); });
+    scope.subscribe(() => { this.active?.controller.abort(); this.quota=null; this.quotaKey='unavailable'; this.status = { running: false, pending: 0, conflicts: 0, lastSync: null, error: null }; this.emit(); });
   }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   async snapshot() { const run=this.scope.capture();if(!run.userId)return null;const state=await this.persistence.read(run.userId);run.check();return state; }
@@ -86,6 +89,18 @@ export class LibrarySyncService {
       await this.refreshStatus();return result;
     });
   }
+  async quotaBlock(key: string, snapshot?: LibrarySyncState | null): Promise<string | null> {
+    const state=snapshot===undefined?await this.snapshot():snapshot,block=state?.quotaBlocks?.[key];
+    return block && (this.quotaKey==='unavailable' || block.signature===this.quotaKey) ? block.message : null;
+  }
+  async blockQuota(key: string, message: string) {
+    const run=this.scope.capture();if(!run.userId)return;
+    await this.persistence.mutate(run.userId,s=>{(s.quotaBlocks??={})[key]={signature:this.quotaKey,message};});run.check();
+  }
+  async retryQuota() {
+    const run=this.scope.capture();if(!run.userId)return;
+    await this.persistence.mutate(run.userId,s=>{s.quotaBlocks={};});run.check();
+  }
   sync(): Promise<void> {
     const owner = this.scope.userId;
     if (!owner) return Promise.resolve();
@@ -110,19 +125,43 @@ export class LibrarySyncService {
       const unfinished=Object.values((await this.persistence.read(owner)).entries).filter(e=>e.dirty&&!e.ready);
       for(const entry of unfinished) { await this.exclusive(async()=>{check();const current=(await this.persistence.read(owner)).entries[entry.key];if(current?.operationId!==entry.operationId||current.ready)return;await this.applyLocal(owner,entry); check(); await this.persistence.mutate(owner,s=>{if(s.entries[entry.key]?.operationId===entry.operationId)s.entries[entry.key].ready=true;});}); }
       check();
+      if(this.remote.quota){
+        try {const quota=await this.remote.quota(owner,signal);check();this.quota=quota;this.quotaKey=quotaSignature(quota);}
+        catch(error){
+          check();this.quota=null;this.quotaKey='unavailable';
+          // Progressive backend rollout: existing metadata still uses the established RPC.
+          // File uploads independently require reservations and fail closed.
+          if((error as {code?:string})?.code!=='contract')throw error;
+          this.status={...this.status,error:'Medição de cotas ainda indisponível no servidor. Novos arquivos aguardam a implantação; dados existentes continuam sincronizando.'};
+        }
+      }
       // Pull first to learn parent tombstones; dirty edits are preserved until CAS resolves them.
       const initialRows=await this.remote.pull(owner,signal);check();
       for(const row of initialRows.sort((a,b)=>Number(b.kind==='book')-Number(a.kind==='book'))){validateRemoteRow(row,owner);await this.receive(owner,row);check();}
       const pending=Object.values((await this.persistence.read(owner)).entries).filter(e=>e.dirty&&e.ready).sort((a,b)=>Number(b.kind==='book')-Number(a.kind==='book'));
       for(const snapshot of pending) {
-        check(); const current=(await this.persistence.read(owner)).entries[snapshot.key];check();
+        check(); const currentState=await this.persistence.read(owner),current=currentState.entries[snapshot.key];check();
         if(!current?.dirty||!current.ready)continue;
-        const answer=await this.remote.apply(owner,current,signal);check();validateRemoteRow(answer.row,owner);
-        await this.receive(owner,answer.row,current.operationId,answer.accepted);check();
+        if(!current.deleted && await this.quotaBlock(current.key,currentState))continue;
+        if(current.kind!=='book'){
+          const parent=currentState.entries[syncKey('book',current.bookId)];
+          if(parent?.dirty && !parent.shadow && await this.quotaBlock(parent.key,currentState))continue;
+        }
+        try {
+          const answer=await this.remote.apply(owner,current,signal);check();validateRemoteRow(answer.row,owner);
+          await this.receive(owner,answer.row,current.operationId,answer.accepted);check();
+        } catch(error) {
+          check();if(!isQuotaError(error))throw error;
+          await this.blockQuota(current.key,error.message);
+          this.status={...this.status,error:error.message};
+        }
       }
       const rows=await this.remote.pull(owner,signal);check();
       for(const row of rows.sort((a,b)=>Number(b.kind==='book')-Number(a.kind==='book'))) { validateRemoteRow(row,owner); await this.receive(owner,row);check(); }
       await this.persistence.mutate(owner,s=>{s.lastSync=Date.now();});check();
+      const blocks=(await this.persistence.read(owner)).quotaBlocks??{};check();
+      const blocked=Object.values(blocks).find(b=>this.quotaKey==='unavailable'||b.signature===this.quotaKey);
+      if(blocked)this.status={...this.status,error:blocked.message};
     } catch(error) {
       if(this.scope.userId===owner && !signal.aborted) this.status={...this.status,error:error instanceof Error?error.message:'Não foi possível sincronizar.'};
       throw error;
@@ -145,6 +184,10 @@ export class LibrarySyncService {
       const conflict=accepted===false && old?.dirty ? {payload:old.payload,deleted:old.deleted}:old?.conflict;
       const next:LibrarySyncEntry={key,kind:row.kind,id:row.id,bookId:row.book_id,payload:row.payload,deleted:!!row.deleted_at,dirty:false,ready:true,operationId:newLibraryId(),baseRevision:row.revision,shadow:row,...(conflict?{conflict}:{})};
       state.entries[key]=next;apply=next;
+      if(state.quotaBlocks){
+        delete state.quotaBlocks[key];
+        if(row.kind==='book' && (row.deleted_at || row.payload.remotePath))delete state.quotaBlocks['file:'+row.id];
+      }
       if(row.kind==='book'&&row.deleted_at)for(const e of Object.values(state.entries))if(e.bookId===row.id&&e.kind!=='book'){if(e.dirty)e.conflict={payload:e.payload,deleted:e.deleted};e.dirty=false;}
     });run.check();if(apply)await this.applyLocal(owner,apply);run.check();
   }

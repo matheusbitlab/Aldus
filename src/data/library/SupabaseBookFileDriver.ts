@@ -1,3 +1,4 @@
+import { QuotaError } from '@/src/domain/saas/quota';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@/src/data/remote/supabase';
@@ -44,28 +45,59 @@ export class SupabaseBookFileDriver implements BookFileDriver {
       return Uint8Array.from(atob(encoded), character => character.charCodeAt(0));
     }, signal);
   }
+  private async quotaRpc(headers: Record<string,string>, name: string, body: object, signal: AbortSignal): Promise<any> {
+    const controller=new AbortController(),abort=()=>controller.abort();
+    signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
+    const timer=setTimeout(abort,30000);
+    try {
+      const response=await withAbort(fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1/rpc/${name}`,{
+        method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal,
+      }),controller.signal);
+      const result=await withAbort(response.json(),controller.signal);
+      if(!response.ok){
+        if(result?.code==='PQL02')throw new QuotaError('storage');
+        if(response.status===404)throw new Error('Reservas de armazenamento ainda não disponíveis no servidor. A fila foi preservada.');
+        throw new Error(response.status===401||response.status===403?'O servidor negou a reserva privada. Verifique a sessão e a conta.':'Não foi possível confirmar a reserva privada. A fila foi preservada.');
+      }
+      return result;
+    } finally {clearTimeout(timer);signal.removeEventListener('abort',abort);}
+  }
   async upload(owner: string, path: string, file: BookFileReference, mime: string, signal: AbortSignal): Promise<'created' | 'exists'> {
-    const headers = { ...await this.headers(owner), 'Content-Type': mime, 'x-upsert': 'false' }, url = this.url(path, owner);
+    const auth=await withAbort(this.headers(owner),signal),url=this.url(path,owner);
     throwIfAborted(signal);
-    let status: number, errorBody = '';
-    if (Platform.OS === 'web') {
-      if (!file.blob) throw new Error('Arquivo local indisponível.');
-      const response = await fetch(url, { method: 'POST', headers, body: file.blob, signal });
-      status = response.status;
-      if (status === 400) errorBody = await response.text();
-    } else {
-      // Native streams the definitive file; no JS ArrayBuffer of the entire book.
-      const task = FileSystem.createUploadTask(url, file.uri, { headers, httpMethod: 'POST', uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT });
-      const cancel = () => { void task.cancelAsync().catch(() => undefined); };
-      signal.addEventListener('abort', cancel, { once: true });
-      try { const result = await withAbort(task.uploadAsync(), signal); if (!result) throw new Error('Upload cancelado.'); status = result.status; errorBody = result.body ?? ''; }
-      finally { signal.removeEventListener('abort', cancel); }
+    const reservation=await this.quotaRpc(auth,'saas_reserve_upload',{p_path:path,p_bytes:file.size},signal);
+    if(reservation?.bytes!==file.size)throw new Error('Reserva privada inválida.');
+    if(reservation.state==='exists')return 'exists';
+    if(reservation.state!=='reserved'||typeof reservation.token!=='string'||!/^[0-9a-f-]{36}$/.test(reservation.token))throw new Error('Reserva privada inválida.');
+    const headers={...auth,'Content-Type':mime,'x-upsert':'false'};
+    try {
+      throwIfAborted(signal);
+      let status: number,errorBody='';
+      if(Platform.OS==='web'){
+        if(!file.blob)throw new Error('Arquivo local indisponível.');
+        const response=await fetch(url,{method:'POST',headers,body:file.blob,signal});
+        status=response.status;if(!response.ok)errorBody=await withAbort(response.text(),signal);
+      }else{
+        const task=FileSystem.createUploadTask(url,file.uri,{headers,httpMethod:'POST',uploadType:FileSystem.FileSystemUploadType.BINARY_CONTENT});
+        const cancel=()=>{void task.cancelAsync().catch(()=>undefined);};signal.addEventListener('abort',cancel,{once:true});
+        try{const result=await withAbort(task.uploadAsync(),signal);if(!result)throw new Error('Upload cancelado.');status=result.status;errorBody=result.body??'';}
+        finally{signal.removeEventListener('abort',cancel);}
+      }
+      throwIfAborted(signal);
+      const duplicate=status===409||(status===400&&this.isDuplicate(errorBody));
+      if(!duplicate){
+        if(errorBody.length<=8192&&/PQL02|private storage quota exceeded/.test(errorBody))throw new QuotaError('storage');
+        this.checkStatus(status);
+      }
+      const finished=await this.quotaRpc(auth,'saas_finish_upload',{p_path:path,p_token:reservation.token,p_cancel:false},signal);
+      if(finished?.state!=='committed'||finished.bytes!==file.size)throw new Error('Confirmação privada inválida.');
+      return duplicate?'exists':'created';
+    }catch(error){
+      // Server checks durable objects before cancelling. Lost responses never delete bytes.
+      // Frozen A credentials cannot cancel B's work after an account switch.
+      await this.quotaRpc(auth,'saas_finish_upload',{p_path:path,p_token:reservation.token,p_cancel:true},new AbortController().signal).catch(()=>undefined);
+      throw error;
     }
-    throwIfAborted(signal);
-    // Storage deployments can return the legacy HTTP 400 Duplicate response.
-    // Only an identified duplicate enters recovery, which still checks remote bytes.
-    if (status === 409 || (status === 400 && this.isDuplicate(errorBody))) return 'exists';
-    this.checkStatus(status); return 'created';
   }
   private isDuplicate(body: string) {
     if (body.length > 4096) return false;
