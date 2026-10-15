@@ -1,4 +1,5 @@
 import { AccountBookRepository, scopeBookData } from "@/src/data/library/AccountBookRepository";
+import { SupabaseAccountPlanRepository } from '@/src/data/saas/SupabaseAccountPlanRepository';
 import { AccountOrganizationRepository } from "@/src/data/library/AccountOrganizationRepository";
 import { DurableLibrarySyncPersistence } from '@/src/data/library/LibrarySyncPersistence';
 import { LibrarySyncService } from '@/src/data/library/LibrarySyncService';
@@ -43,6 +44,7 @@ import { LocalBookImportService } from "@/src/data/imports/LocalBookImportServic
 import { driveDownloadResolver } from "@/src/data/drive/DriveDownloadResolver";
 
 const useWebStorage = Platform.OS === "web";
+export const accountPlanRepository = new SupabaseAccountPlanRepository();
 const rawBookRepository = useWebStorage ? new IndexedDbBookRepository() : new SqliteBookRepository();
 const bookRepository = new AccountBookRepository(rawBookRepository);
 const rawChapters = useWebStorage ? new IndexedDbChapterRepository() : new SqliteChapterRepository();

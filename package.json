@@ -26,6 +26,7 @@
     "audit:auth:redirects": "node scripts/audit-google-redirects.cjs",
     "export:web": "node scripts/validate-web-env.cjs && expo export --platform web && node scripts/copy-books-to-dist.mjs && node scripts/write-build-metadata.cjs",
     "test:critical": "node scripts/test-critical.cjs",
+    "test:saas": "node scripts/test-saas-schema.cjs && node scripts/test-saas-client.cjs && node scripts/test-saas-compatibility.cjs",
     "test:library:account": "node scripts/test-library-account.cjs",
     "test:library:rls": "node scripts/test-library-rls.cjs",
     "build:apk:archive": "node scripts/archive-commit-apk.mjs",
