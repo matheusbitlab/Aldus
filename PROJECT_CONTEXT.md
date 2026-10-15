@@ -12,6 +12,10 @@ EPUB agora usa cache por importação, fontes compartilhadas no documento combin
 processamento sequencial e yield/cancelamento cooperativo; schema e posição do Reader
 permanecem iguais. Evidências, limites e próximos bugs estão em BUGS_ATUAIS.md.
 Os adendos históricos abaixo serão absorvidos e removidos na consolidação documental.
+Sync remoto novamente indisponível em 15/10: duas tabelas esperadas com 404/PGRST205.
+Sem acesso administrativo conectado; nenhum deploy ou descarte da outbox. Sonda somente
+leitura: `node scripts/audit-library-sync-public.cjs`; implantação humana em
+LIBRARY_SYNC_DEPLOYMENT.md após inventário/ledger. Bucket físico permanece inconclusivo.
 
 ## Adendo atual — Drive com pastas navegáveis, 12/10/2026
 

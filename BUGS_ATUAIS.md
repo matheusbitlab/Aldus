@@ -30,19 +30,19 @@ Metadados, spine, CSS/fontes offline, imagens/SVG/srcset, links, rollback e isol
 ### Prioridade
 ALTA.
 ### Status
-EM CORREÇÃO.
+BLOQUEADO EXTERNAMENTE.
 ### Sintoma e reprodução
 “37 operações pendentes” e servidor indisponível; contador soma entidades dirty e arquivos.
 ### Evidência e primeira divergência
-Diagnóstico de 12/10: pull user_library_items retorna 404/PGRST205 antes de RPC/upload. Estado remoto atual ainda será conferido.
+Sonda atual de 15/10/2026, 10:58 BRT: user_library_items e user_library_operations retornam 404/PGRST205; profiles retorna 401/42501. GET público do bucket retorna 400/NoSuchBucket, sem provar ausência física. Pull continua anterior a RPC/upload no código.
 ### Causa
-Contrato indisponível CONFIRMADO naquele diagnóstico; migration ausente PROVÁVEL. Bucket privado não visível anon não prova ausência.
+Contrato REST indisponível CONFIRMADO atualmente; migration ausente PROVÁVEL. Sem inventário administrativo não distinguir ausência física, schema/projeto e cache.
 ### Arquivos envolvidos e correção
-SupabaseLibraryAdapter, migrations 202610110001/002 e supabase/audit/02_library_sync_inventory.sql. Comparar inventário antes de qualquer SQL; manter outbox intacta.
+SupabaseLibraryAdapter, migrations 202610110001/002 e supabase/audit/02_library_sync_inventory.sql. scripts/audit-library-sync-public.cjs verifica somente metadados públicos, sem linhas/RPC/mutações. Procedimento humano em LIBRARY_SYNC_DEPLOYMENT.md. Nenhuma alteração ao engine/outbox nem SQL remoto.
 ### Testes realizados
-Pendente conferência atual.
+Sonda pública reproduz o bloqueio atual. test-library-sync/files/reading-sync/coordinator/restart PASS com SQLite e fronteiras controladas; test-library-rls PASS em PostgreSQL/PGlite isolado com A/B/anon e fences de Storage. Preservação da fila, idempotência, CAS, isolamento e recuperação verificados. Não equivalem a deploy.
 ### Testes pendentes e dependências externas
-Inventário administrativo, aplicação incremental se necessária, HTTP A/B/anon e dois dispositivos.
+Sem credencial Postgres/CLI/admin nem conexão do plugin Supabase neste ambiente. Operador: executar supabase/audit/01_inventory.sql e 02_library_sync_inventory.sql no projeto configurado, comparar ledger/objetos/ACL/RLS/bucket; aplicar 202610110001 → 202610110002 somente se ausentes e compatíveis, conforme LIBRARY_SYNC_DEPLOYMENT.md. Repetir inventário, HTTP A/B/anon e dois dispositivos. Não apagar as 37 pendências; contagem real do aparelho não foi inspecionada.
 ### Não regredir
 RLS, Storage privado, CAS/recibos/tombstones, ownership e outbox durável; nenhum segredo no cliente.
 
