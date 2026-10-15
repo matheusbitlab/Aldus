@@ -64,7 +64,8 @@ export function ReaderScreen({ bookId }: Props) {
   const renderCount = useRef(0);
   const reflowModeGeneration = useRef(0);
   const reflowPublication = useRef<AbortController | null>(null);
-  useEffect(() => { reflowModeGeneration.current++; return () => { reflowModeGeneration.current++; reflowPublication.current?.abort(); }; }, [bookId]);
+  const reflowSourceSignature = useRef<string | null>(null);
+  useEffect(() => { reflowModeGeneration.current++; reflowSourceSignature.current = null; return () => { reflowModeGeneration.current++; reflowPublication.current?.abort(); reflowSourceSignature.current = null; }; }, [bookId]);
   const nativeBrightnessApplied = useRef(false);
   const originalBrightnessRef = useRef<number | null>(null);
   const nativeBrightnessOperation = useRef(0);
@@ -305,7 +306,9 @@ export function ReaderScreen({ bookId }: Props) {
 
           if (savedSettings?.mode === "reflow") {
             startsInReflow = true;
-            const sourceSignature = getPdfSourceSignature(result.book);
+            const sourceSignature = await getPdfSourceSignature(result.book, downloadController.signal);
+            if (!active) return;
+            reflowSourceSignature.current = sourceSignature;
             const cached = await appDependencies.pdfReflowCache
               .findByBookId(result.book.id)
               .catch(() => null);
@@ -385,7 +388,6 @@ export function ReaderScreen({ bookId }: Props) {
   const isPdf = bookMimeType === "application/pdf";
   const pdfReadingMode: PdfReadingMode = pdfReaderSettings?.mode ?? "original";
   const isReflowPdf = isPdf && pdfReadingMode === "reflow";
-  const pdfSourceSignature = currentBook ? getPdfSourceSignature(currentBook) : "";
   const readerChapterItems = useMemo(() => {
     const source = isEpub ? chapters : isReflowPdf ? pdfReflowChapters : [];
     const seenTitles = new Set<string>();
@@ -427,6 +429,7 @@ export function ReaderScreen({ bookId }: Props) {
     reflowPublication.current?.abort();
     const preparation = new AbortController();
     reflowPublication.current = preparation;
+    reflowSourceSignature.current = null;
     const generation = ++reflowModeGeneration.current;
     setEpubNavigationRequest(null);
     setRequestedPage(null);
@@ -457,10 +460,13 @@ export function ReaderScreen({ bookId }: Props) {
     setEpubTotalPages(0);
 
     try {
+      const sourceSignature = await getPdfSourceSignature(currentBook, preparation.signal);
+      if (generation !== reflowModeGeneration.current || preparation.signal.aborted) return;
+      reflowSourceSignature.current = sourceSignature;
       const cached = await appDependencies.pdfReflowCache.findByBookId(currentBook.id).catch(() => null);
       if (generation !== reflowModeGeneration.current) return;
       if (cached && cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION &&
-          cached.sourceSignature === getPdfSourceSignature(currentBook) &&
+          cached.sourceSignature === sourceSignature &&
           await isValidatedReflowDocumentAsync(cached.document, preparation.signal)) {
         if (cached.document.classification === "image-based") {
           returnToOriginal("O Reflow requer OCR para este PDF. O arquivo original continua disponível.");
@@ -502,10 +508,11 @@ export function ReaderScreen({ bookId }: Props) {
         return;
       }
       if (!currentBook) throw new Error("O livro não está mais disponível.");
+      const sourceSignature = reflowSourceSignature.current ?? await getPdfSourceSignature(currentBook, publication.signal);
       const prepared = await toStoredReflowChaptersAsync(currentBook.id, document, publication.signal);
       await appDependencies.pdfReflowCache.save({
         id: currentBook.id,
-        sourceSignature: getPdfSourceSignature(currentBook),
+        sourceSignature,
         processorVersion: PDF_REFLOW_PROCESSOR_VERSION,
         document,
         updatedAt: Date.now(),
@@ -1075,8 +1082,8 @@ export function ReaderScreen({ bookId }: Props) {
   );
 }
 
-function getPdfSourceSignature(book: LibraryBook): string {
-  return book.fileHash ?? `${book.fileName}|${book.fileSize}|${book.mimeType}`;
+async function getPdfSourceSignature(book: LibraryBook, signal: AbortSignal): Promise<string> {
+  return book.fileHash ?? appDependencies.privateBookFiles.localFingerprint(book.id, signal);
 }
 
 const styles = StyleSheet.create({

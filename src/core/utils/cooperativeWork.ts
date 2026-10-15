@@ -4,14 +4,14 @@ import { throwIfAborted } from "./cancellation";
 export async function runCooperatively<T>(steps: Generator<unknown, T>, signal?: AbortSignal): Promise<T> {
   try {
     await yieldToHost(signal);
-    let deadline = Date.now() + 8;
+    let deadline = performance.now() + 8;
     for (;;) {
       throwIfAborted(signal);
       const next = steps.next();
       if (next.done) return next.value;
-      if (Date.now() >= deadline) {
+      if (performance.now() >= deadline) {
         await yieldToHost(signal);
-        deadline = Date.now() + 8;
+        deadline = performance.now() + 8;
       }
     }
   } finally { steps.return(undefined as never); }

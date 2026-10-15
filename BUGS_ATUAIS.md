@@ -59,8 +59,8 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - Evidência histórica: 10:58 BRT HTTP404/PGRST205; após deploy informado, nova sonda de
   12:58 BRT retornou HTTP401/42501 nas duas tabelas. Usuário informou versions remotas
   20261015145012/20261015145018, bucket privado e sete policies. NÃO reaplicar 001/002.
-- Reconferência real em 15/10 às 14:22 BRT: as duas tabelas seguem HTTP401/42501;
-  library_apply nulo negado (401/42501), helper Storage retorna false ao anônimo.
+- Reconferência real em 15/10 às 15:17 BRT: as duas tabelas seguem HTTP401/42501;
+  RPCs reconferidas às 15:28 BRT: library_apply nulo negado (401/42501), helper Storage false.
   Bucket HTTP400/NoSuchBucket ao anônimo não comprova ausência de bucket privado.
   IMPLEMENTADO LOCALMENTE / VALIDADO ANÔNIMO; APLICADO REMOTAMENTE conforme operador.
   VALIDADO AUTENTICADO / A-B / CONTA DESATIVADA / STORAGE real / ANDROID: PENDENTES.
@@ -117,9 +117,9 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 
 ## BUG 06 — Reflow grande demora em 98–100% e cancelamento final sem fechamento
 
-- Prioridade: ALTA. Status: IMPLEMENTADO / VALIDADO CONTROLADO / ANDROID PENDENTE.
+- Prioridade: ALTA. Status: IMPLEMENTADO / VALIDADO CONTROLADO E WEB / ANDROID PENDENTE.
 - Sintoma/reprodução: histórico físico Weber 584 páginas parado em 582/584; cancelar/Back
-  atrasados. Arquivo original de 969 páginas não identificado. Não reproduzido nesta campanha.
+  atrasados. Arquivo original de 969 páginas não identificado. Travamento físico não reproduzido.
 - Evidência/primeira divergência: execução Weber eventualmente publicou cache; await exato
   do intervalo não foi isolado. República 525 páginas cancelou durante extração e depois
   concluiu, sem validar cancelamento na montagem final ou no arquivo de 969 páginas.
@@ -143,6 +143,12 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   passaram abertura→extração→montagem→validação→HTML→commit→releitura. Weber disponível:
   5.265.071 bytes, 2.055.524 caracteres; montagem 4675ms, cache/serialização 1665ms sob carga.
   Não é reprodução física, nem prova do PDF original de 969p ou de imagens/OCR Android.
+  Web exportado/PDF.js real de 49p: falhou ao reabrir porque a assinatura metadata→fileHash
+  da primeira sincronização invalidava o cache. Agora assinatura SHA-256 estável desde o
+  primeiro preparo, calculada em blocos sem writes/Upload quando o hash ainda não existe.
+  test-library-web.cjs --reflow passou Reader/commit/primeiro layout, reload em documento
+  novo e reutilização do mesmo cache/updatedAt. Auth/Storage continuam fixtures HTTP.
+  ReaderScreen passou dez toggles e tipografia na página intermediária sem remount/perda.
 - Testes pendentes: mesmo PDF/build, fases 98–100%, memória/thread JS, cancel/Back e reopen.
 - Dependências externas: arquivo/aparelho e próximo build consolidado.
 - Não regredir: Original independente, cache validado, posição, cleanup e terminal único.

@@ -79,6 +79,10 @@ bookId no guard de conta, transação exclusiva SQLite e oncomplete IndexedDB, s
 em memória. Cancelar durante gravação faz rollback antes do commit; cache confirmado
 anterior não é apagado. Retorno antigo não publica após Back/troca de modo/livro/unmount.
 Leitura geométrica e WebView/base64 da extração são liberados antes da fase final.
+Assinatura do cache é SHA-256 do conteúdo, inclusive antes do primeiro upload atribuir
+fileHash ao livro. Quando ausente, localFingerprint reutiliza o driver/hash em blocos,
+somente leitura, com conta/abort; não grava metadata nem altera fila. Primeira sincronização
+não invalida o mesmo derivado. Budget de CPU usa relógio monotônico, não relógio civil.
 JSON.parse do cache, clone IndexedDB, flatten final e primeiro layout continuam tendo
 custo proporcional ao documento; não prometer suporte ilimitado ou validação Android.
 
@@ -198,7 +202,8 @@ supabase/audit/01_inventory.sql e 02_library_sync_inventory.sql para comparar le
 definições/ACL/RLS e bucket já implantados. Considerar somente o hardening incremental
 20261015160539 após esse inventário; nunca reaplicar 001/002 ou reparar versões por hipótese.
 
-Reconferência pública de 15/10 às 14:22 BRT: items/operations HTTP401/42501, sem PGRST205;
+Reconferência pública de 15/10: tabelas às 15:17 BRT e RPCs às 15:28 BRT;
+items/operations HTTP401/42501, sem PGRST205;
 flashcard_battle/get e library_apply nulo HTTP401/42501, helper de Storage HTTP200/false.
 Bucket retornou HTTP400/NoSuchBucket ao anônimo: isso não contradiz o bucket privado
 informado nem comprova existência/ausência administrativa. Níveis atuais: IMPLEMENTADO

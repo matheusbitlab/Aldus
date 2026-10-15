@@ -12,6 +12,7 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
    const json=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
    if(p==='/fixture.json'){json({books:[{id:'remote-book',title:'Livro Privado Teste',author:'Autor Teste',url:'/fixture.epub',format:'epub'}]});return;}
    if(p==='/fixture.epub'){res.setHeader('Content-Type','application/epub+zip');res.end(epub);return;}
+   if(p==='/fixture.pdf'){res.setHeader('Content-Type','application/pdf');fs.createReadStream('assets/Livros/sobre-o-ocio.pdf').pipe(res);return;}
    if(p.startsWith('/fixture-remote/')){
      let user;try{user=JSON.parse(Buffer.from((req.headers.authorization??'').split('.')[1],'base64url')).sub;}catch{}if(!user){json({},401);return;}
      const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=Buffer.concat(chunks);
@@ -65,6 +66,25 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
    // Real IndexedDB transaction abort must preserve durable outbox, with no fake memory success.
    const rollback=await b.evaluate(`(async()=>{const p=window.fixturePersistence,before=await p.webGetPersistent('library_sync_state',${JSON.stringify(owner)}),original=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(...args){const tx=original.apply(this,args);if(args[1]==='readwrite')queueMicrotask(()=>tx.abort());return tx;};let rejected=false;try{await p.webMutatePersistent('library_sync_state',${JSON.stringify(owner)},s=>({...s,lastSync:123}));}catch{rejected=true;}finally{IDBDatabase.prototype.transaction=original;}return {rejected,unchanged:JSON.stringify(before)===JSON.stringify(await p.webGetPersistent('library_sync_state',${JSON.stringify(owner)}))};})()`);assert.deepEqual(rollback,{rejected:true,unchanged:true});
    await navigate(a,originA,'/library');await filter(a);await until(a,'Livro Privado Teste');await click(a,'Ações de Livro Privado Teste');await click(a,'Remover da minha biblioteca');await click(a,'Confirmar remoção');await eventually(async()=>(await stored(a,id)).isDeleted,'library deletion committed');await manual(a,originA);await manual(b,originB);assert.equal(objects.size,0);assert.ok((await stored(b,id)).isDeleted);await navigate(b,originB,'/library');await filter(b);assert.ok(!(await text(b)).includes('Livro Privado Teste'),'deleted item must not resurrect');
+   if(process.argv.includes('--reflow')){
+     // Seed only the local file/book boundary. Real exported Reader/PDF.js, finalization,
+     // strict account cache and layout run unchanged, with no production service requests.
+     await a.evaluate(`(async()=>{const p=window.fixturePersistence,id='fixture-pdf',file=await(await fetch('/fixture.pdf')).blob();await p.webPutPersistent('documents',{id,data:file,fileName:'fixture.pdf',mimeType:'application/pdf'});await p.webSaveBookPersistent({id,ownerUserId:${JSON.stringify(owner)},title:'Reflow Web controlado',author:'Fixture',fileName:'fixture.pdf',filePath:'web-pdf://'+id,fileSize:file.size,fileHash:null,mimeType:'application/pdf',coverImagePath:null,totalChapters:1,totalWords:0,addedDate:1,lastOpenedDate:null,isDeleted:false,importComplete:true,progress:0});})()`);
+     await navigate(a,originA,'/reader/fixture-pdf');await until(a,'Como deseja ler?');
+     await a.evaluate(`(()=>{const e=[...document.querySelectorAll('[role="button"]')].find(e=>e.textContent.trim().startsWith('Leitura Livre'));if(!e)throw Error('Missing Reflow mode');e.click()})()`);
+     await until(a,'Leitura livre pronta.');
+     await eventually(()=>a.evaluate(`(()=>{const m=document.body.innerText.match(/Página (\\d+) de (\\d+)/);return !!m&&Number(m[2])>1})()`),'Reflow first layout/pagination acknowledgement');
+     const committed=await a.evaluate(`window.fixturePersistence.webGetPersistent('pdf_reflow_cache','fixture-pdf')`);assert.equal(committed.document.pageCount,49);assert.ok(committed.document.characterCount>20000);
+     assert.equal(committed.sourceSignature,require('node:crypto').createHash('sha256').update(fs.readFileSync('assets/Livros/sobre-o-ocio.pdf')).digest('hex'),'Derivative must use the content hash before metadata synchronization');
+     await eventually(()=>a.evaluate(`(()=>{const frame=[...document.querySelectorAll('iframe')].find(f=>f.srcdoc?.includes('pdf-reflow'));return !!frame&&!!frame.srcdoc.includes('article')&&!document.body.innerText.includes('Preparando leitura livre')})()`),'published PDF derivative iframe');
+     await a.evaluate('window.fixtureBeforeCacheReload=true');
+     await a.command('Page.reload');
+     await eventually(async()=>{try{return await a.evaluate('window.fixtureBeforeCacheReload!==true && !!window.fixturePersistence && !!document.body')}catch{return false}},'fresh document after reload, not old iframe');
+     await eventually(()=>a.evaluate(`(()=>{const m=document.body?.innerText.match(/Página (\\d+) de (\\d+)/);return !!m&&Number(m[2])>1})()`),'reopened Reflow pagination acknowledgement');
+     await eventually(()=>a.evaluate(`(()=>{const frame=[...document.querySelectorAll('iframe')].find(f=>f.srcdoc?.includes('pdf-reflow'));return !!frame&&!!frame.srcdoc.includes('article')&&!document.body.innerText.includes('Preparando leitura livre')})()`),'cache reopen PDF derivative');
+     const reopened=await a.evaluate(`window.fixturePersistence.webGetPersistent('pdf_reflow_cache','fixture-pdf')`);assert.equal(reopened.updatedAt,committed.updatedAt,'Reopen must reuse the committed cache, not rerun extraction');
+     console.log('PASS real exported Web Reflow: real 49-page PDF/PDF.js -> production Reader -> account-guarded IndexedDB commit -> derivative iframe -> reload reuses exact cache. File/book seeding only; not Android/OCR proof.');
+   }
    // Switching authenticated owner retains bytes but account repository/route deny old book.
    await b.evaluate(`(()=>{const key='sb-${project[1]}-auth-token',s=JSON.parse(localStorage.getItem(key));s.user.id=${JSON.stringify(other)};s.access_token=${JSON.stringify(Buffer.from('{}').toString('base64url'))}+'.'+btoa(JSON.stringify({sub:${JSON.stringify(other)},exp:Math.floor(Date.now()/1000)+86400})).replace(/=/g,'')+'.fixture';localStorage.setItem(key,JSON.stringify(s));})()`);await navigate(b,originB,`/reader/${id}`);await until(b,'Livro não encontrado na biblioteca.');
    console.log('PASS exported production Web: separate A/B IndexedDB, real EPUB import offline+reload, private HTTP upload, metadata-only cloud book, production Reader on-demand, device-only remove/reopen, outbox rollback, account switch and permanent library deletion. Remote Supabase fixture only. Screenshots .expo/library-sync-validation.');

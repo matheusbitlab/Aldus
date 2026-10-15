@@ -26,8 +26,9 @@ const flushTimers=async()=>act(async()=>{const due=[...timers.values()];timers.c
  await report(1,3,false);assert.equal(reader.progress,.5);assert.equal(writes.length,0);
  await report(1,101,true);assert.equal(getDoc().props.epubPage,51);assert.equal(getDoc().props.restoreTargetReady,true);assert.equal(writes.length,0);
  await report(51,101,true);await flushTimers();assert.equal(getDoc().props.initialRestorePending,false);assert.equal(writes.at(-1).pageNumber,51);assert.equal(writes.at(-1).percentage,.5);
- const instance=getDoc();for(let i=0;i<4;i++)await act(async()=>reader.toggleControls());assert.strictEqual(getDoc(),instance);assert.equal(getDoc().props.epubPage,51);
+ const instance=getDoc();for(let i=0;i<10;i++)await act(async()=>reader.toggleControls());assert.strictEqual(getDoc(),instance);assert.equal(getDoc().props.epubPage,51);
  await act(async()=>renderer.root.findByType('ReaderControls').props.onSettings());assert.strictEqual(getDoc(),instance);assert.equal(getDoc().props.epubPage,51);
+ const preferences=renderer.root.findByType('ReaderSettingsPanel');await act(async()=>preferences.props.onPdfSettingsChange({...preferences.props.pdfSettings,fontSize:22,lineHeight:1.8}));assert.strictEqual(getDoc(),instance);assert.equal(getDoc().props.epubPage,51);
  await report(1,101,true);await flushTimers();assert.equal(writes.at(-1).pageNumber,1);assert.equal(writes.at(-1).percentage,0,'An acknowledged real navigation to page 1 must be accepted');
  await act(async()=>renderer.unmount());assert.equal(back.size,0);
  // Back during preparation returns to the preserved Original mode progress.

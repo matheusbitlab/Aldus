@@ -38,9 +38,14 @@ const clone=x=>structuredClone(x);
  const document=await require('pdf-lib').PDFDocument.create();document.addPage([300,400]).drawText('Real PDF fixture for private sync');
  const a=device(),b=device();const pdf=new Blob([await document.save()],{type:'application/pdf'});
  await a.books.save(book('x'));a.files.set('x',pdf);
+ const beforeSyncFingerprint=await a.service.localFingerprint('x',new AbortController().signal);
+ assert.equal(beforeSyncFingerprint,crypto.createHash('sha256').update(Buffer.from(await pdf.arrayBuffer())).digest('hex'));
+ assert.equal((await a.books.findById('x')).fileHash,null,'Fingerprinting derivative identity must not mutate the book/outbox');
+ const cancelledFingerprint=new AbortController();cancelledFingerprint.abort();await assert.rejects(a.service.localFingerprint('x',cancelledFingerprint.signal),{name:'AbortError'});
  offline=true;await assert.rejects(a.service.upload('x'),/offline/);assert.equal((await a.books.findById('x')).filePath,'web-pdf://x');assert.equal(a.service.states.get('x').state,'ERROR');
  offline=false;lost=true;await assert.rejects(a.service.upload('x'),/lost response/);await a.service.upload('x');assert.equal(objects.size,1,'lost upload response retry does not duplicate files');
  const published=await a.books.findById('x');assert.equal(published.fileSize,pdf.size);assert.match(published.fileHash,/^[a-f0-9]{64}$/);
+ assert.equal(await a.service.localFingerprint('x',new AbortController().signal),beforeSyncFingerprint,'Cache identity must survive first sync assigning fileHash');
  duplicateStatus=400;
  for(const body of [{statusCode:'409',error:'Duplicate',message:'The resource already exists'},{code:'ResourceAlreadyExists'}, {code:'KeyAlreadyExists'}, {code:'already_exists'}]) {
    duplicateBody=JSON.stringify(body);assert.equal(await a.driver.upload(A,published.remotePath,{blob:pdf,size:pdf.size,uri:''},'application/pdf',new AbortController().signal),'exists');

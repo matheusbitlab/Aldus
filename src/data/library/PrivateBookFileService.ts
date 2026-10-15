@@ -3,7 +3,7 @@ import { ChapterRepository } from '@/src/domain/repositories/ChapterRepository';
 import { AccountBookRepository } from './AccountBookRepository';
 import { LibraryAccountScope, libraryAccountScope } from './LibraryAccountScope';
 import { privateBookPath } from './BookFileIntegrity';
-import { throwIfAborted } from '@/src/core/utils/cancellation';
+import { throwIfAborted, withAbort } from '@/src/core/utils/cancellation';
 import { findBundledAsset } from './BundledBookIdentity';
 
 export interface BookFileReference { uri: string; size: number; blob?: Blob; }
@@ -32,6 +32,22 @@ export class PrivateBookFileService {
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private emit() { for (const listener of this.listeners) listener(); }
   cancel() { for (const job of this.jobs.values()) job.controller.abort(); }
+  /** Stable derivative identity before the first upload assigns fileHash; no network/write. */
+  async localFingerprint(id: string, signal: AbortSignal): Promise<string> {
+    const run = this.scope.capture(), controller = new AbortController();
+    const abort = () => controller.abort(), unsubscribe = this.scope.subscribe(abort);
+    signal.addEventListener('abort', abort, {once:true}); if (signal.aborted) abort();
+    const check = () => { run.check(); throwIfAborted(controller.signal); };
+    try {
+      check(); const book = await withAbort(this.books.findById(id), controller.signal); check();
+      if (!book || book.importComplete === false) throw new Error('Livro não disponível nesta conta.');
+      if (book.fileHash) return book.fileHash;
+      const file = await withAbort(this.driver.local(book), controller.signal); check();
+      if (!file) throw new Error('A cópia local deste livro não foi encontrada.');
+      const hash = await withAbort(this.driver.hash(file, controller.signal), controller.signal); check();
+      return hash;
+    } finally { signal.removeEventListener('abort',abort); unsubscribe(); }
+  }
   private job(id: string, state: BookTransferState, work: (signal: AbortSignal, check: () => void, owner: string) => Promise<LibraryBook>, external?: AbortSignal) {
     const run = this.scope.capture();
     if (!run.userId) return Promise.reject(new Error('Entre na sua conta.'));
