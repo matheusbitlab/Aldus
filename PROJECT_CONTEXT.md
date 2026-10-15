@@ -227,6 +227,78 @@ rede depois do cancelamento. Prazo de I/O encerra a chamada sem tocar na outbox.
 Erros distinguem contrato ausente, sessão, autorização/42501 e rede; não recomendar novo
 login como solução automática para RLS/ACL negada. test-library-remote cobre essas fronteiras.
 
+### 6.1. SaaS freemium — Etapa 1 (15/10/2026)
+
+IMPLEMENTADO LOCALMENTE / IMPLANTAÇÃO REMOTA PENDENTE. Catálogo autoritativo em
+public.saas_plans + saas_plan_features; assinatura em saas_account_subscriptions;
+concessões específicas futuras em saas_account_entitlements. Papel master/overrides
+anteriores não são assinatura e não promovem para Pro. Nenhum pagamento/provedor/add-on.
+
+| Plano | Preço BRL | Livros sincronizados | Armazenamento privado |
+| --- | --- | --- | --- |
+| Free | R$ 0 | 100 | 500 MiB (524288000 bytes) |
+| Pro | Não definido (`null`) | 2.000 | 10 GiB (10737418240 bytes) |
+
+Valores iniciais configuráveis somente no backend. Todos os planos têm leitor completo,
+importação, estudo básico, Sync de biblioteca/progresso/estudo/organização e EPUB/PDF privado.
+O baseline não pode ser removido por configuração premium. Recursos novos usam chaves
+extensíveis; novos planos usam IDs de catálogo, sem enum Free/Pro no cliente. Futuros
+add-ons devem acrescentar concessões/limites no resolvedor do servidor, com nova migration
+e versão de contrato quando necessário; não criar compra, saldo ou add-on no cache local.
+
+Migration NOVA: 20261015190705_saas_plans_entitlements.sql, criada pela CLI. Depende de
+profiles, Library/recuperação e 20261015160539_library_active_account_fences.sql.
+Não editar/reaplicar 202610110001/002 nem reparar ledger remoto por hipótese. Antes de
+implantar: inventariar definições/ACL/RLS e a versão real do Storage; reconciliar versões
+20261015145012/018 informadas pelo operador; aplicar somente incrementais ausentes na ordem.
+Nenhum DDL/migration/Edge Function/deploy remoto foi executado nesta etapa.
+
+Free é atribuído pelo trigger de profiles a novos perfis ativos e na reativação; backfill
+aditivo cobre ativos existentes sem tocar em perfis, livros, arquivos, recibos ou estudo.
+Desativados não recebem concessão nova nem leem o snapshot. Clientes têm somente SELECT
+próprio com RLS e RPC de consulta sem argumento de usuário. Somente service_role/backend
+confiável altera catálogo/assinatura/entitlements; segredo nunca entra no bundle. JSON,
+AsyncStorage, metadata de usuário/JWT e papel master não concedem plano. Assinatura
+active/trialing vigente resolve plano concedido; expirada/revogada/futura volta ao Free.
+
+RPC saas_account_snapshot retorna versão, conta, fonte server_database, plano efetivo,
+preço nullable, limites, uso, restante, features e estado/origem/prazos da assinatura.
+Uso deriva de livros remotos vivos e metadata.size do Storage, incluindo objetos ainda
+não limpos após tombstone/staging. Não deriva de fileSize declarado no JSON do livro.
+Tamanho legado desconhecido retorna `null` para uso/restante de bytes e impede apenas
+crescimento de Storage até reconciliação confiável; nunca inventar zero nem apagar objeto.
+
+Quota de livros usa trigger AFTER para respeitar UPSERT/CAS existente; serializa crescimento
+por lock do perfil. Quota de bytes usa constraint trigger DEFERRABLE INITIALLY DEFERRED:
+a sonda INSERT de permissão do Storage é revertida antes do tamanho definitivo; somente
+completion durável confirma bytes, com lock por conta e sem confiar em contentLength.
+Testes locais cobrem probe/savepoint/rollback e completion, inclusive aumento por UPDATE.
+Requer READ COMMITTED como no Data API. Storage HTTP e disputa real entre dispositivos
+continuam pendentes; não inferir da simulação PostgreSQL que upload de produção foi validado.
+
+Compatibilidade: dados acima da franquia permanecem legíveis; atualizar livros existentes,
+progresso/estudo/organização e excluir continua permitido. Limita apenas novos livros
+remotos e crescimento de bytes. Leitura/importação local não consulta plano e mantém os
+guards Auth existentes. Falha de quota preserva outbox e permite retry da mesma intenção.
+Não há migração do schema local, Reader refatorado nem engine Sync substituído.
+
+Contrato tipado: src/domain/saas/accountPlan.ts. Consumo comum Web/Android:
+src/data/saas/SupabaseAccountPlanRepository.ts, exposto por accountPlanRepository na
+composição existente. Congela JWT por chamada, valida owner/epoch A→B→A, contrato e
+restante; cancelamento e prazo cobrem sessão/fetch/corpo. Sem backend/contrato válido,
+retorna source=unavailable/snapshot=null; não inventa Pro, Free ou franquias. Resolução
+cliente é indicativa para UI; futuras operações premium devem repetir autorização no
+backend. Não há cache persistido de entitlements nem UI de compra nesta etapa.
+
+VALIDADO LOCALMENTE: npm run test:saas (PostgreSQL/PGlite real para migration/RLS,
+transporte controlado Web/Android e outbox SQLite/OpenBook), typecheck e export:web.
+Matriz crítica anterior passou 56/56 incluindo as duas suítes SaaS iniciais; suíte adicional
+de compatibilidade também passou e integra test:critical. Não é prova de Auth/Storage HTTP,
+concorrência de duas sessões PostgreSQL, navegador real desta etapa ou aparelho Android.
+Próximo passo operacional: implantação explicitamente autorizada após inventário, seguida
+de testes autenticados A/B/desativada, upload/download e limites concorrentes. Etapa 2
+não iniciada. Nenhum APK, cobrança ou mudança em main.
+
 ## 7. Sources
 
 Source Library é catálogo da fonte, separado da biblioteca pessoal. Configuração local e

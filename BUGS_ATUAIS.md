@@ -91,6 +91,29 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   repetir inventário e testes autenticados. Não reaplicar nem editar migrations históricas.
 - Não regredir: USER A != USER B, Storage privado, CAS/recibos/tombstones, offline e fila durável.
 
+### SaaS Etapa 1 — dependência de implantação e validação da Library
+
+- Status: IMPLEMENTADO LOCALMENTE / IMPLANTAÇÃO REMOTA E QA AUTENTICADO PENDENTES.
+- Migration nova 20261015190705_saas_plans_entitlements.sql depende do hardening do BUG 11;
+  preservar o mapeamento histórico do ledger e aplicar somente incrementais após inventário.
+- Catálogo Free/Pro, concessão Free no servidor, assinatura, entitlements e snapshot tipado
+  estão implementados. Free inclui Sync/Storage privado. Cliente não promove plano;
+  master não significa Pro. Sem backend, plano é indisponível e leitura local permanece.
+- Quotas preservam dados existentes acima do limite, atualizações/estudo e outbox;
+  bloqueiam apenas novos livros remotos/crescimento de bytes. Legado sem metadata.size
+  confiável mantém arquivo e reporta uso desconhecido (`null`), exigindo reconciliação
+  administrativa antes de ampliar bytes. Não preencher tamanhos com JSON do cliente.
+- Testes locais: SaaS PostgreSQL/PGlite (RLS A/B/anon, autopromoção, disabled, backfill,
+  expirado/revogado, UPSERT no limite e probe/commit Storage), adapter controlado e
+  compatibilidade SQLite/OpenBook PASS. Typecheck/export Web PASS; matriz crítica 56/56
+  anterior à adição da suíte de compatibilidade, que também passou isoladamente.
+- Pendente: inventário/implantação autorizada e HTTP real A/B/disabled, upload/download
+  com versão real do Storage e concorrência entre dispositivos. O constraint trigger de
+  bytes é deferred para não bloquear a sonda revertida de permissão; integração real não
+  foi exercitada. Nenhuma certificação de produção/Android é inferida do PGlite/export.
+- Não regredir: leitura local/importação, Sync no Free, USER A != USER B, Storage privado,
+  perfis/contas desativadas, recibos e fila durável. Sem APK, cobrança ou Etapa 2.
+
 ## BUG 03 — Drive real preso em conectar/indexar
 
 - Prioridade: ALTA. Status: IMPLEMENTADO / VALIDAÇÃO ANDROID PENDENTE.
