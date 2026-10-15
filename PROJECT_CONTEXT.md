@@ -36,6 +36,7 @@ O número é snapshot do serviço de advisories, não certificação de ausênci
 - src/data/: SQLite/IndexedDB, importadores, EPUB, PDFs derivados, Sources, Drive e Sync.
 - src/presentation/: ReaderScreen, adapters, componentes, hooks, contextos e stores.
 - src/community/: domínio, aplicação, dados, adapters e apresentação isolados da Community.
+- src/admin/: contratos, adapter e apresentação do Aldus Admin; autorização efetiva por RPC.
 - modules/: módulos Expo locais aldus-drive-auth e aldus-pdf-ocr.
 - supabase/: migrations imutáveis, Edge Functions, inventários read-only, scripts admin e testes.
 - Composição: src/presentation/services/dependencies.ts. Reutilizar seus repositories e serviços.
@@ -301,6 +302,112 @@ Próximo passo operacional: implantação explicitamente autorizada após invent
 de testes autenticados A/B/desativada, upload/download e limites concorrentes. Etapa 2
 não iniciada. Nenhum APK, cobrança ou mudança em main.
 
+### 6.2. Aldus Admin — Etapa 1.5 (15/10/2026)
+
+IMPLEMENTADO LOCALMENTE / ATIVAÇÃO REMOTA PENDENTE. Área /admin no Expo Router, com
+entrada em Ajustes somente após aldus_admin_session confirmar a associação no servidor.
+Layout Web usa largura responsiva própria; o frame e os fluxos do Reader permanecem.
+Dez seções: Visão Geral, Usuários, Assinaturas, Planos e Preços, Armazenamento, Métricas,
+Configurações, Administradores, Auditoria e Saúde do Sistema. Há loading, vazio, erro,
+acesso negado e backend indisponível. Nenhuma concessão administrativa por cache offline.
+
+Migration NOVA 20261015194604_aldus_admin.sql depende de profiles, Library/recuperação,
+hardening de conta ativa e SaaS Etapa 1. Não modifica migrations históricas nem recria
+catálogo/assinaturas. Cria aldus_admin_members, aldus_admin_audit, aldus_plan_proposals,
+aldus_price_history, aldus_system_settings e aldus_setting_history, com RLS e sem acesso
+direto de clientes. Schema aldus_admin_private guarda helpers, revisões e recibos.
+saas_plans recebe descrição comercial e preço anual nullable; assinaturas não são
+reescritas por alteração de preço. Histórico comercial imutável registra vigência imediata;
+preço cobrado permanece indisponível. Agendamento automático de preço futuro não existe.
+
+OWNER administra associações, catálogo, configurações e operações delegáveis. ADMIN recebe
+somente users.read/users.write/subscriptions.manage/metrics.read/audit.read concedidos pelo
+OWNER. ADMIN não gerencia outros administradores nem amplia as próprias permissões;
+operações sobre a própria associação são negadas. master/Free/Pro não concedem administração.
+O conjunto de permissões permite futura evolução de funções Suporte/Financeiro, sem criá-las.
+
+Backend: aldus_admin_session, aldus_admin_read e aldus_admin_change; comandos são allowlist
+tipada, não editor SQL/JSON genérico. Cada chamada valida auth.uid, sessão Auth ainda
+existente/não expirada, e-mail confirmado, perfil ativo e associação/permissão atuais.
+Alterações exigem JWT aal2 validado pelo gateway, sessão aal2 ligada a fator TOTP ainda
+verificado e AMR TOTP assinado há no máximo 10 minutos. Sem essas provas, bloqueia.
+Frontend tem enrollment/challenge TOTP pelo SDK existente; o segredo do próprio enrollment
+fica apenas no estado transitório. MFA real do projeto ainda precisa de validação remota.
+
+Todas as alterações exigem motivo e confirmação textual do recurso no modal e no servidor.
+Revisão esperada impede lost update; lock transacional serializa mudanças/último OWNER.
+UUID de requisição + recibo evita duplicação após resposta perdida; retry revalida permissões.
+Casos negados retornam erro sanitizado sem rethrow para preservar a auditoria fora do
+sub-bloco revertido. Auditoria registra ator/recurso/ação/horário/resultado/motivo e mudanças
+mínimas, sem payloads de livros, tokens ou e-mails desnecessários. Triggers impedem UPDATE/
+DELETE de auditoria e históricos de preços/configuração. Administradores não têm acesso
+direto à biblioteca privada de outra conta, arquivos, caminhos, notas ou impersonação.
+
+Triggers em associação/perfil protegem o último OWNER ativo inclusive em escrita confiável.
+O painel exige tratar associação administrativa separadamente antes de desativar uma conta
+administrativa. Nenhuma exclusão definitiva foi implementada. Mudanças de plano/revogação
+de benefício não apagam dados nem removem Sync/Storage básico do Free.
+Desativar não apaga arquivos nem revoga leitura offline já autorizada pelo cache existente;
+o controle administrativo e os contratos remotos de conta ativa não usam esse cache.
+
+Bootstrap preparado: supabase/admin/bootstrap_aldus_owner.sql. Somente conexão confiável
+ao banco, depois de autorização explícita, configura aldus.bootstrap_owner_uuid com UUID
+real independentemente conferido em Auth. O helper privado exige que esse UUID corresponda
+ao e-mail indicado pelo proprietário, confirmado, com perfil ativo, e que bootstrap ainda
+não tenha ocorrido. Ausência/mismatch/e-mail não confirmado interrompe sem criar conta.
+Não executado em produção; existência/UUID/verificação da conta indicada NÃO foram consultados.
+O e-mail não participa de autorização no cliente. O contato legal público já existente
+pode coincidir com ele e permanece somente contato, sem privilégio.
+
+Usuários: paginação de 25, busca por nome/username/e-mail/UUID, filtro plano/status/cadastro,
+detalhes mínimos de conta, permissões efetivas, assinatura separada, uso/franquias e
+recibos Sync. Conta ativa pode receber Pro manual com expiração obrigatória, revogação e
+entitlements premium_ temporários. OWNER altera associação/role/permissões de outras contas
+verificadas e cria propostas de planos sem ativá-las. Interface não executa compras.
+
+Métricas reais são consultas ao backend: cadastrados/novos por período, últimos logins
+(não usuários ativos), Free/Pro efetivos, assinaturas vigentes/expiradas, registros de Pro
+manual, livros remotos vivos, objetos/bytes, média por conta, recibos Sync e cadastros/dia.
+Tamanhos desconhecidos resultam em bytes/média indisponíveis, nunca zero inventado.
+MRR/ARR/receita/cancelamentos/churn/transações/eventos/reembolsos ficam null com
+“Aguardando integração de pagamentos”. Concessão Pro manual não é venda. Conversão histórica
+Free→Pro, usuários ativos e falhas Auth/Sync/processamento não têm medição e ficam null.
+Saúde comprova apenas a consulta ao banco e o horário; logs externos/Drive/Storage HTTP/
+deploys ficam indisponíveis até conectores/telemetria sanitizada e sondas autorizadas.
+
+Configuração allowlist: app.notice é aplicado em runtime em Ajustes; app.public_name,
+app.institutional_url, app.policy_notice, operation.maintenance_notice,
+operation.supported_version e flags opcionais Community/Battle/premium/experimental são
+armazenadas/versionadas, mas marcadas requires_deploy=true (sem alterar automaticamente
+esses recursos nesta etapa). Interface permite restaurar revisão histórica criando nova
+revisão. Franquias/preços/entitlements do catálogo são efetivos no backend imediatamente.
+Nenhuma chave genérica pode alterar Auth, RLS, Storage, secrets ou direitos básicos Free.
+
+Inventário SOMENTE LEITURA pelos plugins em 15/10: Supabase projeto cmivracxuihtmsbmtuec
+ACTIVE_HEALTHY; ledger lista apenas 20261015144958 flashcard_battles,
+20261015145012 private_account_library e 20261015145018 private_library_file_recovery.
+Não comprova ausência de objetos de Auth fora do ledger. Hardening/SaaS/Admin não aparecem
+nesse inventário. Vercel: pesquisa por projeto aldus na conta conectada retornou vazio;
+não inferir ausência global de deployment ou monitoramento pronto. GitHub conectado
+confirmou acesso ao repositório. Nenhum SQL administrativo remoto, DDL, conta real,
+bootstrap, migration ou deploy foi executado pelo agente.
+
+VALIDADO LOCALMENTE: typecheck/export Web, test:admin (PostgreSQL/PGlite real, contratos e
+transporte controlado) e matriz crítica 59/59 incluindo Auth/SaaS/segurança/Reader/Library/
+Community/Flashcards. test:admin:web usa app exportado → HTTP local → migrations PostgreSQL
+reais; exercita OWNER/ADMIN/comum, rota direta, revogação de sessão, offline, concessão Pro,
+preços/configuração com confirmação/auditoria e aviso em Ajustes. Capturas desktop/mobile
+em .expo/admin-validation foram inspecionadas. Auth/JWT/TOTP dessas provas são fixtures,
+não identidades reais; Promise.all/CAS local não prova disputa entre sessões PostgreSQL.
+
+Ativação pendente: autorização explícita, inventário completo de objetos/ACL/RLS/Storage/
+schemas Auth e mapeamento do ledger; aplicar somente incrementais ausentes na ordem; verificar
+UUID/e-mail confirmado do proprietário e executar bootstrap confiável; habilitar e testar
+TOTP real, HTTP A/B/revogação/último OWNER, ações concorrentes e auditoria. Não reaplicar
+migrations históricas por hipótese. Atualização Android requer nova compilação/instalação
+do app para incluir a rota/componentes; nenhum APK nem validação física nesta etapa.
+Sem cobrança, provedor escolhido, gateway, SaaS Etapa 2 ou novo recurso de Reader.
+
 ## 7. Sources
 
 Source Library é catálogo da fonte, separado da biblioteca pessoal. Configuração local e
@@ -390,8 +497,9 @@ Secrets exclusivos da função: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 USERNAME_LOGIN_HMAC_KEY (aleatório >=32 caracteres), além dos secrets Supabase de servidor.
 Não implantar sem configurar/testar Redis. node scripts/test-username-login.cjs cobre o contrato
 e concorrência com Redis/Auth controlados, não serviço real nem proteção DDoS de infraestrutura.
-Supabase/Vercel aparecem instalados no catálogo de plugins nesta sessão, mas não expõem
-ferramentas administrativas utilizáveis; isso supera a nota antiga de plugin não instalado.
+Supabase/GitHub/Vercel expõem ferramentas conectadas nesta sessão. Na Etapa 1.5 foram
+usadas apenas para inventários de leitura (seção 6.2), sem SQL administrativo remoto,
+mudança em contas ou deploy. Isso supera a nota anterior de ferramentas indisponíveis.
 OPTIONS username-login reconferido em 15/10 às 14:22 BRT: HTTP404/NOT_FOUND.
 Implantação da função e testes reais continuam pendentes. Redis está implementado/testado
 com contrato controlado; configuração, conectividade e limites do serviço remoto não verificados.
@@ -625,8 +733,10 @@ rotação/cutout, scroll do painel ou cancelamento final de arquivos grandes.
   cancelamento, prévia editável, deduplicação, referências verificáveis e aprovação.
   IA externa somente com ação explícita informando dados enviados/custos; não confundir
   geração local com IA. Export Anki, origem no Reader e sync de revisões ainda pendentes.
-- Franquias/cotas/assinatura/billing são propostas sem preços ou integração pronta.
-  Credenciais ficam no servidor; cancelamento de plano não tira cartões/revisão/export locais.
+- Franquias/assinatura e Admin foram implementados localmente nas seções 6.1/6.2.
+  Billing e preços efetivamente cobrados dependem de integração futura explicitamente
+  autorizada; não iniciada. Credenciais ficam no servidor; cancelamento de plano não tira
+  cartões/revisão/export locais.
 - Escala do Sync (cursor/entidades incrementais/TUS), retenção e exclusão de conta;
   social e moderação seguem a seção 13. Nenhum roadmap autoriza implementar outra etapa sozinho.
 

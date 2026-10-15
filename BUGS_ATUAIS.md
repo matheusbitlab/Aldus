@@ -85,8 +85,9 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   App Web com dois IndexedDB/HTTP fixture passou upload/download/remoções/rollback/conta.
 - Testes pendentes: inventário admin, comparar implantação existente e avaliar somente a nova
   migration de hardening (BUG 11); HTTP autenticado A/B/disabled, Storage e dois aparelhos.
-- Dependências externas: plugins instalados sem ferramentas administrativas expostas e CLI
-  sem access token. Operador autorizado deve seguir [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md):
+- Dependências externas: plugins Supabase/GitHub/Vercel disponíveis na Etapa 1.5; inventário
+  remoto somente leitura confirmou ledger Library 20261015145012/018. Implantação requer
+  autorização explícita e deve seguir [LIBRARY_SYNC_DEPLOYMENT.md](LIBRARY_SYNC_DEPLOYMENT.md):
   comparar ledger/objetos/ACL/RLS/bucket; reconhecer o mapeamento remoto 20261015145012/018;
   repetir inventário e testes autenticados. Não reaplicar nem editar migrations históricas.
 - Não regredir: USER A != USER B, Storage privado, CAS/recibos/tombstones, offline e fila durável.
@@ -113,6 +114,27 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   foi exercitada. Nenhuma certificação de produção/Android é inferida do PGlite/export.
 - Não regredir: leitura local/importação, Sync no Free, USER A != USER B, Storage privado,
   perfis/contas desativadas, recibos e fila durável. Sem APK, cobrança ou Etapa 2.
+
+### Aldus Admin Etapa 1.5 — ativação remota pendente
+
+- IMPLEMENTADO LOCALMENTE / IMPLANTAÇÃO E QA REMOTO PENDENTES. Migration nova
+  20261015194604_aldus_admin.sql depende de hardening e SaaS Etapa 1. Inventário do plugin
+  list_migrations em 15/10 mostrou somente Battle/Library/recuperação com versões remotas
+  20261015144958/20261015145012/20261015145018; não inferir estado de objetos fora do ledger.
+- OWNER inicial não concedido. Script supabase/admin/bootstrap_aldus_owner.sql exige UUID
+  Auth real, e-mail indicado confirmado e perfil ativo, em conexão confiável autorizada.
+  Nenhuma conta real foi consultada/criada/alterada nem SQL administrativo remoto executado.
+- Testes locais: PostgreSQL/RLS, bootstrap/MFA/revogação/último OWNER/CAS/auditoria,
+  contrato/adapter, typecheck, export Web e matriz crítica 59/59 PASS. Ensaio Web real do
+  app exportado com HTTP/PostgreSQL locais PASS em OWNER/ADMIN/comum, Pro/preços/avisos,
+  confirmação, revogação e layouts desktop/mobile. Auth/JWT/TOTP são fixtures controladas.
+- Pendente: inventário completo/implantação autorizada, identidade inicial e MFA reais,
+  sessões HTTP A/B, disputa entre conexões PostgreSQL, Storage e validação Android.
+- Configurações marcadas requires_deploy ficam armazenadas/versionadas até integração
+  de runtime; só app.notice aparece em Ajustes nesta etapa. Financeiro sem provedor é
+  indisponível, nunca receita zero presumida; sem logs de falhas ou telemetria inventados.
+- Não regredir: Sync/Storage Free, Reader, dados privados, master separado de Admin/Pro,
+  auditoria imutável, conta ativa e último OWNER. Sem APK/deploy/cobrança/Etapa 2 SaaS.
 
 ## BUG 03 — Drive real preso em conectar/indexar
 
