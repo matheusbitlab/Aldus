@@ -14,6 +14,14 @@ Expo Router ~57.0.23 e Zustand. Android e Web têm implementações próprias; n
 paridade iOS de Drive, OCR, PDF ou sensores. O app exige sessão e perfil ativo para suas
 rotas privadas; leitura offline preserva a identidade previamente validada, sem criar login.
 
+Missão integrada: atualizações compatíveis somente no lockfile de transitivas shell-quote
+1.10.0→1.12.0, undici 7.29.0→7.30.1, source-map-js 1.2.1→1.2.2 e brace-expansion
+2.1.4→2.1.7. Não mudou Expo/RN nem houve audit fix --force. Auditoria npm de 15/10 13:17 BRT:
+0 críticos, 58 altos, 12 moderados (70 registros incluindo propagação; não 70 causas únicas).
+Restam causas em braces, decode-uri-component, node-forge, postcss-selector-parser e uuid.
+Parte exige mudança incompatível/sem patch atual; não fazer downgrade Expo sugerido pelo npm.
+O número é snapshot do serviço de advisories, não certificação de ausência de vulnerabilidade.
+
 ## 2. Arquitetura
 
 - app/: rotas, tabs, providers e grupos protegidos do Expo Router.
