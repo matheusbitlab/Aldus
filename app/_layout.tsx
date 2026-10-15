@@ -92,6 +92,7 @@ function AppShell() {
                 <Stack.Screen name="account/index" />
                 <Stack.Screen name="account/edit-profile" />
                 <Stack.Screen name="account/change-password" />
+                <Stack.Screen name="community" />
               </Stack.Protected>
             </Stack>}
         </View>
