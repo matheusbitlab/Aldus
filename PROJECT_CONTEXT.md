@@ -4,7 +4,15 @@ Atualizado em 15/10/2026. Fonte única de contexto permanente para IA.
 Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código: HEAD atual da branch,
 identificado pelo Git e pelo build-info.json do export, sem hash autorreferente inventado.
 Branch oficial de desenvolvimento: main, por decisão do usuário em 15/10/2026.
-Após fetch, main/origin/main estavam em 52456d9740a6234db94508b3a3ed48ba3012d060,
+Todas as próximas implementações devem partir da main, com commits e push para
+origin/main, salvo instrução explícita em contrário. A integração da Etapa 2 foi
+consolidada por fast-forward de 9cb5a968f0e5de9af0185e70a1e4fe3a8eba3e8f para
+9b3c6198e2f89430c8b50f8e7f49349f853c2f01, preservando os quatro commits
+502abc6, 34c589e, 5474b9c e 9b3c619. A única edição posterior desta consolidação
+é este documento; o HEAD final é obtido pelo Git, sem hash autorreferente.
+
+Histórico da consolidação anterior (Etapa 1): após fetch, main/origin/main estavam em
+52456d9740a6234db94508b3a3ed48ba3012d060,
 ancestral de integration/comunidade-literaria em e8a2940089fd248ca4e9b917d16edd3213d45bc0.
 Consolidação por fast-forward preservou todos os 34 commits adicionais, incluindo Community,
 correções do caderno, Auth/segurança, Library Sync, Drive, Flashcards/Battle, EPUB/PDF Reflow,
@@ -673,12 +681,23 @@ em massa. integration/comunidade-literaria é histórica, não a branch padrão;
 Migrations históricas são imutáveis; incrementais só após inventário e autorização remota.
 Nunca commitar .env.local, tokens, secrets, keystores privados, APKs ou livros pessoais.
 
-Validação local da consolidação na main em 15/10/2026: typecheck, export:web e
+Validação local da primeira consolidação na main (Etapa 1) em 15/10/2026: typecheck, export:web e
 test:critical PASS (57/57 suítes), cobrindo Community, Reader/EPUB/Reflow, Library Sync,
 Auth/segurança, Drive, Flashcards/Battle e SaaS. Código/migrations são idênticos à integração;
 a única edição nova desta consolidação é este documento. BUGS_ATUAIS.md foi preservado
 byte a byte. Testes controlados/export não equivalem a validação física, Storage/Auth HTTP
 ou implantação remota. Nenhum APK, deploy Supabase, migration de produção ou SaaS Etapa 2.
+
+Consolidação da Etapa 2 na main em 15/10/2026: fetch confirmou as duas branches locais
+alinhadas aos respectivos remotos e main ancestral da integração. Fast-forward de
+9cb5a96 para 9b3c619 preservou integralmente Admin 1.5, Community, Reader, Auth, Sync,
+SaaS e migrations. Typecheck e export:web PASS; test:critical 62/62 PASS, incluindo
+admin-security/admin-client, saas-schema/saas-client/saas-compatibility e as três suítes
+de cotas (SQL PGlite, cliente SQLite e driver HTTP controlado). Apenas este documento
+foi editado após a integração; BUGS_ATUAIS.md e todos os arquivos de aplicação/testes/
+migrations permanecem idênticos à integração. Plugins GitHub, Supabase e Vercel foram
+consultados somente para leitura. Nenhum APK, deploy, migration remota ou nova etapa SaaS.
+As pendências de validação autenticada/concorrência remota da Etapa 2 continuam abertas.
 
 Web/CI: npm run build delega a export:web. Antes do Expo, validate-web-env.cjs rejeita
 chaves privadas/public env insegura; Vercel produção exige configuração legal real.
@@ -790,10 +809,11 @@ Artefatos ignorados são evidência auxiliar, nunca terceira fonte de contexto o
 ## SaaS — Etapa 2: cotas reais de Sync e Storage (15/10/2026)
 
 IMPLEMENTADO LOCALMENTE / ATIVAÇÃO REMOTA E QA AUTENTICADO PENDENTES.
-Por instrução específica desta etapa, desenvolvimento e push somente em
-integration/comunidade-literaria. A branch recebeu main 9cb5a96 por fast-forward,
-preservando Admin 1.5 e todo o histórico. main continua sendo o padrão geral;
-nesta campanha não houve commit nem push nela.
+A implementação foi produzida originalmente em integration/comunidade-literaria,
+que recebeu main 9cb5a96 por fast-forward, preservando Admin 1.5 e todo o histórico.
+Os quatro commits da Etapa 2 foram depois consolidados na main por fast-forward.
+A referência à integração é somente histórica: novas implementações devem partir
+da main e ser enviadas a origin/main, salvo instrução explícita em contrário.
 
 - Catálogo existente continua sendo a autoridade: Free 100 livros / 524288000 bytes
   (500 MiB), Pro 2000 livros / 10737418240 bytes (10 GiB). Valores não foram duplicados
