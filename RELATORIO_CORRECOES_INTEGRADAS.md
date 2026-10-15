@@ -19,6 +19,7 @@ próprio hash antes de commit. Logs/artefatos ignorados não são contexto obrig
 | Sessão/perfil | Provider/guard/feature access não exigiam explicitamente igualdade dos UUIDs em todos os caminhos | Rejeição antes de cache/publicação, guard e canUse defensivos | VALIDADO CONTROLADO |
 | Batalha | Upload e join podiam observar identidades diferentes; resposta antiga podia aparecer após troca/blur | JWT/UUID/epoch congelados na operação composta, abort/owner check, conteúdo da tela por UUID e revisão | VALIDADO CONTROLADO / MULTIPLAYER REMOTO PENDENTE |
 | Library remota disabled | library_apply validava auth.uid mas não account_status; ownership não significava conta ativa | Migration incremental: implementação CAS intacta em schema privado, wrapper ativo e fences RLS/Storage | IMPLEMENTADO / DEPLOY INCREMENTAL PENDENTE |
+| Cancelamento Sync | Cancel deixava running ativo; preparação pendente podia iniciar rede após stop e restart reutilizar execução antiga | Estado terminal imediato e lifecycle separado do epoch de conta | VALIDADO CONTROLADO E WEB |
 | Drive | Grants/índice em memória sobreviviam à troca de conta Aldus | Revogação síncrona no scope, incluindo authorize pendente e índices em andamento | VALIDADO CONTROLADO / API E ANDROID REAIS PENDENTES |
 | Dependências | Quatro transitivas em faixas vulneráveis | Updates compatíveis no lockfile, sem trocar Expo/RN | VALIDADO LOCAL; OUTROS AVISOS ABERTOS |
 | Build Windows | gradlew.bat por nome falha com lookup do diretório corrente desabilitado | Caminho absoluto, quoting de espaços e argumentos Windows literais | VALIDADO COM CMD REAL E BAT DE ECHO; NÃO EXECUTOU GRADLE |
@@ -113,8 +114,8 @@ Comandos executados nesta missão e fronteiras:
 - npm run export:web: PASS; Expo2438 módulos, app/assets exportados e build-info gerado.
   Build executado com alterações ainda não commitadas registra dirty=true, não build limpa.
 - npx --yes deno@2.9.6 check supabase/functions/username-login/index.ts: PASS.
-- Matriz inicial npm run test:critical: 47/47 PASS. Após ampliar Auth/username com SDK
-  instalado e wrapper Windows, matriz final npm run test:critical: 48/48 PASS.
+- Matrizes npm run test:critical: 47/47, depois48/48 e matriz final49/49 PASS, incluindo
+  a nova suíte de cancelamento/lifecycle Sync. Não equivalem a teste remoto/Android.
 - test-username-login.cjs: erros uniformes, perfil ativo tardio, body/tipos/limites,
   fail-closed, múltiplos workers/requests e canários; SDK Supabase instalado estabelece
   sessão via invoke→setSession→SIGNED_IN, sem sessão nova na falha. HTTP/Redis controlados.
@@ -128,9 +129,19 @@ Comandos executados nesta missão e fronteiras:
   remoção/reabertura, progress/notes/highlights e A/B. Fronteira remota é fixture.
 - test-library-web.cjs: PASS, app exportado em Chrome com dois IndexedDB independentes,
   importação/Reader real sob demanda, metadata-only, HTTP fixture, rollback e troca de conta.
+  Após corrigir lifecycle e harness, duas execuções consecutivas passaram no mesmo export.
 - test-source-library-browser.cjs: PASS após substituir clique antecipado por espera de
   botão habilitado/rota correta no harness; não foi alteração de produção para mascarar falha.
   Árvore/fuzzy/offline/IndexedDB/rollback/remoção e1000 livros/24 cards montados cobertos.
+- Na repetição Library Web, o harness observou idle e tentou clicar depois que o auto-sync
+  já havia iniciado. Check+click passaram a ser atômicos no navegador, sem aumentar timeout.
+  A investigação também reproduziu defeitos independentes de stop/cancel no produto:
+  test-library-cancellation.cjs --baseline confirma running preso e rede após stop;
+  teste corrigido verifica terminal, retomada e descarte de preparação antiga, sem limpar outbox.
+  Repetições posteriores também expuseram startup Chrome/CDP indisponível e consulta de
+  body durante navegação: falhas de ferramenta/harness, não prova de falha do app.
+  O harness trata body ainda ausente e ativa a aba que representa o dispositivo em uso,
+  evitando throttling artificial da aba oculta. Não desabilita guardas ou sandbox do produto.
 - test-reader-browser.cjs: PASS em Chrome local com perfil descartável, colunas fracionárias,
   página final/totais, tipografia/âncora, slider e alvos dos controles acima do iframe.
 - Importadores/EPUB/Reader Native controlado/Settings/Reflow scheduler/âncoras/Community/
@@ -228,6 +239,8 @@ nativos. Lista exata: git diff --name-only 7f50a90..HEAD; commits: git log --rev
 - f9b918b — CI/Web rastreável, guard de env Web/Android, sondas e harnesses.
 - Todos esses commits tiveram push para integration/comunidade-literaria. O commit
   documental de fechamento é identificado pelo histórico Git e resposta final.
+- 42ae07d — primeiro relatório integrado. A correção adicional de lifecycle Sync e os
+  ajustes de harness foram registrados em commit posterior, sem apagar esse histórico.
 
 ## 9. Contexto e próximos passos
 

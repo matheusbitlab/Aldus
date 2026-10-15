@@ -1,7 +1,8 @@
 # Aldus Reader — Contexto do Projeto
 
 Atualizado em 15/10/2026. Fonte única de contexto permanente para IA.
-Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código funcional de referência: f9b918b.
+Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código: HEAD atual da branch,
+identificado pelo Git e pelo build-info.json do export, sem hash autorreferente inventado.
 Campanha na branch integration/comunidade-literaria, iniciada no HEAD 2f98b7937d6ea2b47e30d99e03ac1bec0f0d5a9a.
 Missão integrada posterior iniciada em 7f50a9048876aec350186b594006c24f2bc73a22,
 com evolução do servidor informada pelo operador e sem reaplicar migrations históricas.
@@ -183,6 +184,12 @@ Limites: snapshot/outbox JSON por conta e full pull até 100×500 entidades; upl
 sem TUS/resume persistente; parsers/Blob ainda podem usar memória proporcional ao livro.
 Evicção verifica arquivo remoto inteiro e consome banda. Não há E2E, compartilhamento público
 ou expurgo completo de tombstones/recibos/caches; exclusão de conta ainda é operacional.
+
+Cancelamento/foreground do Sync: engine.cancel limpa running imediatamente sem apagar
+outbox. Coordinator usa lifecycle próprio além do epoch de conta: stop invalida preparação
+pendente, impede fases de rede posteriores e restart da mesma conta cria execução nova.
+Retorno/finally antigo não sobrescreve o estado novo. test-library-cancellation.cjs reproduz
+o baseline em --baseline e cobre cancelamento/stop/retomada sem alterar a fila.
 
 ## 7. Sources
 
@@ -447,7 +454,7 @@ VERCEL_GIT_COMMIT_SHA/GITHUB_SHA precisam corresponder ao HEAD. dirty=true nunca
 prova de build limpa. O metadata não inclui env, JWT, host privado ou dados de usuário.
 vercel.json fixa build/output/install e headers compatíveis com o iframe do Reader.
 .github/workflows/validate.yml: Node24, npm ci, ferramentas de teste isoladas, typecheck,
-Deno check, 48 suites críticas, export/metadata, diff check e audit crítico. Actions pinadas
+Deno check, 49 suites críticas, export/metadata, diff check e audit crítico. Actions pinadas
 por SHA, contents:read, checkout sem persistir credencial. Sem segredo/deploy automático.
 Workflow preparado/localmente validado; só execução Actions real comprova CI remoto.
 Vercel Git integration/checks/permissões/logs dependem do operador; não presumir deploy

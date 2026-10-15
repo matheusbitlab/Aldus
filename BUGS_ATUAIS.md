@@ -1,7 +1,8 @@
 # Aldus Reader — Bugs Atuais
 
 Atualizado em 15/10/2026. Branch integration/comunidade-literaria.
-HEAD de referência funcional: f9b918b; baseline desta missão: 7f50a9048876aec350186b594006c24f2bc73a22.
+Referência funcional: HEAD da branch/commit que contém esta atualização.
+Baseline desta missão: 7f50a9048876aec350186b594006c24f2bc73a22.
 Baseline da campanha anterior: 2f98b7937d6ea2b47e30d99e03ac1bec0f0d5a9a.
 Somente problemas ativos. Contexto permanente: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validação física nova.
@@ -46,6 +47,9 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
   02_library_sync_inventory.sql e scripts/audit-library-sync-public.cjs.
 - Correção: sonda read-only reproduzível e inventário completado; engine/outbox preservados.
   Nenhum SQL remoto, deploy ou descarte de operações foi executado.
+  Na missão integrada, engine.cancel passou a encerrar running; coordinator ganhou lifecycle
+  para impedir rede após stop e permitir restart da mesma conta sem reutilizar Promise antiga.
+  Causa desses caminhos CONFIRMADA em teste controlado; não atribuída ao relato físico de37 operações.
 - Testes realizados: library-sync/files/reading-sync/coordinator/restart PASS em SQLite/
   fronteiras controladas; library-rls PASS em PostgreSQL/PGlite A/B/anon e fences Storage.
   App Web com dois IndexedDB/HTTP fixture passou upload/download/remoções/rollback/conta.

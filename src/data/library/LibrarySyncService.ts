@@ -97,7 +97,11 @@ export class LibrarySyncService {
     void promise.finally(() => { if (this.active?.promise===promise) this.active=null; }).catch(()=>undefined);
     return promise;
   }
-  cancel() { this.active?.controller.abort(); }
+  cancel() {
+    this.active?.controller.abort();
+    this.status = { ...this.status, running: false };
+    this.emit();
+  }
   private async run(owner: string, signal: AbortSignal) {
     const run = this.scope.capture();
     const check=()=>{run.check();if(signal.aborted)throw new Error('Sincronização cancelada.');};

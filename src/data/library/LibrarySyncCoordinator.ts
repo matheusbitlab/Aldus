@@ -14,8 +14,9 @@ export const availabilityLabels: Record<LibraryAvailability,string> = { LOCAL:'N
 /** Account-scoped orchestration. UI never accesses Storage or database REST directly. */
 export class LibrarySyncCoordinator {
   private enabled = false;
+  private lifecycle = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private active: { generation:number; promise:Promise<void> } | null = null;
+  private active: { generation:number; lifecycle:number; promise:Promise<void> } | null = null;
   private listeners = new Set<() => void>();
   private completedListeners = new Set<() => void>();
   private state: LibrarySyncState | null = null;
@@ -31,7 +32,7 @@ export class LibrarySyncCoordinator {
   onCompleted(listener:()=>void){this.completedListeners.add(listener);return()=>{this.completedListeners.delete(listener);};}
   private emit(){this.version++;for(const listener of this.listeners)listener();}
   start(){this.enabled=true;this.schedule(0);void this.refresh().catch(()=>undefined);}
-  stop(){this.enabled=false;if(this.timer)clearTimeout(this.timer);this.timer=null;this.engine.cancel();this.files.cancel();}
+  stop(){this.enabled=false;this.lifecycle++;if(this.timer)clearTimeout(this.timer);this.timer=null;this.engine.cancel();this.files.cancel();this.status={...this.status,running:false};this.emit();}
   schedule(delay=2500){if(!this.enabled||!this.scope.userId)return;if(this.timer)clearTimeout(this.timer);this.timer=setTimeout(()=>{this.timer=null;void this.syncNow().catch(()=>undefined);},delay);}
   private needsFile(book:LibraryBook){return !book.isDeleted && book.importComplete!==false && !book.remotePath && !!book.filePath && !(book.bundledAssetId && findBundledAsset(book.bundledAssetId)?.hash===book.fileHash);}
   async refresh(){const run=this.scope.capture();const [state,books]=await Promise.all([this.engine.snapshot(),this.books.listOwned()]);run.check();this.state=state;this.status={...this.status,pendingFiles:books.filter(book=>this.needsFile(book)||(book.isDeleted&&!book.remoteCleanupDone)).length};await this.engine.refreshStatus();run.check();this.emit();}
@@ -43,35 +44,37 @@ export class LibrarySyncCoordinator {
     return this.state?.entries[syncKey('book',book.id)]?.shadow ? 'SYNCED':'LOCAL';
   }
   syncNow():Promise<void>{
-    const generation=this.scope.generation;if(this.active?.generation===generation)return this.active.promise;
-    const promise=this.run();this.active={generation,promise};void promise.finally(()=>{if(this.active?.promise===promise)this.active=null;}).catch(()=>undefined);return promise;
+    if(!this.enabled||!this.scope.userId)return Promise.resolve();
+    const generation=this.scope.generation,lifecycle=this.lifecycle;if(this.active?.generation===generation&&this.active.lifecycle===lifecycle)return this.active.promise;
+    const promise=this.run(lifecycle);this.active={generation,lifecycle,promise};void promise.finally(()=>{if(this.active?.promise===promise)this.active=null;}).catch(()=>undefined);return promise;
   }
-  private async run(){
+  private async run(lifecycle:number){
     const run=this.scope.capture();if(!run.userId||!this.enabled)return;
+    const check=()=>{run.check();if(!this.enabled||this.lifecycle!==lifecycle)throw new Error('Sincronização cancelada.');};
     this.status={...this.status,running:true,error:null};this.emit();
     try {
-      await this.replica.seed(this.engine);run.check();await this.engine.sync();run.check();
-      const books=await this.books.listOwned();run.check();
+      await this.replica.seed(this.engine);check();await this.engine.sync();check();
+      const books=await this.books.listOwned();check();
       let fileError:string|null=null;
       for(const book of books){
-        run.check();
-        if(book.localEvictionPath)await this.files.finishEviction(book);
-        if(this.needsFile(book))try{await this.files.upload(book.id);}catch(error){run.check();fileError=error instanceof Error?error.message:'Falha no envio do arquivo.';}
+        check();
+        if(book.localEvictionPath)await this.files.finishEviction(book);check();
+        if(this.needsFile(book))try{await this.files.upload(book.id);}catch(error){check();fileError=error instanceof Error?error.message:'Falha no envio do arquivo.';}
       }
       // Publish remotePath only after successful upload. Metadata never auto-downloads bytes.
-      await this.engine.sync();run.check();
-      const state=await this.engine.snapshot();run.check();
+      check();await this.engine.sync();check();
+      const state=await this.engine.snapshot();check();
       for(const book of await this.books.listOwned()){
-        run.check();const confirmed=state?.entries[syncKey('book',book.id)]?.shadow;
+        check();const confirmed=state?.entries[syncKey('book',book.id)]?.shadow;
         if(book.isDeleted && !book.remoteCleanupDone && confirmed?.deleted_at) {
           try {await this.files.cleanupRemovedBook(book,confirmed.payload.remotePath??book.remotePath);}
-          catch(error){run.check();fileError=error instanceof Error?error.message:'Exclusão do arquivo pendente.';}
+          catch(error){check();fileError=error instanceof Error?error.message:'Exclusão do arquivo pendente.';}
         }
       }
-      run.check();this.status={...this.status,error:fileError};libraryMutationEvents.error=null;
+      check();this.status={...this.status,error:fileError};libraryMutationEvents.error=null;
       for(const listener of this.completedListeners)listener();
-    }catch(error){run.check();this.status={...this.status,error:error instanceof Error?error.message:'Não foi possível sincronizar.'};throw error;}
-    finally {if(this.scope.generation===this.active?.generation || this.scope.userId===run.userId){try{run.check();this.status={...this.status,running:false};await this.refresh();}catch{/* revoked account */}}}
+    }catch(error){run.check();if(this.lifecycle!==lifecycle||!this.enabled)return;this.status={...this.status,error:error instanceof Error?error.message:'Não foi possível sincronizar.'};throw error;}
+    finally {if(this.lifecycle===lifecycle&&(this.scope.generation===this.active?.generation || this.scope.userId===run.userId)){try{run.check();this.status={...this.status,running:false};await this.refresh();}catch{/* revoked account */}}}
   }
   async removeDeviceCopy(id:string){
     const run=this.scope.capture();const book=await this.books.findById(id),state=await this.engine.snapshot();run.check();
