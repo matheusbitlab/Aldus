@@ -10,7 +10,7 @@ export interface PdfReflowProgress {
 export interface PdfReflowProcessorProps {
   uri: string;
   onProgress: (progress: PdfReflowProgress) => void;
-  onComplete: (document: PdfReflowDocument) => void;
+  onComplete: (document: PdfReflowDocument, signal?: AbortSignal) => void | Promise<void>;
   onError: (message: string) => void;
   onCancel: () => void;
 }

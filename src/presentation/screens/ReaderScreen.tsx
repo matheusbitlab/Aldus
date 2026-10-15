@@ -36,8 +36,9 @@ import { EpubNavigationRequest, EpubPageInfo } from "@/src/presentation/componen
 import { getPdfPageMode, PdfPageMode } from "@/src/presentation/components/PdfPageViewerProps";
 import { PdfModeChooser } from "@/src/presentation/components/PdfModeChooser";
 import { PdfReflowProcessor } from "@/src/presentation/components/PdfReflowProcessor";
-import { toStoredReflowChapters } from "@/src/data/local/PdfReflowDocumentBuilder";
-import { isValidatedReflowDocument } from "@/src/data/local/pdfReflowQuality";
+import { toStoredReflowChaptersAsync } from "@/src/data/local/PdfReflowDocumentBuilder";
+import { isValidatedReflowDocumentAsync } from "@/src/data/local/pdfReflowQuality";
+import { throwIfAborted } from "@/src/core/utils/cancellation";
 import {
   defaultPdfReaderSettings,
   PDF_REFLOW_PROCESSOR_VERSION,
@@ -62,7 +63,8 @@ interface Props {
 export function ReaderScreen({ bookId }: Props) {
   const renderCount = useRef(0);
   const reflowModeGeneration = useRef(0);
-  useEffect(() => { reflowModeGeneration.current++; return () => { reflowModeGeneration.current++; }; }, [bookId]);
+  const reflowPublication = useRef<AbortController | null>(null);
+  useEffect(() => { reflowModeGeneration.current++; return () => { reflowModeGeneration.current++; reflowPublication.current?.abort(); }; }, [bookId]);
   const nativeBrightnessApplied = useRef(false);
   const originalBrightnessRef = useRef<number | null>(null);
   const nativeBrightnessOperation = useRef(0);
@@ -118,6 +120,7 @@ export function ReaderScreen({ bookId }: Props) {
   const [pdfPageMode, setPdfPageMode] = useState<PdfPageMode>("single");
   const [pdfReaderSettings, setPdfReaderSettings] = useState<PdfReaderSettings | null>(null);
   const [pdfReflowDocument, setPdfReflowDocument] = useState<PdfReflowDocument | null>(null);
+  const [pdfReflowChapters, setPdfReflowChapters] = useState<StoredChapter[]>([]);
   const [reflowRestoreState, setReflowRestoreState] = useState<"inactive" | "pending" | "applying">("inactive");
   const [reflowPreparing, setReflowPreparing] = useState(false);
   const [reflowProgress, setReflowProgress] = useState({ currentPage: 0, totalPages: 0 });
@@ -296,6 +299,7 @@ export function ReaderScreen({ bookId }: Props) {
           setPdfPageMode(nextSettings.layout);
           setPdfModeChooserVisible(!savedSettings);
           setPdfReflowDocument(null);
+          setPdfReflowChapters([]);
           setReflowPreparing(false);
           setReflowFeedback(null);
 
@@ -310,11 +314,14 @@ export function ReaderScreen({ bookId }: Props) {
               cached &&
               cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION &&
               cached.sourceSignature === sourceSignature &&
-              isValidatedReflowDocument(cached.document) &&
+              await isValidatedReflowDocumentAsync(cached.document, downloadController.signal) &&
               cached.document.classification !== "image-based"
             ) {
+              const prepared = await toStoredReflowChaptersAsync(result.book.id, cached.document, downloadController.signal);
+              if (!active) return;
+              setPdfReflowChapters(prepared);
               setPdfReflowDocument(cached.document);
-            } else if (cached && cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION && cached.sourceSignature === sourceSignature && isValidatedReflowDocument(cached.document) && cached.document.classification === "image-based") {
+            } else if (cached && cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION && cached.sourceSignature === sourceSignature && cached.document.classification === "image-based") {
               const originalSettings = { ...nextSettings, mode: "original" as const };
               restoredProgress = originalSettings.originalProgress ?? result.progress?.percentage ?? 0;
               setPdfReaderSettings(originalSettings);
@@ -379,12 +386,6 @@ export function ReaderScreen({ bookId }: Props) {
   const pdfReadingMode: PdfReadingMode = pdfReaderSettings?.mode ?? "original";
   const isReflowPdf = isPdf && pdfReadingMode === "reflow";
   const pdfSourceSignature = currentBook ? getPdfSourceSignature(currentBook) : "";
-  const pdfReflowChapters = useMemo(
-    () => currentBook && pdfReflowDocument
-      ? toStoredReflowChapters(currentBook.id, pdfReflowDocument)
-      : [],
-    [currentBook, pdfReflowDocument]
-  );
   const readerChapterItems = useMemo(() => {
     const source = isEpub ? chapters : isReflowPdf ? pdfReflowChapters : [];
     const seenTitles = new Set<string>();
@@ -408,6 +409,7 @@ export function ReaderScreen({ bookId }: Props) {
   }, []);
 
   const returnToOriginal = useCallback((message?: string) => {
+    reflowPublication.current?.abort();
     const originalProgress = pdfReaderSettings?.originalProgress ?? initialPdfProgress.current;
     initialPdfProgress.current = originalProgress;
     setProgress(originalProgress);
@@ -416,11 +418,15 @@ export function ReaderScreen({ bookId }: Props) {
     reflowRestoreTarget.current = null;
     initialEpubProgress.current = null;
     setPdfReflowDocument(null);
+    setPdfReflowChapters([]);
     setPdfReaderSettings(current => ({ ...(current ?? defaultPdfReaderSettings), mode: "original" }));
     if (message) setReflowFeedback(message);
   }, [pdfReaderSettings, setProgress]);
 
   const handlePdfModeChange = useCallback(async (mode: PdfReadingMode) => {
+    reflowPublication.current?.abort();
+    const preparation = new AbortController();
+    reflowPublication.current = preparation;
     const generation = ++reflowModeGeneration.current;
     setEpubNavigationRequest(null);
     setRequestedPage(null);
@@ -450,53 +456,73 @@ export function ReaderScreen({ bookId }: Props) {
     setEpubPage(1);
     setEpubTotalPages(0);
 
-    const cached = await appDependencies.pdfReflowCache
-      .findByBookId(currentBook.id)
-      .catch(() => null);
-    if (generation !== reflowModeGeneration.current) return;
-    if (
-      cached &&
-      cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION &&
-      cached.sourceSignature === getPdfSourceSignature(currentBook) &&
-      isValidatedReflowDocument(cached.document)
-    ) {
-      if (cached.document.classification === "image-based") {
-        returnToOriginal("O Reflow requer OCR para este PDF. O arquivo original continua disponível.");
-      } else {
-        setPdfReflowDocument(cached.document);
+    try {
+      const cached = await appDependencies.pdfReflowCache.findByBookId(currentBook.id).catch(() => null);
+      if (generation !== reflowModeGeneration.current) return;
+      if (cached && cached.processorVersion === PDF_REFLOW_PROCESSOR_VERSION &&
+          cached.sourceSignature === getPdfSourceSignature(currentBook) &&
+          await isValidatedReflowDocumentAsync(cached.document, preparation.signal)) {
+        if (cached.document.classification === "image-based") {
+          returnToOriginal("O Reflow requer OCR para este PDF. O arquivo original continua disponível.");
+        } else {
+          const prepared = await toStoredReflowChaptersAsync(currentBook.id, cached.document, preparation.signal);
+          if (generation !== reflowModeGeneration.current || preparation.signal.aborted) return;
+          setPdfReflowChapters(prepared);
+          setPdfReflowDocument(cached.document);
+        }
+        setReflowPreparing(false);
+        return;
       }
-      setReflowPreparing(false);
-      return;
+      setPdfReflowDocument(null);
+      setPdfReflowChapters([]);
+      setReflowProgress({ currentPage: 0, totalPages: 0 });
+      setReflowPreparing(true);
+    } catch {
+      if (!preparation.signal.aborted && generation === reflowModeGeneration.current) {
+        returnToOriginal("Não foi possível abrir o cache Reflow. O PDF Original continua disponível.");
+      }
     }
-
-    setPdfReflowDocument(null);
-    setReflowProgress({ currentPage: 0, totalPages: 0 });
-    setReflowPreparing(true);
   }, [currentBook, pdfReaderSettings, pdfTotalPages, progress, returnToOriginal]);
 
   const handleReflowProgress = useCallback((nextProgress: { currentPage: number; totalPages: number }) => {
     setReflowProgress(nextProgress);
   }, []);
 
-  const handleReflowComplete = useCallback((document: PdfReflowDocument) => {
-    setReflowPreparing(false);
-    if (!isValidatedReflowDocument(document) || document.classification === "image-based" || document.characterCount < 1 || document.chapters.length === 0) {
-      returnToOriginal(document.classification === "image-based" ? "O Reflow requer OCR para este PDF. Você voltou ao PDF Original." : "O texto extraído não pôde ser validado. Você voltou ao PDF Original.");
-      return;
-    }
-
-    if (currentBook) {
-      void appDependencies.pdfReflowCache.save({
+  const handleReflowComplete = useCallback(async (document: PdfReflowDocument, signal?: AbortSignal) => {
+    const generation = reflowModeGeneration.current;
+    const publication = new AbortController();
+    reflowPublication.current?.abort();
+    reflowPublication.current = publication;
+    const abort = () => publication.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+    try {
+      if (!await isValidatedReflowDocumentAsync(document, publication.signal) || document.classification === "image-based" || document.characterCount < 1 || document.chapters.length === 0) {
+        returnToOriginal(document.classification === "image-based" ? "O Reflow requer OCR para este PDF. Você voltou ao PDF Original." : "O texto extraído não pôde ser validado. Você voltou ao PDF Original.");
+        return;
+      }
+      if (!currentBook) throw new Error("O livro não está mais disponível.");
+      const prepared = await toStoredReflowChaptersAsync(currentBook.id, document, publication.signal);
+      await appDependencies.pdfReflowCache.save({
         id: currentBook.id,
         sourceSignature: getPdfSourceSignature(currentBook),
         processorVersion: PDF_REFLOW_PROCESSOR_VERSION,
         document,
         updatedAt: Date.now(),
-      }).catch(() => undefined);
-    }
-    setPdfReflowDocument(document);
-    setPdfReaderSettings({ ...(pdfReaderSettings ?? defaultPdfReaderSettings), mode: "reflow" });
-    setReflowFeedback("Leitura livre pronta.");
+      }, publication.signal);
+      throwIfAborted(publication.signal);
+      if (generation !== reflowModeGeneration.current) return;
+      setPdfReflowChapters(prepared);
+      setPdfReflowDocument(document);
+      setPdfReaderSettings(current => ({ ...(current ?? defaultPdfReaderSettings), mode: "reflow" }));
+      setReflowFeedback("Leitura livre pronta.");
+      setReflowPreparing(false);
+    } catch (error) {
+      if (!publication.signal.aborted && generation === reflowModeGeneration.current) {
+        returnToOriginal("Não foi possível confirmar o cache da leitura livre. O PDF Original e o cache anterior foram preservados.");
+        throw error;
+      }
+    } finally { signal?.removeEventListener("abort", abort); }
   }, [currentBook, pdfReaderSettings, returnToOriginal]);
 
   const handleReflowError = useCallback((message: string) => {

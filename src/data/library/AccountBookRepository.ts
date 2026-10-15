@@ -76,7 +76,7 @@ export function scopeBookData<T extends object>(repository: T, books: AccountBoo
       const run = books.scope.capture();
       let bookId: string | undefined;
       if (["listByBookId", "findByBookId", "replaceForBook", "get", "delete", "importPreservingExisting"].includes(String(property))) bookId = args[0];
-      else if (property === "save") bookId = args[0]?.bookId ?? (typeof args[0] === "string" ? args[0] : undefined);
+      else if (property === "save") bookId = args[0]?.bookId ?? (typeof args[0] === "string" ? args[0] : "findByBookId" in target ? args[0]?.id : undefined);
       else if (property === "remove" && !("findById" in target)) bookId = args[0];
       else if (property === "findById" || property === "remove") {
         const item = await (target as any).findById(args[0]); run.check();

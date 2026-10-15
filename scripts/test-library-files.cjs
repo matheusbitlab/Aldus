@@ -16,7 +16,7 @@ const clone=x=>structuredClone(x);
    return new Response(corrupt?new Blob(['corrupt']):file,{status:200});
  };
  const platform={OS:'web'},nativeFiles={createUploadTask:()=>({uploadAsync:async()=>({status:400,body:duplicateBody}),cancelAsync:async()=>{}}),FileSystemUploadType:{BINARY_CONTENT:0}};
- const load=loader({'react-native':{Platform:platform},'expo-file-system/legacy':nativeFiles,
+ const load=loader({'react-native':{Platform:platform},'expo-file-system/legacy':nativeFiles,'expo-file-system':{},
    '@/src/data/remote/supabase':{supabase:{auth:{getSession:async()=>({data:{session:{user:{id:user},access_token:`jwt-${user}`}}})}}},
    '@/src/presentation/services/PdfThumbnailGenerator':{pdfThumbnailGenerator:{generate:async()=>null}}});
  const {libraryAccountScope:scope}=load('src/data/library/LibraryAccountScope.ts');scope.set(A);

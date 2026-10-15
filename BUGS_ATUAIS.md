@@ -99,18 +99,32 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 
 ## BUG 06 — Reflow grande demora em 98–100% e cancelamento final sem fechamento
 
-- Prioridade: ALTA. Status: ABERTO.
+- Prioridade: ALTA. Status: IMPLEMENTADO / VALIDADO CONTROLADO / ANDROID PENDENTE.
 - Sintoma/reprodução: histórico físico Weber 584 páginas parado em 582/584; cancelar/Back
   atrasados. Arquivo original de 969 páginas não identificado. Não reproduzido nesta campanha.
 - Evidência/primeira divergência: execução Weber eventualmente publicou cache; await exato
   do intervalo não foi isolado. República 525 páginas cancelou durante extração e depois
   concluiu, sem validar cancelamento na montagem final ou no arquivo de 969 páginas.
-- Causa: INCONCLUSIVA para o intervalo físico. Scheduler microtask/idle e bytecode Hermes
-  já foram corrigidos e tiveram provas posteriores; não ressuscitar esses defeitos.
+- Causa física: INCONCLUSIVA. Novas causas CONFIRMADAS no código: guard esperava bookId
+  mas cache fornece id; save era rejeitado e o Reader ignorava erro/publicava antes do commit.
+  Plano OCR repetia scans síncronos/flatMap; qualidade final, HTML e JSON também eram síncronos.
+  Bytecode/scheduler histórico já corrigidos não são apresentados como defeitos novos.
 - Arquivos: PdfReflowProcessor.native.tsx, PdfReflowDocumentBuilder.ts, ReaderScreen.tsx.
-- Correção: nenhuma adicional nesta campanha; preservar qualidade/fallback/OCR e cancelamento existentes.
+- Correção: guard aceita ID do cache apenas em repository findByBookId; preparação aguarda
+  commit sem ocultar falha. Validação/OCR/HTML/JSON cooperativos, CPU budget de 8ms, aborto
+  em cada fronteira, SQLite exclusivo/rollback e IndexedDB oncomplete/abort, geração protegida.
+  Libera geometria/base64/WebView de extração antes do commit; Original e cache anterior preservados.
 - Testes realizados: evidência histórica de extração/cancelamento/cache e suítes controladas;
   mudanças OCR posteriores não certificam a reprodução física específica.
+- Novos testes: test-reflow-finalization (guard falha no baseline, SQLite real/rollback,
+  IndexedDB abort após put, fixture JSON de 9,6MB, heartbeat/cancel), test-reader-screen
+  --finalization-baseline falha antes do commit; corrigido mantém Back e ignora save tardio.
+  test-reflow-native-lifecycle exercita componente Native real com bridge/IO controlados:
+  cancel/unmount nos últimos 1%, falha de cache, terminal único e liberação da WebView.
+  PDFs reais em desktop/texto sem imagens: Ócio 49p, Ética 63p, República 525p e Weber 584p
+  passaram abertura→extração→montagem→validação→HTML→commit→releitura. Weber disponível:
+  5.265.071 bytes, 2.055.524 caracteres; montagem 4675ms, cache/serialização 1665ms sob carga.
+  Não é reprodução física, nem prova do PDF original de 969p ou de imagens/OCR Android.
 - Testes pendentes: mesmo PDF/build, fases 98–100%, memória/thread JS, cancel/Back e reopen.
 - Dependências externas: arquivo/aparelho e próximo build consolidado.
 - Não regredir: Original independente, cache validado, posição, cleanup e terminal único.

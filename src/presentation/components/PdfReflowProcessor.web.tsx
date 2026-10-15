@@ -3,8 +3,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { getDocument, GlobalWorkerOptions, ImageKind, OPS, type PDFPageProxy } from "pdfjs-dist";
 import { PdfReflowImage, PdfReflowPageData } from "@/src/domain/types/pdfReader";
 import { buildPdfReflowDocumentAsync } from "@/src/data/local/PdfReflowDocumentBuilder";
-import { assessTextExtractionQuality, isClearlyCorruptedTextExtraction, CORRUPT_PDF_TEXT, isValidatedReflowDocument } from "@/src/data/local/pdfReflowQuality";
-import { createPdfOcrPlan, createReflowDerivation } from "@/src/data/local/pdfOcrPolicy";
+import { assessTextExtractionQuality, isClearlyCorruptedTextExtraction, CORRUPT_PDF_TEXT, isValidatedReflowDocumentAsync } from "@/src/data/local/pdfReflowQuality";
+import { createPdfOcrPlanAsync, createReflowDerivation } from "@/src/data/local/pdfOcrPolicy";
 import { PdfReflowProgress, PdfReflowProcessorProps, reflowProgressLabel } from "@/src/presentation/components/PdfReflowProcessorProps";
 import { createReflowOperation } from "./reflowOperation";
 
@@ -88,7 +88,8 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
           } finally { page.cleanup(); }
         }
         if (operation.active) {
-          const ocrPlan = createPdfOcrPlan(pages);
+          update({ stage: "validating", currentPage: pdf.numPages, totalPages: pdf.numPages });
+          const ocrPlan = await createPdfOcrPlanAsync(pages, operation.signal);
           if (ocrPlan.state === "OCR_REQUIRED") {
             setOcrRequiredPages(ocrPlan.pageNumbers.length);
             update({ stage: "awaiting-ocr", currentPage: 0, totalPages: ocrPlan.pageNumbers.length });
@@ -97,10 +98,14 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
           }
           update({ stage: "building", currentPage: pdf.numPages, totalPages: pdf.numPages });
           const document = await buildPdfReflowDocumentAsync(pages, pdf.numPages, operation.signal, createReflowDerivation(pdf.numPages, []));
+          pages.length = 0;
           update({ stage: "validating", currentPage: pdf.numPages, totalPages: pdf.numPages });
-          if (!isValidatedReflowDocument(document)) throw new Error(CORRUPT_PDF_TEXT);
+          if (!await isValidatedReflowDocumentAsync(document, operation.signal)) throw new Error(CORRUPT_PDF_TEXT);
           update({ stage: "finalizing", currentPage: pdf.numPages, totalPages: pdf.numPages });
-          if (operation.finish()) { release(); callbacks.current.onComplete(document); }
+          pages.length = 0;
+          release(); // Extraction resources are no longer needed while committing the cache.
+          await callbacks.current.onComplete(document, operation.signal);
+          operation.finish();
         }
       })
       .catch((failure: unknown) => {

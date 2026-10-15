@@ -72,6 +72,16 @@ sépia/claros/escuros; e-reader é atalho de aparência, não emulação de hard
 Brilho Web é luminosidade da página; Native aplica/restaura brilho da sessão e respeita
 AppState/cleanup. Tema/fonte/brilho não comandam restauração nem remontam documento.
 
+Preparação Reflow permanece cancelável até confirmar cache e preparar HTML. Plano OCR,
+qualidade, builder, conversão de blocos/HTML e serialização SQLite cooperam em fatias de
+CPU; Native usa idle com prazo e não setImmediate/microtasks. O cache usa record.id como
+bookId no guard de conta, transação exclusiva SQLite e oncomplete IndexedDB, sem sucesso
+em memória. Cancelar durante gravação faz rollback antes do commit; cache confirmado
+anterior não é apagado. Retorno antigo não publica após Back/troca de modo/livro/unmount.
+Leitura geométrica e WebView/base64 da extração são liberados antes da fase final.
+JSON.parse do cache, clone IndexedDB, flatten final e primeiro layout continuam tendo
+custo proporcional ao documento; não prometer suporte ilimitado ou validação Android.
+
 EPUB possui marcadores/notas, grifos/cores/comentários, seleção e export/import por livro.
 Âncoras exact/relocated permitem retorno; ambiguous/missing exigem aviso e nunca navegação
 silenciosa. Importação de estudo é transacional/idempotente. PDF Original tem marcador

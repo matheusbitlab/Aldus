@@ -4,8 +4,8 @@ import { WebView, WebViewMessageEvent } from "react-native-webview";
 import * as FileSystem from "expo-file-system/legacy";
 import { PdfReflowPageData, PdfTextProcessingState } from "@/src/domain/types/pdfReader";
 import { buildPdfReflowDocumentAsync } from "@/src/data/local/PdfReflowDocumentBuilder";
-import { isValidatedReflowDocument, CORRUPT_PDF_TEXT } from "@/src/data/local/pdfReflowQuality";
-import { createPdfOcrPlan, createReflowDerivation, isSufficientOcrText, PdfOcrPlan, replacePageWithOcr } from "@/src/data/local/pdfOcrPolicy";
+import { isValidatedReflowDocumentAsync, CORRUPT_PDF_TEXT } from "@/src/data/local/pdfReflowQuality";
+import { createPdfOcrPlanAsync, createReflowDerivation, isSufficientOcrText, PdfOcrPlan, replacePageWithOcr } from "@/src/data/local/pdfOcrPolicy";
 import { beginPdfOcr, cancelPdfOcr, recognizePdfPage } from "@/src/data/local/pdfOcr.native";
 import { PdfReflowProgress, PdfReflowProcessorProps, reflowProgressLabel } from "@/src/presentation/components/PdfReflowProcessorProps";
 import { createReflowOperation } from "./reflowOperation";
@@ -87,6 +87,7 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
   const buildAndFinish = async (extracted: PdfReflowPageData[], totalPages: number, ocrPages: number[]) => {
     const run = operation.current;
     if (!run?.active) return;
+    setPdfBase64(null); // The extraction WebView/input no longer belong to finalization.
     update({ stage: "building", currentPage: totalPages, totalPages });
     const document = await buildPdfReflowDocumentAsync(
       extracted,
@@ -95,16 +96,18 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
       createReflowDerivation(totalPages, ocrPages)
     );
     if (!run.active) return;
+    pages.current = [];
+    extracted.length = 0; // Release text-item geometry before validation/HTML/cache copies.
     update({ stage: "validating", currentPage: document.pageCount, totalPages: document.pageCount });
-    if (!isValidatedReflowDocument(document) || document.classification === "image-based") {
+    if (!await isValidatedReflowDocumentAsync(document, run.signal) || document.classification === "image-based") {
       throw new Error(ocrPages.length > 0 ? "OCR não encontrou texto legível suficiente neste PDF." : CORRUPT_PDF_TEXT);
     }
     update({ stage: "finalizing", currentPage: document.pageCount, totalPages: document.pageCount });
     pages.current = [];
     setProcessingState(ocrPages.length > 0 ? "OCR_VALID" : "TEXT_VALID");
+    await callbacks.current.onComplete(document, run.signal);
     if (run.finish()) {
       reflowDiagnostic("SUCCESS", { operationId: generation.current, phase: ocrPages.length > 0 ? "ocr" : "extraction" });
-      callbacks.current.onComplete(document);
     }
   };
 
@@ -152,7 +155,8 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
     }
   };
 
-  const handleMessage = (event: WebViewMessageEvent) => {
+  const handleMessage = async (event: WebViewMessageEvent) => {
+    const messageRun = operation.current;
     try {
       const message = JSON.parse(event.nativeEvent.data) as {
         operationId?: number;
@@ -187,7 +191,9 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
       } else if (message.type === "complete" && message.totalPages) {
         assembling.current = true;
         const extracted = pages.current;
-        const plan = createPdfOcrPlan(extracted);
+        update({ stage: "validating", currentPage: message.totalPages, totalPages: message.totalPages });
+        const plan = await createPdfOcrPlanAsync(extracted, run.signal);
+        if (!run.active) return;
         setProcessingState(plan.state);
         if (plan.state === "OCR_REQUIRED") {
           const required = new Set(plan.pageNumbers);
@@ -205,7 +211,7 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
         fail("Não foi possível extrair o conteúdo deste PDF. O PDF Original continua disponível.");
       }
     } catch {
-      fail("O processador PDF retornou dados inválidos.");
+      if (messageRun === operation.current && messageRun?.active) fail("O processador PDF retornou dados inválidos.");
     }
   };
 

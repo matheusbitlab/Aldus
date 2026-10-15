@@ -1,18 +1,18 @@
 // Actual ReaderScreen orchestration; storage, viewers and native hardware boundaries controlled.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),cp=require('node:child_process');
 const React=require('../.expo/auth-test-tools/node_modules/react'),{act,create}=require('../.expo/auth-test-tools/node_modules/react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
-const baseline=process.argv.includes('--baseline'),cache=new Map(),timers=new Map(),listeners=new Set(),writes=[],back=new Set();let timerId=0,fixture='reflow';
+const baseline=process.argv.includes('--baseline'),finalizationBaseline=process.argv.includes('--finalization-baseline'),cache=new Map(),timers=new Map(),listeners=new Set(),writes=[],back=new Set();let timerId=0,fixture='reflow';
 let reader={progress:0,controlsVisible:false,setProgress:v=>setReader({progress:v}),setControlsVisible:v=>setReader({controlsVisible:v}),toggleControls:()=>setReader({controlsVisible:!reader.controlsVisible})};
 function setReader(next){reader={...reader,...next};listeners.forEach(fn=>fn());}
 const readerStore=()=>React.useSyncExternalStore(fn=>{listeners.add(fn);return()=>listeners.delete(fn)},()=>reader);readerStore.getState=()=>reader;
 const noop=()=>{},widget=name=>props=>React.createElement(name,props,props.children);
 const palette={background:'#fff',panel:'#eee',text:'#222',secondaryText:'#777',accent:'#a54'};
 const dependencies={highlightRepository:{listByBookId:async()=>[]},openBook:{execute:async id=>({book:{id,title:'Fixture',mimeType:fixture==='epub'?'application/epub+zip':'application/pdf',filePath:'file:///fixture',fileName:'fixture.pdf',fileSize:123,fileHash:'fixture-signature'},chapters:fixture==='epub'?[{id:'epub',title:'Chapter',html:'<p>Text</p>',characterCount:4}]:[],progress:{percentage:.5}})},pdfReaderSettings:{get:async()=>({...load('src/domain/types/pdfReader.ts').defaultPdfReaderSettings,mode:fixture==='original'?'original':'reflow',reflowProgress:.5,originalProgress:.2}),save:async()=>{}},pdfReflowCache:{findByBookId:async()=>null,save:async()=>{}},updateReadingProgress:{execute:async x=>writes.push(x)}};
-function load(file){if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);const input=baseline&&file.endsWith('ReaderScreen.tsx')?cp.execFileSync('git',['show','77c490c:'+file],{encoding:'utf8'}):fs.readFileSync(file,'utf8');const code=ts.transpileModule(input,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
+function load(file){if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);const input=(baseline||finalizationBaseline)&&file.endsWith('ReaderScreen.tsx')?cp.execFileSync('git',['show',(finalizationBaseline?'3df3f5b':'77c490c')+':'+file],{encoding:'utf8'}):fs.readFileSync(file,'utf8');const code=ts.transpileModule(input,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
 new Function('require','exports','setTimeout','clearTimeout',code)(name=>{
 if(name==='react')return React;if(name==='react/jsx-runtime')return require('../.expo/auth-test-tools/node_modules/react/jsx-runtime');if(name==='react-native')return {View:'View',Text:'Text',Pressable:'Pressable',ActivityIndicator:'Spinner',StatusBar:'StatusBar',Platform:{OS:'android'},StyleSheet:{create:x=>x,absoluteFill:{position:'absolute',top:0,bottom:0,left:0,right:0}},AppState:{currentState:'active',addEventListener:()=>({remove:noop})},BackHandler:{addEventListener:(_,fn)=>{back.add(fn);return {remove:()=>back.delete(fn)}}},useWindowDimensions:()=>({width:420,height:780})};if(name==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:32,bottom:24,left:5,right:7})};if(name==='expo-router')return {router:{push:noop}};if(name==='expo-brightness')return {isAvailableAsync:async()=>false};if(name.includes('/services/dependencies'))return {appDependencies:dependencies};if(name.includes('/stores/readerStore'))return {useReaderStore:readerStore};if(name.includes('/contexts/ReaderSettingsContext'))return {useReaderSettings:()=>({fontSize:16,fontFamily:'Georgia',marginSize:24,theme:'light',brightness:100,useSystemBrightness:true,palette})};if(name.includes('epubOpenMetrics'))return {epubDiagnosticConsole:{log:noop},markEpubOpenEvent:noop,markEpubOpenSpanStart:noop,markEpubOpenSpanEnd:noop};
 for(const component of ['MotionCuesOverlay','StudyBookmarksPanel','ReaderControls','ReaderSettingsPanel','DocumentReaderAdapter','PdfModeChooser','PdfReflowProcessor'])if(name.endsWith('/'+component))return {[component]:widget(component)};
-if(name.startsWith('@/')||name.startsWith('.')){const base=name.startsWith('@/')?name.slice(2):path.posix.join(path.posix.dirname(file),name);return load(['.ts','.tsx'].map(ext=>base+ext).find(p=>fs.existsSync(p)));}return require(name);},exports,fn=>{timers.set(++timerId,fn);return timerId},id=>timers.delete(id));return exports;}
+if(name.startsWith('@/')||name.startsWith('.')){const base=name.startsWith('@/')?name.slice(2):path.posix.join(path.posix.dirname(file),name);return load(['.ts','.tsx'].map(ext=>base+ext).find(p=>fs.existsSync(p)));}return require(name);},exports,file.endsWith('cooperativeWork.ts')?global.setTimeout:fn=>{timers.set(++timerId,fn);return timerId},file.endsWith('cooperativeWork.ts')?global.clearTimeout:id=>timers.delete(id));return exports;}
 const flushTimers=async()=>act(async()=>{const due=[...timers.values()];timers.clear();due.forEach(fn=>fn());});
 (async()=>{
  const {ReaderScreen}=load('src/presentation/screens/ReaderScreen.tsx');let renderer;
@@ -46,6 +46,23 @@ const flushTimers=async()=>act(async()=>{const due=[...timers.values()];timers.c
  await act(async()=>renderer.root.findByType('ReaderSettingsPanel').props.onPdfModeChange('original'));await flushTimers();assert.equal(getDoc().props.pdfReadingMode,'original');await act(async()=>renderer.unmount());
  writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'close'}));});
  await act(async()=>renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid));await report(1,101,true);await report(51,101,true);await act(async()=>renderer.unmount());await flushTimers();assert.equal(writes.at(-1)?.pageNumber,51,'Last acknowledged position must survive immediate close');
+ // Cache completion is part of preparation, not an unobserved background write.
+ let releaseSave,saveStarted=false,publication;
+ dependencies.pdfReflowCache.save=async()=>{saveStarted=true;await new Promise(resolve=>releaseSave=resolve)};
+ await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'cache-cancel'}));});
+ await act(async()=>{publication=renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid)});
+ for(let n=0;n<100&&!saveStarted;n++)await act(async()=>new Promise(setImmediate));assert.equal(saveStarted,true);
+ assert.equal(renderer.root.findAllByType('DocumentReaderAdapter').length,0,'Do not publish Reflow before cache commit');
+ assert.equal(renderer.root.findAllByType('PdfReflowProcessor').length,1,'Final cache write must remain cancellable/Back-handled');
+ await act(async()=>{[...back][0]()});assert.equal(getDoc().props.pdfReadingMode,'original');
+ await act(async()=>{releaseSave();await publication});assert.equal(getDoc().props.pdfReadingMode,'original','Late cache write cannot restore cancelled Reflow');await act(async()=>renderer.unmount());
+ saveStarted=false;
+ await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'cache-commit'}));});
+ await act(async()=>{publication=renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid)});
+ for(let n=0;n<100&&!saveStarted;n++)await act(async()=>new Promise(setImmediate));assert.equal(saveStarted,true);
+ await act(async()=>{releaseSave();await publication});assert.equal(getDoc().props.pdfReadingMode,'reflow');assert.ok(getDoc().props.pdfReflowChapters[0].html.includes('readable'));
+ await act(async()=>renderer.unmount());
+ dependencies.pdfReflowCache.save=async()=>{};
  fixture='epub';writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'epub'}));});
  await report(1,3,false);assert.equal(getDoc().props.epubPage,1);assert.equal(reader.progress,.5);
  await report(1,101,true);assert.equal(getDoc().props.epubPage,51);await report(51,101,true);await flushTimers();assert.equal(writes.at(-1).pageNumber,51);

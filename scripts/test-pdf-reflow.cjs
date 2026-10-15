@@ -28,7 +28,7 @@ function load(file) {
   const controller=new AbortController();
   const pages=Array.from({length:100},(_,i)=>({...clean,pageNumber:i+1}));
   const pending=builder.buildPdfReflowDocumentAsync(pages,100,controller.signal);
-  setImmediate(()=>controller.abort());await assert.rejects(pending,/cancelado/);
+  setImmediate(()=>controller.abort());await assert.rejects(pending,{name:'AbortError'});
   assert.deepEqual(await builder.buildPdfReflowDocumentAsync([clean],1,new AbortController().signal),doc);
   assert.equal(doc.derivation.source,'text-extraction');
   const scan={...clean,pageNumber:2,textItems:[],images:[{src:'data:image/jpeg;base64,x',x:0,y:0,width:500,height:700}]};

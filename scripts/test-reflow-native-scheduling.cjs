@@ -10,7 +10,7 @@ global.cancelIdleCallback=id=>{idle.delete(id);clearTask(id);};
  const pages=Array.from({length:40},(_,i)=>({pageNumber:i+1,pageWidth:500,pageHeight:700,textItems:[{text:'A readable paragraph about native scheduling. '.repeat(10),x:20,y:600,width:300,height:12}],images:[]}));
  const controller=new AbortController();const result=build(pages,40,controller.signal);task(()=>controller.abort());
  if(process.argv.includes('--baseline')){await result;assert.equal(controller.signal.aborted,false);await new Promise(task);console.log('REPRODUCED RN microtask immediate: entire build completes before queued Native input can cancel');return;}
- await assert.rejects(result,/cancelado/);assert.equal(controller.signal.aborted,true);assert.equal(idle.size,0,'Abort must remove pending Native idle work');
+ await assert.rejects(result,{name:'AbortError'});assert.equal(controller.signal.aborted,true);assert.equal(idle.size,0,'Abort must remove pending Native idle work');
  const valid=await build(pages,40,new AbortController().signal);assert.equal(valid.pageCount,40);assert.equal(idle.size,0);
  console.log('PASS Native task can cancel between pages; idle continuation released on abort; complete build still validates');
 })().catch(e=>{console.error(e);process.exitCode=1;});

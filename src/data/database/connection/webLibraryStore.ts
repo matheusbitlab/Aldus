@@ -1,4 +1,9 @@
 type StoreName = "books" | "book_metadata" | "chapters" | "documents" | "reading_progress" | "bookmarks" | "highlights" | "web_search_history" | "pdf_reflow_cache" | "source_catalogs" | "source_import_links" | "library_sync_state";
+// Kept dependency-free: this storage module is also exercised inside browser realms.
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) { const error = new Error("Operação cancelada."); error.name = "AbortError"; throw error; }
+}
+
 type StoredValue = { id: string };
 
 const storeNames: StoreName[] = ["books", "book_metadata", "chapters", "documents", "reading_progress", "bookmarks", "highlights", "web_search_history", "pdf_reflow_cache", "source_catalogs", "source_import_links", "library_sync_state"];
@@ -83,20 +88,26 @@ export async function webGetAllPersistent<T extends StoredValue>(storeName: Stor
   if (!database) throw new Error("Armazenamento persistente indisponível. Libere o armazenamento deste site para acessar suas notas.");
   return request<T[]>(database.transaction(storeName, "readonly").objectStore(storeName).getAll());
 }
-export async function webPutPersistent<T extends StoredValue>(storeName: StoreName, value: T): Promise<void> {
-  await persistentMutation(storeName, store => store.put(value));
+export async function webPutPersistent<T extends StoredValue>(storeName: StoreName, value: T, signal?: AbortSignal): Promise<void> {
+  await persistentMutation(storeName, store => store.put(value), signal);
 }
 export async function webDeletePersistent(storeName: StoreName, id: string): Promise<void> {
   await persistentMutation(storeName, store => store.delete(id));
 }
-async function persistentMutation(storeName: StoreName, mutate: (store: IDBObjectStore) => void): Promise<void> {
+async function persistentMutation(storeName: StoreName, mutate: (store: IDBObjectStore) => void, signal?: AbortSignal): Promise<void> {
+  throwIfAborted(signal);
   const database = await openDatabase();
   if (!database) throw new Error("Não foi possível salvar suas notas. Libere o armazenamento deste site e tente novamente.");
+  throwIfAborted(signal);
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(storeName, "readwrite");
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = transaction.onabort = () => reject(transaction.error ?? new Error("Não foi possível gravar a nota."));
-    mutate(transaction.objectStore(storeName));
+    const abort = () => { try { transaction.abort(); } catch { /* Already committed; never remove a confirmed record. */ } };
+    const cleanup = () => signal?.removeEventListener("abort", abort);
+    transaction.oncomplete = () => { cleanup(); resolve(); };
+    transaction.onerror = transaction.onabort = () => { cleanup(); reject(transaction.error ?? new Error("Não foi possível gravar os dados persistentes.")); };
+    signal?.addEventListener("abort", abort, { once: true });
+    try { throwIfAborted(signal); mutate(transaction.objectStore(storeName)); }
+    catch (error) { abort(); cleanup(); reject(error); }
   });
 }
 

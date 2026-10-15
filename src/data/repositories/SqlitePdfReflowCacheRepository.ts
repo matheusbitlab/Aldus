@@ -1,7 +1,9 @@
 import { PdfReflowCacheRepository } from "@/src/domain/repositories/PdfReflowCacheRepository";
 import { PdfReflowCacheRecord } from "@/src/domain/types/pdfReader";
 import { getDatabase } from "@/src/data/database/connection/database";
-import { isValidatedReflowDocument } from "@/src/data/local/pdfReflowQuality";
+import { isValidatedReflowDocumentAsync } from "@/src/data/local/pdfReflowQuality";
+import { serializeReflowCache } from "@/src/data/local/reflowSerialization";
+import { throwIfAborted } from "@/src/core/utils/cancellation";
 
 export class SqlitePdfReflowCacheRepository implements PdfReflowCacheRepository {
   async findByBookId(bookId: string): Promise<PdfReflowCacheRecord | null> {
@@ -24,17 +26,23 @@ export class SqlitePdfReflowCacheRepository implements PdfReflowCacheRepository 
     }
   }
 
-  async save(record: PdfReflowCacheRecord): Promise<void> {
-    if (!isValidatedReflowDocument(record.document)) throw new Error("Cache Reflow sem validação de qualidade.");
+  async save(record: PdfReflowCacheRecord, signal?: AbortSignal): Promise<void> {
+    if (!await isValidatedReflowDocumentAsync(record.document, signal)) throw new Error("Cache Reflow sem validação de qualidade.");
+    const serialized = await serializeReflowCache(record.document, signal);
     const database = await getDatabase();
-    await database.runAsync(
+    throwIfAborted(signal);
+    await database.withExclusiveTransactionAsync(async transaction => {
+      throwIfAborted(signal);
+      await transaction.runAsync(
       "INSERT INTO pdf_reflow_cache (book_id, source_signature, processor_version, document_json, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(book_id) DO UPDATE SET source_signature = excluded.source_signature, processor_version = excluded.processor_version, document_json = excluded.document_json, updated_at = excluded.updated_at",
       record.id,
       record.sourceSignature,
       record.processorVersion,
-      JSON.stringify(record.document),
+      serialized,
       record.updatedAt
-    );
+      );
+      throwIfAborted(signal); // Roll back cancellation during a non-interruptible Native write.
+    });
   }
 
   async remove(bookId: string): Promise<void> {

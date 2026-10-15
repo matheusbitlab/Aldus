@@ -10,6 +10,7 @@ import {
 } from "@/src/domain/types/pdfReader";
 import { StoredChapter } from "@/src/domain/entities/LibraryBook";
 import { validateReflowPagesSteps } from "./pdfReflowQuality";
+import { runCooperatively } from "@/src/core/utils/cooperativeWork";
 
 interface VisualLine {
   pageNumber: number;
@@ -43,38 +44,7 @@ export function buildPdfReflowDocument(
 }
 
 export async function buildPdfReflowDocumentAsync(pages: PdfReflowPageData[], pageCount: number, signal: AbortSignal, derivation?: PdfReflowDerivation): Promise<PdfReflowDocument> {
-  const steps = buildReflowSteps(pages, pageCount, derivation);
-  for (;;) {
-    if (signal.aborted) { steps.return(undefined as never); throw new Error("Processamento cancelado."); }
-    const result = steps.next();
-    if (result.done) return result.value;
-    // Cooperative page-sized work, not a delay/retry or navigation workaround.
-    await yieldReflowWork(signal);
-  }
-}
-
-function yieldReflowWork(signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let release = () => {};
-    const finish = () => { release(); signal.removeEventListener("abort", abort); resolve(); };
-    const abort = () => { release(); signal.removeEventListener("abort", abort); reject(new Error("Processamento cancelado.")); };
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) { abort(); return; }
-    // RN 0.86 implements setImmediate with queueMicrotask: it cannot yield to
-    // Native input/render tasks. The idle scheduler crosses that boundary.
-    if (typeof requestIdleCallback === "function") {
-      const id = requestIdleCallback(finish);
-      release = () => { if (typeof cancelIdleCallback === "function") cancelIdleCallback(id); };
-    } else if (typeof setImmediate === "function") {
-      const id = setImmediate(finish);
-      release = () => clearImmediate(id);
-    } else {
-      const channel = new MessageChannel();
-      release = () => { channel.port1.close(); channel.port2.close(); };
-      channel.port1.onmessage = finish;
-      channel.port2.postMessage(null);
-    }
-  });
+  return runCooperatively(buildReflowSteps(pages, pageCount, derivation), signal);
 }
 
 function* buildReflowSteps(pages: PdfReflowPageData[], pageCount: number, derivation?: PdfReflowDerivation): Generator<void, PdfReflowDocument> {
@@ -117,6 +87,7 @@ function* buildReflowSteps(pages: PdfReflowPageData[], pageCount: number, deriva
     ].sort((first, second) => eventY(first) - eventY(second));
 
     for (const event of events) {
+      yield;
       if (event.kind === "image") {
         flushParagraph();
         if (event.image.width < 24 || event.image.height < 24) continue;
@@ -473,7 +444,19 @@ export function toStoredReflowChapters(
   bookId: string,
   document: PdfReflowDocument
 ): StoredChapter[] {
-  return document.chapters.map((chapter, chapterIndex) => {
+  const steps = storedChapterSteps(bookId, document);
+  let next = steps.next();
+  while (!next.done) next = steps.next();
+  return next.value;
+}
+
+export function toStoredReflowChaptersAsync(bookId: string, document: PdfReflowDocument, signal?: AbortSignal): Promise<StoredChapter[]> {
+  return runCooperatively(storedChapterSteps(bookId, document), signal);
+}
+
+function* storedChapterSteps(bookId: string, document: PdfReflowDocument): Generator<void, StoredChapter[]> {
+  const chapters: StoredChapter[] = [];
+  for (const [chapterIndex, chapter] of document.chapters.entries()) {
     const toc = chapterIndex === 0 && document.toc.length
       ? `<nav class="reader-toc"><h1>Sumário</h1><ol>${document.toc.map((entry) => {
           const targetIndex = document.chapters.findIndex((candidate) => getChapterHeadingKey(candidate.title) === getChapterHeadingKey(entry.title));
@@ -481,19 +464,26 @@ export function toStoredReflowChapters(
           return `<li><a href="#epub-chapter-${target}">${escapeHtml(entry.title)}</a></li>`;
         }).join("")}</ol></nav>`
       : "";
-    const blocks = chapter.blocks.map((block) => {
+    const fragments: string[] = [];
+    for (const block of chapter.blocks) {
+      yield;
       if (block.type === "image" && block.src) {
         const className = block.presentation === "drop-cap" ? " class=\"pdf-reflow-drop-cap\"" : "";
-        return `<figure${className}><img data-pdf-reflow-image="true" src="${escapeAttribute(block.src)}" alt="${escapeAttribute(block.alt ?? "Ilustração")}" /></figure>`;
-      }
-      if (block.type === "heading") {
+        const src = yield* escapeHtmlSteps(block.src, true);
+        const alt = yield* escapeHtmlSteps(block.alt ?? "Ilustração", true);
+        fragments.push(`<figure${className}><img data-pdf-reflow-image="true" src="${src}" alt="${alt}" /></figure>`);
+      } else if (block.type === "heading") {
         const level = Math.min(3, Math.max(1, block.level ?? 2));
-        return `<h${level}>${escapeHtml(block.text ?? "")}</h${level}>`;
+        const text = yield* escapeHtmlSteps(block.text ?? "");
+        fragments.push(`<h${level}>${text}</h${level}>`);
+      } else {
+        const text = yield* escapeHtmlSteps(block.text ?? "");
+        fragments.push(`<p>${text}</p>`);
       }
-      return `<p>${escapeHtml(block.text ?? "")}</p>`;
-    }).join("\n");
+    }
+    const blocks = fragments.join("\n");
 
-    return {
+    chapters.push({
       id: `${bookId}-reflow-${chapterIndex}`,
       bookId,
       chapterIndex,
@@ -502,16 +492,23 @@ export function toStoredReflowChapters(
       endCfi: null,
       characterCount: chapter.blocks.reduce((total, block) => total + (block.text?.length ?? 0), 0),
       html: `<body><article>${toc}${blocks}</article></body>`,
-    };
-  });
+    });
+  }
+  return chapters;
 }
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function escapeAttribute(value: string): string {
-  return escapeHtml(value).replace(/"/g, "&quot;");
+function* escapeHtmlSteps(value: string, attribute = false): Generator<void, string> {
+  const parts: string[] = [];
+  for (let start = 0; start < value.length; start += 16384) {
+    const part = escapeHtml(value.slice(start, start + 16384));
+    parts.push(attribute ? part.replace(/"/g, "&quot;") : part);
+    yield;
+  }
+  return parts.join("");
 }
 
 function getChapterHeadingKey(value: string): string | null {
