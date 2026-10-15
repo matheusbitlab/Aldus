@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, useSegments } from "expo-router";
 import Head from "expo-router/head";
 import { useEffect } from "react";
 import { ActivityIndicator, AppState, DimensionValue, Platform, StatusBar, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -36,11 +36,12 @@ export default function RootLayout() {
 }
 
 function AppShell() {
+  const segments = useSegments();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { palette, resolvedTheme } = useAppTheme();
   const { loading, session, profile } = useAuth();
-  const usePhoneFrame = Platform.OS === "web" && width > 480;
+  const usePhoneFrame = Platform.OS === "web" && width > 480 && String(segments[0]) !== "admin";
   const appReady = !loading && !!session && !!profile?.username && profile.account_status === "active";
   useEffect(()=>{
     if(!appReady)return;
@@ -93,6 +94,7 @@ function AppShell() {
                 <Stack.Screen name="account/edit-profile" />
                 <Stack.Screen name="account/change-password" />
                 <Stack.Screen name="community" />
+                <Stack.Screen name="admin/index" />
               </Stack.Protected>
             </Stack>}
         </View>

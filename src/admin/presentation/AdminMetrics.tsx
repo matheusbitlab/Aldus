@@ -1,0 +1,17 @@
+import { View } from 'react-native';
+import { AdminMetrics as Metrics } from '../domain/contracts';
+import { bytes,Card,dateLabel,Label,Muted,rowStyle } from './components';
+import { useAppTheme } from '@/src/presentation/contexts/AppThemeContext';
+
+export function AdminMetrics({data,kind}:{data:Metrics;kind:string}){
+ const {palette}=useAppTheme();const maximum=Math.max(1,...data.registrationsByDay.map(d=>d.count));
+ return <>
+ {['overview','metrics'].includes(kind)&&<><Card title="Contas e utilização real"><View style={rowStyle}>{[
+  ['Usuários cadastrados',data.registeredUsers],['Novos no período',data.newUsers],['Logins no período',data.recentSignIns],['Contas Free',data.freeAccounts],['Contas Pro',data.proAccounts],['Assinaturas vigentes',data.activeSubscriptions],['Expiradas',data.expiredSubscriptions],['Operações Sync aceitas no período',data.syncOperations],
+ ].map(([label,value])=><View key={label} style={{minWidth:180,flex:1,padding:10,backgroundColor:palette.surfaceSecondary,borderRadius:8}}><Muted>{label}</Muted><Label>{value}</Label></View>)}</View><Muted>Login registrado não equivale a usuário ativo. Ativos, conversão histórica e falhas Sync: indisponíveis sem medição adicional.</Muted></Card>
+ <Card title="Cadastros por dia"><Muted>Origem: Auth.created_at, dentro do período selecionado.</Muted>{data.registrationsByDay.length?data.registrationsByDay.map(d=><View key={d.day} style={{marginVertical:5}}><Label>{d.day}: {d.count}</Label><View accessibilityLabel={`${d.day}: ${d.count} cadastros`} style={{height:9,width:`${Math.max(1,d.count/maximum*100)}%`,backgroundColor:palette.accent,borderRadius:4}}/></View>):<Muted>Nenhum cadastro no período.</Muted>}</Card></>}
+ {['overview','subscriptions'].includes(kind)&&<Card title="Assinaturas e financeiro"><Label>Vigentes: {data.activeSubscriptions} · Expiradas: {data.expiredSubscriptions}</Label><Label>Registros com concessão Pro manual: {data.manualProGrants}</Label><Muted>Concessões manuais não representam vendas. O catálogo configura preços; nenhum valor está sendo cobrado.</Muted>{['MRR','ARR','Receita total','Cancelamentos','Churn','Conversão Free → Pro','Transações','Eventos de pagamento','Reembolsos'].map(label=><Label key={label}>{label}: Aguardando integração de pagamentos</Label>)}</Card>}
+ {['overview','storage'].includes(kind)&&<Card title="Armazenamento privado"><Label>Utilizado: {bytes(data.usage.storageBytes)}</Label><Label>Média por conta cadastrada: {bytes(data.averageStorageBytes)}</Label><Label>Livros sincronizados: {data.usage.books} · Objetos privados: {data.usage.objects}</Label><Muted>Objetos sem tamanho verificável: {data.usage.unknownSizeObjects}. Não são expostos caminhos, arquivos ou conteúdo dos livros.</Muted></Card>}
+ {kind==='health'&&<Card title="Saúde do Sistema"><Label>Banco de dados: conexão confirmada nesta consulta.</Label><Label>Observado em: {dateLabel(data.observedAt)}</Label><Label>Operações Sync aceitas no período: {data.syncOperations}</Label><Muted>Logs agregados Auth/Sync e processamento: indisponíveis. Requerem pipeline de telemetria sanitizada; recibos de sucesso não medem falhas.</Muted><Muted>Estado de Drive, Storage HTTP e deploys: indisponível. Requer sondas e integração operacional autorizadas, não apenas consulta ao banco.</Muted><Muted>Vercel/Supabase administrativos não são consultados com credenciais privadas pelo navegador.</Muted></Card>}
+ </>;
+}
