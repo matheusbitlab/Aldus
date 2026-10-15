@@ -10,6 +10,7 @@ import { beginPdfOcr, cancelPdfOcr, recognizePdfPage } from "@/src/data/local/pd
 import { PdfReflowProgress, PdfReflowProcessorProps, reflowProgressLabel } from "@/src/presentation/components/PdfReflowProcessorProps";
 import { createReflowOperation } from "./reflowOperation";
 import { reflowDiagnostic } from "@/src/utils/reflowDiagnostics";
+import { newLibraryId } from "@/src/domain/entities/libraryId";
 
 export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCancel }: PdfReflowProcessorProps) {
   const webView = useRef<WebView>(null);
@@ -121,6 +122,10 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
       await beginPdfOcr(generation.current);
       if (!run.active) return;
       const localUri = await ensureLocalOcrUri(uri, pdfBase64, generation.current);
+      if (!run.active) {
+        if (localUri !== uri) await FileSystem.deleteAsync(localUri, { idempotent: true });
+        return;
+      }
       if (localUri !== uri) temporaryOcrUri.current = localUri;
       const pageMap = new Map(pages.current.map(page => [page.pageNumber, page]));
       for (let index = 0; index < plan.pageNumbers.length; index += 1) {
@@ -263,11 +268,16 @@ export function PdfReflowProcessor({ uri, onProgress, onComplete, onError, onCan
 }
 
 async function ensureLocalOcrUri(uri: string, base64: string | null, operationId: number): Promise<string> {
-  if (uri.startsWith("file://") || uri.startsWith("content://") || !uri.includes("://")) return uri;
+  if (uri.startsWith("file://") || uri.startsWith("content://") || (!uri.includes("://") && !uri.startsWith("data:"))) return uri;
   if (!base64 || !FileSystem.cacheDirectory) throw new Error("O OCR requer uma cópia local deste PDF.");
-  const target = `${FileSystem.cacheDirectory}aldus-ocr-${operationId}.pdf`;
-  await FileSystem.writeAsStringAsync(target, base64, { encoding: "base64" } as never);
-  return target;
+  const target = `${FileSystem.cacheDirectory}aldus-ocr-${operationId}-${newLibraryId()}.pdf`;
+  try {
+    await FileSystem.writeAsStringAsync(target, base64, { encoding: "base64" } as never);
+    return target;
+  } catch (error) {
+    await FileSystem.deleteAsync(target, { idempotent: true });
+    throw error;
+  }
 }
 
 async function readRemotePdf(uri: string, signal: AbortSignal): Promise<string> {

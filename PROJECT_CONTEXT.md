@@ -337,6 +337,10 @@ PROCESSING_ERROR. Cache/processador v12 valida proveniência text-extraction/ocr
 engine/versão, páginas e qualidade; rejeita cache antigo/parcial/inconsistente.
 Abort impede novas páginas/publicação; tarefa ML Kit corrente não expõe cancelamento e
 seu retorno é descartado/liberado. Não inventar texto nem promover extração ilegível.
+Temporários OCR têm nome único por operação. Escrita Native não interrompível que termina
+após unmount/abort remove o próprio arquivo; escrita parcial com erro também tenta limpeza.
+Não reutilizar o nome de outra operação nem apagar PDF de origem. Data URI exige staging,
+não é um caminho de arquivo local para PdfRenderer.
 
 Sociedade/Manifesto têm extração textual inválida conhecida; Original continua disponível.
 Gates controlados/compilação não demonstram OCR visual físico. Conteúdo/reconhecimento não

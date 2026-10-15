@@ -149,6 +149,9 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   test-library-web.cjs --reflow passou Reader/commit/primeiro layout, reload em documento
   novo e reutilização do mesmo cache/updatedAt. Auth/Storage continuam fixtures HTTP.
   ReaderScreen passou dez toggles e tipografia na página intermediária sem remount/perda.
+  Regressão de cancelamento OCR confirmada no componente Native: write temporária podia
+  terminar após unmount sem cleanup. Nome agora único, limpeza do retorno tardio/parcial;
+  test-reflow-native-lifecycle --ocr-temp-baseline falha no e54bf50 e versão corrigida passa.
 - Testes pendentes: mesmo PDF/build, fases 98–100%, memória/thread JS, cancel/Back e reopen.
 - Dependências externas: arquivo/aparelho e próximo build consolidado.
 - Não regredir: Original independente, cache validado, posição, cleanup e terminal único.
