@@ -31,6 +31,7 @@ jobs:
           npm install --prefix .expo/auth-test-tools --no-save --package-lock=false --ignore-scripts react@19.2.3 react-test-renderer@19.2.3
           npm install --prefix .expo/library-db-test --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.8
           npm install --prefix .expo/flashcard-db-test --no-save --package-lock=false --ignore-scripts @electric-sql/pglite@0.5.8 fake-indexeddb@6.2.5
+          npm install --prefix .expo/layout-test --no-save --package-lock=false --ignore-scripts yoga-layout@3.2.1
       - run: npm run typecheck
       - run: npx --yes deno@2.9.6 check supabase/functions/username-login/index.ts
       - run: npm run test:critical

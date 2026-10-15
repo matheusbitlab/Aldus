@@ -487,12 +487,11 @@ VERCEL_GIT_COMMIT_SHA/GITHUB_SHA precisam corresponder ao HEAD. dirty=true nunca
 prova de build limpa. O metadata não inclui env, JWT, host privado ou dados de usuário.
 vercel.json fixa build/output/install e headers compatíveis com o iframe do Reader.
 .github/workflows/validate.yml: Node24, npm ci, ferramentas de teste isoladas, typecheck,
-Deno check, 49 suites críticas, export/metadata, diff check e audit crítico. Actions pinadas
+Deno check, matriz test:critical, export/metadata, diff check e audit crítico. Actions pinadas
 por SHA, contents:read, checkout sem persistir credencial. Sem segredo/deploy automático.
 Workflow preparado/localmente validado; só execução Actions real comprova CI remoto.
-Reconciliação local: typecheck, export:web, verificação do metadata exportado e todas as
-49 suítes de test:critical passaram novamente. Apenas os dois contextos oficiais foram
-ajustados; nenhum código, migration, APK ou deploy foi produzido por esta reconciliação.
+Testes controlados não certificam produção ou Android. A matriz inclui leitura binária
+Native, cache/commit/cancelamento final Reflow e adapter REST com sessão/rede pendentes.
 Vercel Git integration/checks/permissões/logs dependem do operador; não presumir deploy
 com base no último commit. README contém roteiro humano; não publicar produção sozinho.
 
@@ -558,6 +557,8 @@ Original/Reflow em página intermediária, dez toggles, tipografia, Back/reopen 
 
 Ferramentas de teste ficam em caches ignorados .expo/auth-test-tools (React/test-renderer
 19.2.3), .expo/library-db-test (PGlite 0.5.8) e .expo/flashcard-db-test (PGlite/fake-indexeddb).
+O ensaio de layout das Preferências usa yoga-layout 3.2.1 em .expo/layout-test, isolado
+do app, também instalado pelo CI. Hierarquia nativa e layout não simulam toque físico.
 Node 24 fornece node:sqlite. Instalar ferramentas isoladas sem mudar manifests do app.
 Browser usa perfil descartável, identidade/HTTP fictícios, IndexedDB real e espera commits;
 injetar fixtures só na página principal, preservando sandbox e sem tocar dados do usuário.

@@ -9,6 +9,19 @@ nenhum encerramento é inferido de merge, export ou teste controlado.
 Somente problemas ativos. Contexto permanente: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validação física nova.
 
+### Origem e escopo da campanha do caderno
+
+| Entradas | Origem comprovada | Tratamento nesta campanha |
+| --- | --- | --- |
+| 01, 02, 03 | Relatos A/B/C do diagnóstico Android de 12/10, recuperado em Git; reiterados no pedido atual | Prioritários: EPUB, Sync e Drive |
+| 06, 07 | Relatos D/E explicitamente reiterados no pedido; histórico físico de 09/10 | Prioritários: Reflow e Preferências |
+| 08 | DIAGNOSTICO_BUGS_APK histórico, BUGS 5/6/7: email, cadastro e recovery | Caderno confirmado; falta evidência autenticada/configuração externa, sem expansão de Auth |
+| 09, 10 | Endpoint/integração indisponíveis; origem como item independente do caderno não comprovada | Mantidos abertos, fora da correção prioritária; não inferir origem |
+| 11–13 | Achados adicionais de conta desativada, Sources DEVICE e dependências | Preservados, sem auditoria/correção genérica nesta campanha |
+
+Referência histórica somente via Git: 7f50a90^:DIAGNOSTICO_PENDENCIAS_ANDROID_2026-10-12.md
+e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
+
 ## BUG 01 — Importação do EPUB Amêndoas congela
 
 - Prioridade: CRÍTICA. Status: IMPLEMENTADO / VALIDAÇÃO ANDROID PENDENTE.
@@ -145,6 +158,11 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
 - Arquivos: ReaderSettingsPanel.tsx, ReaderControls.tsx, ReaderScreen.tsx.
 - Correção: nenhuma adicional; não alterar Reader sem nova primeira divergência.
 - Testes realizados: controles e contratos Web/controlados anteriores positivos, não prova de scroll Native.
+  Novo test-reader-preferences-layout.cjs: componente Native real em React, backdrop irmão
+  sem Pressable ancestral, teclado e 12 layouts Yoga (retrato/paisagem, conteúdo curto/longo
+  e equivalente a fonte ampliada) passaram. Slider real mantém gesto vertical no ScrollView.
+  Nenhuma divergência de layout/contrato reproduzida; não foi feita alteração especulativa
+  no painel, na paginação ou na WebView. Yoga/React não exercitam toques físicos Android.
 - Testes pendentes: painel longo, arraste vertical/slider, fontes ampliadas, safe area e Android.
 - Dependências externas: aparelho/build consolidado.
 - Não regredir: texto/posição/instância do viewer e separação de gesto do painel/documento.

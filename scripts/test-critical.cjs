@@ -6,7 +6,7 @@ const tests = [
   'library-account', 'library-sync', 'library-remote', 'library-cancellation', 'library-files', 'library-reading-sync', 'library-coordinator', 'library-restart', 'library-rls', 'library-ui', 'library-organization',
   'google-drive', 'drive-tree', 'drive-download', 'source-catalog', 'source-library-actions', 'source-indexing',
   'epub-resources', 'epub-native-read', 'book-import', 'download-import', 'catalogs', 'reading-anchors', 'study-storage',
-  'reader-navigation', 'reader-native', 'reader-bytecode', 'reader-screen', 'reader-settings', 'reflow-native-scheduling', 'reflow-finalization', 'reflow-native-lifecycle', 'pdf-reflow',
+  'reader-navigation', 'reader-native', 'reader-bytecode', 'reader-screen', 'reader-settings', 'reader-preferences-layout', 'reflow-native-scheduling', 'reflow-finalization', 'reflow-native-lifecycle', 'pdf-reflow',
   'community-domain', 'community-data', 'community-provider', 'community-ui', 'community-schema', 'legal', 'web-build', 'android-build-command',
 ];
 let failures = 0;
