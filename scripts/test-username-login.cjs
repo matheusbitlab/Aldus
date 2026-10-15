@@ -66,5 +66,34 @@ function harness(state = {}, limit = async () => ({ allowed: true, retryAfter: 0
     await assert.rejects(() => createRedisLimiter(env, async () => response)('reader', 'network'));
   }
   await assert.rejects(() => createRedisLimiter(name => name === 'USERNAME_LOGIN_HMAC_KEY' ? undefined : env(name), redis)('reader', 'network'));
+  // Installed SDK at the client boundary: invoke -> setSession -> user resolution -> SIGNED_IN.
+  const { createClient } = require('@supabase/supabase-js');
+  const uid = '11111111-1111-4111-8111-111111111111', requests = [], events = [];
+  const user = { id: uid, aud: 'authenticated', role: 'authenticated', email: 'fixture@example.invalid', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
+  const encoded = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const access = `${encoded({ alg: 'HS256', typ: 'JWT' })}.${encoded({ sub: uid, exp: Math.floor(Date.now()/1000)+3600, role: 'authenticated' })}.fixture-only`;
+  let accept = true;
+  const client = createClient('https://username-fixture.invalid', 'sb_publishable_fixture', {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: async (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : input.url); requests.push(url.pathname);
+      if (url.pathname.endsWith('/functions/v1/username-login')) {
+        assert.deepEqual(JSON.parse(init.body), { username: 'reader', password: 'synthetic-only' });
+        return Response.json(accept ? { access_token: access, refresh_token: 'fixture-refresh' } : { error: 'Credenciais inválidas.' }, { status: accept ? 200 : 401 });
+      }
+      assert.equal(url.pathname, '/auth/v1/user'); return Response.json(user);
+    } },
+  });
+  const listener = client.auth.onAuthStateChange(event => events.push(event));
+  const service = loader({ './supabase': { requireSupabase: () => client }, 'react-native': { Platform: { OS: 'web' } }, 'expo-linking': {},
+    '@/src/utils/authDiagnostics': { authDiagnostic() {}, finishAuthDiagnostic() {} }, '@/src/utils/authOAuthDiagnostics': {} })('src/data/remote/authService.ts');
+  await service.loginWithIdentifier(' Reader ', 'synthetic-only');
+  assert.equal((await client.auth.getSession()).data.session.user.id, uid); assert.ok(events.includes('SIGNED_IN'));
+  assert.ok(requests.includes('/auth/v1/user')); accept = false;
+  const signedIn = events.filter(e => e === 'SIGNED_IN').length;
+  await assert.rejects(() => service.loginWithIdentifier('reader', 'synthetic-only'), /Não foi possível entrar/);
+  assert.equal(events.filter(e => e === 'SIGNED_IN').length, signedIn);
+  listener.data.subscription.unsubscribe(); await client.auth.signOut({ scope: 'local' });
+  console.log('PASS installed Supabase SDK / controlled HTTP: username function invocation establishes correct session; invalid credentials do not emit SIGNED_IN.');
   console.log('PASS username login: generic failures, active profile recheck, bounded body, fail-closed limiter, atomic REST contract, cross-worker/account limits and secret canaries. Redis/Auth remote NOT tested.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

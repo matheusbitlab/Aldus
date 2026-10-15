@@ -18,7 +18,7 @@ for i, key in ipairs(KEYS) do
   local count = redis.call('INCR', key)
   local ttl = tonumber(ARGV[i * 2])
   if count == 1 or redis.call('TTL', key) < 0 then redis.call('EXPIRE', key, ttl) end
-  if count > tonumber(ARGV[i * 2 - 1]) then retry = math.max(retry, redis.call('TTL', key)) end
+  if count > tonumber(ARGV[i * 2 - 1]) then retry = math.max(retry, 1, redis.call('TTL', key)) end
 end
 return {retry == 0 and 1 or 0, retry}`;
 
