@@ -3,11 +3,13 @@
 Atualizado em 15/10/2026. Fonte única de contexto permanente para IA.
 Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código: HEAD atual da branch,
 identificado pelo Git e pelo build-info.json do export, sem hash autorreferente inventado.
-Branch única de integração: integration/comunidade-literaria. Reconciliação por Git após
-fetch confirmou 7f50a9048876aec350186b594006c24f2bc73a22 como ancestral de
-ea30fabe26405db6e1cf9f9870814ad903c3b9f3, ambos já publicados nessa branch.
-Community integrada e origin/main (52456d9) também são ancestrais; nenhum merge adicional
-necessário. As duas campanhas estão preservadas, sem reescrever história ou alterar main.
+Branch oficial de desenvolvimento: main, por decisão do usuário em 15/10/2026.
+Após fetch, main/origin/main estavam em 52456d9740a6234db94508b3a3ed48ba3012d060,
+ancestral de integration/comunidade-literaria em e8a2940089fd248ca4e9b917d16edd3213d45bc0.
+Consolidação por fast-forward preservou todos os 34 commits adicionais, incluindo Community,
+correções do caderno, Auth/segurança, Library Sync, Drive, Flashcards/Battle, EPUB/PDF Reflow,
+SaaS Etapa 1 e migrations incrementais. Os commits SaaS 7bc7487, 0930ec3 e e8a2940 são
+ancestrais da main. A branch antiga permanece preservada; BUGS_ATUAIS.md não foi alterado.
 APK: PENDENTE DE BUILD CONSOLIDADO; nenhum APK gerado nesta campanha.
 
 ## 1. Visão geral
@@ -555,10 +557,20 @@ maior; preservar certificado da linha instalada ou planejar migração. Não tro
 
 Antes de editar: git status --short, branch --show-current, rev-parse HEAD e log recente.
 Preservar trabalho existente; stage somente arquivos relacionados, revisar cached diff e check.
-Commits por bloco, push da branch de trabalho após validação; sem force push, reset, clean,
-stash ou descarte em massa. Nesta campanha, somente origin/integration/comunidade-literaria;
-main permanece intocada. Migrations históricas são imutáveis; incrementais só após inventário.
+Trabalhar normalmente na main, com commits por bloco e push para origin/main após validação.
+Criar branches separadas somente para trabalhos experimentais, arriscados ou isolados que
+justifiquem isso. Se main estiver protegida, usar Pull Request sem contornar a proteção.
+Nunca fazer force push, reescrever histórico publicado, reset, clean, stash ou descarte
+em massa. integration/comunidade-literaria é histórica, não a branch padrão; não foi apagada.
+Migrations históricas são imutáveis; incrementais só após inventário e autorização remota.
 Nunca commitar .env.local, tokens, secrets, keystores privados, APKs ou livros pessoais.
+
+Validação local da consolidação na main em 15/10/2026: typecheck, export:web e
+test:critical PASS (57/57 suítes), cobrindo Community, Reader/EPUB/Reflow, Library Sync,
+Auth/segurança, Drive, Flashcards/Battle e SaaS. Código/migrations são idênticos à integração;
+a única edição nova desta consolidação é este documento. BUGS_ATUAIS.md foi preservado
+byte a byte. Testes controlados/export não equivalem a validação física, Storage/Auth HTTP
+ou implantação remota. Nenhum APK, deploy Supabase, migration de produção ou SaaS Etapa 2.
 
 Web/CI: npm run build delega a export:web. Antes do Expo, validate-web-env.cjs rejeita
 chaves privadas/public env insegura; Vercel produção exige configuração legal real.
