@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { androidBuildCommand } from "./android-build-command.cjs";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const androidDir = path.join(projectRoot, "android");
@@ -15,12 +16,12 @@ if (!existsSync(wrapper)) {
 }
 
 const buildStarted = Date.now();
+const command = androidBuildCommand(wrapper);
 const result = spawnSync(
-  isWindows ? (process.env.ComSpec || "cmd.exe") : wrapper,
-  isWindows
-    ? ["/d", "/s", "/c", "gradlew.bat :app:assembleRelease --console=plain"]
-    : [":app:assembleRelease", "--console=plain"],
+  command.file,
+  command.args,
   {
+    ...command.options,
     cwd: androidDir,
     stdio: "inherit",
     env: { ...process.env, NODE_ENV: process.env.NODE_ENV || "production" },
