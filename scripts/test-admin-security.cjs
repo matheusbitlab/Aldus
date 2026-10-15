@@ -1,7 +1,9 @@
 const assert=require('node:assert/strict');const {fixture}=require('./admin-test-fixture.cjs');
 (async()=>{
- const {db,as,change,read,session,ids,id,before}=await fixture();
+ const {db,as,change,read,session,ids,id,before,legacy}=await fixture();
  assert.deepEqual((await db.query('select * from public.profiles order by id')).rows,before);
+ assert.deepEqual((await db.query('select * from public.user_library_items order by kind,id')).rows,legacy.items);
+ assert.deepEqual((await db.query('select * from storage.objects order by id')).rows,legacy.objects);
  await assert.rejects(()=>db.query("select aldus_admin_private.bootstrap_owner('matheusborbaifc@gmail.com',$1)",[ids.second]),/no rows/);
  await assert.rejects(()=>db.query("select aldus_admin_private.bootstrap_owner('unverified@example.invalid',$1)",[ids.unverified]),/no rows/);
  await db.query("select aldus_admin_private.bootstrap_owner('matheusborbaifc@gmail.com',$1)",[ids.owner]);
@@ -10,6 +12,11 @@ const assert=require('node:assert/strict');const {fixture}=require('./admin-test
  assert.equal((await change('member','user',0,{role:'OWNER',active:true,permissions:[]})).ok,false,'master+Pro is not admin');
  await assert.rejects(()=>db.exec("update public.aldus_admin_members set role='OWNER'"),/permission denied/);
  await assert.rejects(()=>db.exec('select * from public.aldus_admin_audit'),/permission denied/);
+ for(let attempt=0;attempt<12;attempt++)assert.equal((await change('member','user',0,{role:'OWNER',active:true,permissions:[]})).ok,false);
+ await db.exec('reset role');assert.ok((await db.query("select count(*)::int as n from public.aldus_admin_audit where actor=$1 and outcome='denied'",[ids.user])).rows[0].n<=10,'Unprivileged denied audit is capped');
+ await as('second');await assert.rejects(session,/denied/,'Free is not admin');
+ await db.exec('reset role');await db.query("insert into public.aldus_admin_members(user_id,role) values($1,'ADMIN')",[ids.unverified]);
+ await as('unverified');await assert.rejects(session,/denied/,'Even a stored membership cannot authorize unverified email');
  await as('owner',false);assert.equal((await session()).recentMfa,false);
  assert.equal((await change('member','admin',0,{role:'ADMIN',active:true,permissions:['users.read','users.write','subscriptions.manage','metrics.read','audit.read']})).ok,false);
  await as('owner',true,{age:700});assert.equal((await session()).recentMfa,false);
@@ -22,6 +29,9 @@ const assert=require('node:assert/strict');const {fixture}=require('./admin-test
  assert.equal((await change('member','unverified',0,{role:'ADMIN',active:true,permissions:[]})).ok,false);
  assert.equal((await change('member','owner',0,{role:'ADMIN',active:false,permissions:[]})).ok,false,'No self change');
  await as('admin');assert.equal((await session()).role,'ADMIN');assert.equal((await read('users')).data.rows.length,5);
+ await db.exec('reset role');await db.query("update public.profiles set account_status='disabled' where id=$1",[ids.admin]);
+ await as('admin');await assert.rejects(session,/denied/,'Disabled admin is denied without cache');
+ await db.exec('reset role');await db.query("update public.profiles set account_status='active' where id=$1",[ids.admin]);await as('admin');
  for(const target of ['admin','owner','user'])assert.equal((await change('member',target,0,{role:'OWNER',active:true,permissions:[]})).ok,false);
  assert.equal((await change('account_status','owner',0,{status:'disabled'})).ok,false);
  assert.equal((await change('account_status','user',0,{status:'disabled'},{confirmation:'yes'})).ok,false);
@@ -42,7 +52,7 @@ const assert=require('node:assert/strict');const {fixture}=require('./admin-test
  await as('owner');
  const overview=(await read('overview')).data;assert.equal(overview.registeredUsers,5);assert.equal(overview.payments.mrr,null);assert.equal(overview.activeUsers,null);assert.equal(overview.syncFailures,null);
  assert.equal(overview.payments.status,'not_integrated');assert.ok(!JSON.stringify(overview).includes('@'));
- const user=(await read('user',{id:ids.user})).data;assert.equal(user.effectivePlan.id,'free');assert.equal(user.usage.books,0);
+ const user=(await read('user',{id:ids.user})).data;assert.equal(user.effectivePlan.id,'free');assert.equal(user.usage.books,1);assert.equal(user.features.library_sync,true);
  const free={name:'Free',description:'Core rights',books:100,storageBytes:524288000,monthlyCentavos:0,annualCentavos:0,available:true,features:{premium_future:false}};
  assert.equal((await change('plan','free',0,{...free,monthlyCentavos:10})).ok,false);
  assert.equal((await change('plan','free',0,{...free,books:-1})).ok,false);
@@ -64,12 +74,20 @@ const assert=require('node:assert/strict');const {fixture}=require('./admin-test
   await assert.rejects(()=>db.exec(query),/last active OWNER/);
  await assert.rejects(()=>db.exec("update public.aldus_admin_audit set reason='tampered'"),/immutable/);
  await assert.rejects(()=>db.exec('delete from public.aldus_price_history'),/immutable/);
+ await db.exec('grant select on public.aldus_admin_members to authenticated; create policy accidental_read on public.aldus_admin_members for select to authenticated using(true)');
+ await as('owner');assert.equal((await db.query('select * from public.aldus_admin_members')).rows.length,0,'Restrictive RPC-only policy survives accidental permissive grants');
  await as('owner');const audit=(await read('audit')).data.rows;assert.ok(audit.some(a=>a.outcome==='denied'));assert.ok(audit.some(a=>a.outcome==='success'));
+ assert.equal((await change('member','second',0,{role:'OWNER',active:true,permissions:[]})).ok,true);
+ await as('second');assert.equal((await change('member','owner',0,{role:'OWNER',active:false,permissions:[]})).ok,true,'Another active OWNER permits revocation');
+ await as('owner');await assert.rejects(session,/denied/);
+ await as('second');assert.equal((await change('member','owner',1,{role:'OWNER',active:true,permissions:[]})).ok,true);await as('owner');
  const simultaneous=await Promise.all([change('setting','app.notice',2,{value:'First concurrent intent'}),change('setting','app.notice',2,{value:'Second concurrent intent'})]);
  assert.equal(simultaneous.filter(r=>r.ok).length,1);assert.equal(simultaneous.find(r=>!r.ok).code,'conflict','Same revision cannot overwrite a concurrent accepted intent');
  assert.equal((await change('setting','app.notice',3,{value:'Notice',secret:'must not persist'})).ok,false,'Command payload allowlist');
  await as('user');await db.query("select public.library_apply($1,'private','book','private',0,$2,false)",[id(),{title:'PRIVATE_CONTENT_CANARY',format:'epub'}]);
+ await db.query('insert into storage.objects(bucket_id,name,metadata) values($1,$2,$3)',['aldus-private-library',`${ids.user}/private/${'a'.repeat(64)}.epub`,{size:1}]);
  await as('owner');assert.equal((await db.query('select * from public.user_library_items')).rows.length,0,'OWNER gets no cross-user library grant');
+ assert.equal((await db.query('select * from storage.objects')).rows.length,0,'OWNER gets no cross-user file grant');
  assert.ok(!JSON.stringify(await read('user',{id:ids.user})).includes('PRIVATE_CONTENT_CANARY'));
  await db.exec('reset role');await db.query('update auth.sessions set not_after=now()-interval \'1 minute\' where user_id=$1',[ids.owner]);
  await as('owner');await assert.rejects(session,/denied/);

@@ -27,6 +27,8 @@
     "export:web": "node scripts/validate-web-env.cjs && expo export --platform web && node scripts/copy-books-to-dist.mjs && node scripts/write-build-metadata.cjs",
     "test:critical": "node scripts/test-critical.cjs",
     "test:saas": "node scripts/test-saas-schema.cjs && node scripts/test-saas-client.cjs && node scripts/test-saas-compatibility.cjs",
+    "test:admin": "node scripts/test-admin-security.cjs && node scripts/test-admin-client.cjs",
+    "test:admin:web": "node scripts/test-admin-web.cjs",
     "test:library:account": "node scripts/test-library-account.cjs",
     "test:library:rls": "node scripts/test-library-rls.cjs",
     "build:apk:archive": "node scripts/archive-commit-apk.mjs",

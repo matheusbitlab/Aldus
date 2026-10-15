@@ -23,7 +23,15 @@ async function fixture(){
  }
  await db.query("update public.profiles set role='master' where id=$1",[ids.user]);
  await db.query("update public.saas_account_subscriptions set plan_id='pro',grant_source='trusted_backend' where user_id=$1",[ids.user]);
+ await db.query(`insert into public.user_library_items(user_id,kind,id,book_id,payload) values
+ ($1,'book','legacy','legacy','{"title":"LEGACY_PRIVATE_CANARY","format":"epub"}'),
+ ($1,'progress','legacy-progress','legacy','{"percentage":0.4}'),
+ ($1,'bookmark','legacy-note','legacy','{"note":"LEGACY_NOTE_CANARY"}'),
+ ($1,'highlight','legacy-highlight','legacy','{"text":"LEGACY_HIGHLIGHT_CANARY"}'),
+ ($1,'organization','legacy','legacy','{"favorite":true}')`,[ids.user]);
+ await db.query('insert into storage.objects(bucket_id,name,metadata) values($1,$2,$3)',['aldus-private-library',`${ids.user}/legacy/${'b'.repeat(64)}.epub`,{size:5}]);
  const before=(await db.query('select * from public.profiles order by id')).rows;
+ const legacy={items:(await db.query('select * from public.user_library_items order by kind,id')).rows,objects:(await db.query('select * from storage.objects order by id')).rows};
  const migration=fs.readdirSync('supabase/migrations').find(f=>f.endsWith('_aldus_admin.sql'));
  await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
  const as=async(name='owner',mfa=true,opts={})=>{
@@ -37,6 +45,6 @@ async function fixture(){
   opts.requestId??id(),action,ids[target]??target,revision,JSON.stringify(payload),opts.reason??'Controlled local regression',opts.confirmation??'CONFIRMAR '+(ids[target]??target)])).rows[0].r;
  const read=async(section,filters={})=>(await db.query('select public.aldus_admin_read($1,$2) as r',[section,JSON.stringify(filters)])).rows[0].r;
  const session=async()=>(await db.query('select public.aldus_admin_session() as r')).rows[0].r;
- return{db,as,change,read,session,ids,id,before};
+ return{db,as,change,read,session,ids,id,before,legacy};
 }
 module.exports={fixture,ids};

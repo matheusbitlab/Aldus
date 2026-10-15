@@ -54,6 +54,7 @@ do $$ declare t text; begin
  foreach t in array array['aldus_admin_members','aldus_admin_audit','aldus_plan_proposals','aldus_price_history','aldus_system_settings','aldus_setting_history'] loop
   execute format('alter table public.%I enable row level security',t);
   execute format('revoke all on public.%I from public,anon,authenticated',t);
+  execute format('create policy aldus_admin_rpc_only on public.%I as restrictive for all to public using(false) with check(false)',t);
  end loop;
 end $$;
 alter table aldus_admin_private.receipts enable row level security;
@@ -242,8 +243,14 @@ declare permission text; actor_role text; resource text; request jsonb; receipt 
  answer jsonb; target_id uuid; next_revision bigint; feature text; enabled boolean; old_plan public.saas_plans;
  setting_value jsonb; failure_code text; changes jsonb := '{}';
 begin
+ -- Ordinary callers must not contend on the privileged mutation lock or flood audit.
+ if not aldus_admin_private.allowed('access') then
+  insert into public.aldus_admin_audit(actor,resource,action,outcome,changes,request_id)
+  select auth.uid(),'denied',left(coalesce(p_action,'invalid'),50),'denied','{"code":"forbidden_or_mfa"}',p_request_id
+  where (select count(*) from public.aldus_admin_audit where actor=auth.uid() and outcome='denied' and occurred_at>now()-interval '1 minute')<10;
+  return jsonb_build_object('ok',false,'code','forbidden_or_mfa');
+ end if;
  -- Global serialization + optimistic revision prevents lost updates and last-OWNER races.
- perform pg_advisory_xact_lock(hashtextextended('aldus_admin_changes',0));
  request:=jsonb_build_object('action',p_action,'target',p_target,'base',p_expected_revision,'payload',p_payload,'reason',p_reason);
  begin
   if p_request_id is null or p_payload is null or jsonb_typeof(p_payload)<>'object' or octet_length(p_payload::text)>16384
@@ -263,6 +270,10 @@ begin
   perform aldus_admin_private.require_permission(permission);
   if not aldus_admin_private.recent_mfa() then raise exception 'recent TOTP MFA required' using errcode='42501'; end if;
   if p_confirmation is distinct from 'CONFIRMAR '||p_target then raise exception 'explicit confirmation required' using errcode='22023'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('aldus_admin_changes',0));
+  -- Membership/session can be revoked while waiting for another administrator.
+  perform aldus_admin_private.require_permission(permission);
+  if not aldus_admin_private.recent_mfa() then raise exception 'recent TOTP MFA required' using errcode='42501'; end if;
   select role into actor_role from public.aldus_admin_members where user_id=auth.uid();
   if p_action in ('member','plan','plan_proposal','setting','setting_rollback') and actor_role<>'OWNER' then raise exception 'OWNER required' using errcode='42501'; end if;
   select * into receipt from aldus_admin_private.receipts where actor=auth.uid() and request_id=p_request_id;
