@@ -20,6 +20,10 @@ const cache=new Map();function load(file){if(cache.has(file))return cache.get(fi
    responseOverride={ok:false,status,json:async()=>({code,message:'secret-provider-canary'})};
    await assert.rejects(adapter.pull('A',new AbortController().signal),error=>error.code===category&&!error.message.includes('secret-provider-canary'));
  }
+ for(const [code,message,resource] of [['PQL01','anything','books'],['PQL02','anything','storage'],['P0001','synced book quota exceeded','books'],['P0001','private storage quota exceeded or usage unknown','storage']]){
+   responseOverride={ok:false,status:400,json:async()=>({code,message})};
+   await assert.rejects(adapter.pull('A',new AbortController().signal),error=>error.code==='quota'&&error.resource===resource);
+ }
  responseOverride=null;
  console.log('PASS actual Library REST adapter: cancel pending SDK session, fetch and response body; IO deadline; no late network, fresh retry. Controlled boundaries, not authenticated remote proof.');
 })().catch(e=>{console.error(e);process.exitCode=1});
