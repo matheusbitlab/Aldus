@@ -19,6 +19,7 @@ const mocks = {
   'expo-modules-core': { requireOptionalNativeModule: () => null },
   'react-native': { Platform: { OS: 'web' } },
   'expo-file-system/legacy': {},
+  'expo-file-system': {}, // This suite exercises Web Blob imports, not Native File.bytes.
   'expo-network': {},
   '@react-native-async-storage/async-storage': { getItem: async key => storage.get(key) ?? null, setItem: async (key, value) => storage.set(key, value) },
 };

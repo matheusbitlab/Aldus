@@ -5,7 +5,7 @@ const tests = [
   'flashcards', 'flashcard-scoring', 'flashcard-storage', 'flashcard-sessions', 'flashcard-ui', 'flashcard-battles',
   'library-account', 'library-sync', 'library-cancellation', 'library-files', 'library-reading-sync', 'library-coordinator', 'library-restart', 'library-rls', 'library-ui', 'library-organization',
   'google-drive', 'drive-tree', 'drive-download', 'source-catalog', 'source-library-actions', 'source-indexing',
-  'epub-resources', 'book-import', 'download-import', 'catalogs', 'reading-anchors', 'study-storage',
+  'epub-resources', 'epub-native-read', 'book-import', 'download-import', 'catalogs', 'reading-anchors', 'study-storage',
   'reader-navigation', 'reader-native', 'reader-bytecode', 'reader-screen', 'reader-settings', 'reflow-native-scheduling', 'pdf-reflow',
   'community-domain', 'community-data', 'community-provider', 'community-ui', 'community-schema', 'legal', 'web-build', 'android-build-command',
 ];

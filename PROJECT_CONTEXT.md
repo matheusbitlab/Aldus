@@ -110,6 +110,10 @@ Não descartar CSS/fontes nem remover recursos para reduzir memória. Fixture de
 Amêndoas real e Android continuam pendentes; a fixture não é o arquivo pessoal.
 PDF valida assinatura %PDF e usa o fluxo existente; importação não processa Reflow/OCR.
 Percentual existe somente com total de bytes conhecido; demais etapas são indeterminadas.
+Native EPUB lê Uint8Array pela API assíncrona File.bytes do Expo instalado, sem intermediários
+Base64/atob/Uint8Array.from na thread JS. A leitura nativa em curso não é interrompível;
+abort impede iniciar parse/publicação de seu retorno tardio. O ZIP e o documento completos
+ainda precisam caber em memória; isto não demonstra capacidade ilimitada ou Amêndoas físico.
 
 ## 5. Biblioteca
 

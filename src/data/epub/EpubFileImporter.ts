@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { File } from "expo-file-system";
 import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import { newLibraryId } from "@/src/domain/entities/libraryId";
 import { Platform } from "react-native";
@@ -96,9 +97,12 @@ export class EpubFileImporter {
       });
       return bytes;
     }
-    const base64 = await withAbort(FileSystem.readAsStringAsync(uri, { encoding: "base64" } as never), signal);
+    // The installed Expo filesystem exposes async native bytes. Base64 + atob +
+    // Uint8Array.from used to retain two full JS strings and decode on the input thread.
+    // The Native read itself cannot be interrupted; never parse a late cancelled result.
+    const bytes = await withAbort(new File(uri).bytes(), signal);
     throwIfAborted(signal);
-    return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    return bytes;
   }
 }
 

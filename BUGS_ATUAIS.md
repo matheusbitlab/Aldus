@@ -24,6 +24,11 @@ APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validaçã
   src/domain/usecases/ImportEpubUseCase.ts; scripts/test-epub-resources.cjs.
 - Correção: cache por parse, capítulos/recursos sequenciais, yield cooperativo, abort entre
   etapas/leitura e fontes idênticas apenas na última posição original, preservando cascata.
+  Nova primeira divergência CONFIRMADA no caminho Native: leitura Base64 seguida de atob
+  e cópia por caractere bloqueava JS antes do ZIP. Agora usa File.bytes assíncrono já instalado.
+  test-epub-native-read.cjs falha no baseline 3df3f5b e passa com bytes/cancel/erro/retry.
+  Fixture controlada de 8 MiB: 11.184.812 caracteres Base64 decodificados → zero;
+  etapa completa 3298→5 ms no desktop com filesystem controlado, não tempo Android.
 - Testes realizados: fixture/fontes/condições CSS/SVG/srcset/imagens/links/JSON/cancelamento
   PASS; Freud saudável com 26 capítulos PASS; test-book-import/test-catalogs PASS.
   Baseline 25.767 ms e primeira revisão 1.339 ms sob carga concorrente; revisão final 318 ms
