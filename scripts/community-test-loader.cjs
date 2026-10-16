@@ -3,7 +3,10 @@ module.exports = function makeLoader(overrides = {}) {
   const cache = new Map();
   function load(file) {
     file = path.resolve(file);
-    if (!path.extname(file)) file += fs.existsSync(file + '.ts') ? '.ts' : '.tsx';
+    if (!fs.existsSync(file)) {
+      const inferred = [file + '.ts', file + '.tsx'].find(candidate => fs.existsSync(candidate));
+      if (inferred) file = inferred;
+    }
     if (cache.has(file)) return cache.get(file).exports;
     const module = { exports: {} }; cache.set(file, module);
     const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: {

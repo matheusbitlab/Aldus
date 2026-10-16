@@ -33,7 +33,7 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
        if(!objects.has(name)){json({},404);return;}downloads++;res.setHeader('Content-Type','application/epub+zip');res.end(objects.get(name));return;
      }json({},404);return;
    }
-   let target=path.resolve(exported,'.'+p);if(!target.startsWith(exported+path.sep)){res.writeHead(403);res.end();return;}if(!fs.existsSync(target)||fs.statSync(target).isDirectory())target=path.join(exported,'index.html');res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.ttf':'font/ttf','.png':'image/png','.jpg':'image/jpeg','.epub':'application/epub+zip'})[path.extname(target)]??'application/octet-stream');fs.createReadStream(target).pipe(res);
+   let target=path.resolve(exported,'.'+p);if(!target.startsWith(exported+path.sep)){res.writeHead(403);res.end();return;}if(!fs.existsSync(target)||fs.statSync(target).isDirectory())target=path.join(exported,p==='/'?'index.html':'app.html');res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.ttf':'font/ttf','.png':'image/png','.jpg':'image/jpeg','.epub':'application/epub+zip'})[path.extname(target)]??'application/octet-stream');fs.createReadStream(target).pipe(res);
  }catch(error){res.writeHead(500,{'Content-Type':'application/json'});res.end(JSON.stringify({code:error.code??'fixture_error',message:error.message}));console.error(error);}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const originA=`http://127.0.0.1:${server.address().port}`,originB=`http://localhost:${server.address().port}`;
  const profileDirectory=fs.mkdtempSync(path.join(os.tmpdir(),'aldus-library-browser-')),shots=path.resolve('.expo/library-sync-validation');fs.mkdirSync(shots,{recursive:true});

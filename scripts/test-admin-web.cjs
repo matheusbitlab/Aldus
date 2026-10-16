@@ -38,13 +38,13 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
    await enqueue(async()=>{await f.as(user,user!=='owner'||mfaReady);try{
     let result;if(name==='aldus_admin_session')result=await f.session();
     else if(name==='aldus_admin_read')result=await f.read(args.p_section,args.p_filters);
-    else if(name==='aldus_admin_change'){mutations++;result=await f.change(args.p_action,args.p_target,args.p_expected_revision,args.p_payload,{requestId:args.p_request_id,reason:args.p_reason,confirmation:args.p_confirmation});}
+    else if(name==='aldus_admin_change'){mutations++;result=await f.change(args.p_action,args.p_target,args.p_expected_revision,args.p_payload,{requestId:args.p_request_id,reason:args.p_reason,confirmation:args.p_confirmation});if(!result.ok)console.log('SYNTHETIC_CHANGE_REJECTED',JSON.stringify({action:args.p_action,expectedRevision:args.p_expected_revision,code:result.code}));}
     else if(name==='aldus_app_notice')result=(await f.db.query('select public.aldus_app_notice() as v')).rows[0].v;
-    else{json({},404);return;}json(result);
+    else{json({},404);return;}if(name==='aldus_admin_read'&&mutations>0)await wait(150);json(result);
    }catch(error){json({code:error.code??'42501'},403);}});return;
   }
   let target=path.resolve(exported,'.'+decodeURIComponent(u.pathname));if(!target.startsWith(exported+path.sep)){res.writeHead(403);res.end();return;}
-  if(!fs.existsSync(target)||fs.statSync(target).isDirectory())target=path.join(exported,'index.html');
+  if(!fs.existsSync(target)||fs.statSync(target).isDirectory())target=path.join(exported,u.pathname==='/'?'index.html':'app.html');
   res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.ttf':'font/ttf','.png':'image/png','.jpg':'image/jpeg'})[path.extname(target)]??'application/octet-stream');fs.createReadStream(target).pipe(res);
  }catch(error){console.error(error);res.writeHead(500);res.end('Local fixture error')}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${server.address().port}`;
@@ -72,7 +72,7 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
    };
   }`});
   const text=()=>client.evaluate('document.body?.innerText??""');
-  const until=async snippet=>{const start=Date.now();while(Date.now()-start<45000){if((await text()).includes(snippet))return;await wait(100);}throw Error('Missing '+snippet+': '+(await text()).slice(0,1800));};
+  const until=async snippet=>{const start=Date.now();while(Date.now()-start<45000){if((await text()).includes(snippet))return;await wait(100);}await shot('operation-error');throw Error('Missing '+snippet+': '+(await text()).slice(-1800));};
   const click=async label=>{const start=Date.now();while(Date.now()-start<12000){const clicked=await client.evaluate(`(()=>{const el=[...document.querySelectorAll('[role="button"]')].find(e=>e.getAttribute('aria-label')===${JSON.stringify(label)});if(!el||el.getAttribute('aria-disabled')==='true')return false;el.click();return true})()`);if(clicked)return;await wait(100);}throw Error('Enabled button missing '+label+': '+(await text()).slice(0,2000));};
   const input=(label,value)=>client.evaluate(`(()=>{const el=document.querySelector('[aria-label='+CSS.escape(${JSON.stringify(label)})+']');if(!el)throw Error('Input missing');Object.getOwnPropertyDescriptor(el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const navigate=async(route,identity)=>{if(identity)await client.evaluate(`localStorage.setItem('fixture-admin-identity',${JSON.stringify(identity)})`);await client.command('Page.navigate',{url:origin+route});};
@@ -84,6 +84,9 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
   await input('Código TOTP de 6 dígitos',invalid);await click('Verificar TOTP');await until('Código não verificado');assert.equal(mfaReady,false);
   await input('Código TOTP de 6 dígitos',TOTP.totp());await click('Verificar TOTP');await until('MFA recente confirmado pelo servidor.');assert.equal(mfaReady,true);await shot('owner-desktop');
   assert.ok((await text()).includes('Aguardando integração de pagamentos'));assert.ok(!(await text()).includes('PRIVATE_CONTENT_CANARY'));
+  assert.ok(await client.evaluate('!!document.querySelector(\'[data-testid="admin-sidebar"]\')'),'Desktop sidebar');
+  assert.ok(!(await text()).includes('R$ 0'),'No invented financial zero');
+  assert.ok(await client.evaluate('!(/\\b(OWNER|ADMIN|Free|Storage|Churn)\\b/.test(document.querySelector(\'[data-testid="admin-shell"]\').innerText))'),'Administrative labels in pt-BR');
   assert.ok(await client.evaluate('document.documentElement.scrollWidth<=window.innerWidth+2'),'Desktop responsive width');
   for(const [label,ready] of [['Assinaturas','Assinaturas e financeiro'],['Armazenamento','Armazenamento privado'],['Métricas','Cadastros por dia'],['Administradores','UUID da conta a promover'],['Auditoria','Auditoria administrativa'],['Saúde do Sistema','Banco de dados: conexão confirmada']]){await click(label);await until(ready);await click('Atualizar dados');await until(ready);}
   await click('Usuários');await until('Pesquisar usuários');await click('Gerenciar '+f.ids.user);await until('Informações da conta');await click('Conceder Pro temporário');await until('Digite CONFIRMAR');await confirm(f.ids.user);
@@ -93,7 +96,7 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
   await click('Preparar concessão premium');await confirm(f.ids.user);await enqueue(async()=>{await f.as('owner');assert.equal((await f.read('user',{id:f.ids.user})).data.features.premium_future,true);});
   await click('Administradores');await until('UUID da conta a promover');await input('UUID da conta a promover',f.ids.second);await click('Conceder associação administrativa');await confirm(f.ids.second);await click('Revogar associação '+f.ids.second);await confirm(f.ids.second);
   await enqueue(async()=>{await f.as('owner');assert.equal((await f.read('members')).data.rows.find(m=>m.user_id===f.ids.second).active,false);});
-  await click('Planos e Preços');await until('Nome comercial pro');await input('Preço mensal em centavos pro (vazio = indefinido)','3490');await input('Preço anual em centavos pro (vazio = indefinido)','34900');await click('Salvar plano pro');await confirm('pro');
+  await click('Planos e Preços');await until('Nome comercial Pro');await input('Preço mensal em centavos Pro (vazio = indefinido)','3490');await input('Preço anual em centavos Pro (vazio = indefinido)','34900');await click('Salvar plano Pro');await confirm('pro');
   await enqueue(async()=>{await f.as('owner');assert.equal((await f.read('plans')).data.rows.find(p=>p.id==='pro').price_brl_centavos,3490);});
   await click('Configurações');await until('Valor app.notice');await input('Valor app.notice','Aviso controlado do painel');await click('Salvar app.notice');await confirm('app.notice');
   await navigate('/settings');await until('Aviso controlado do painel');await until('Abrir Aldus Admin');await click('Abrir Aldus Admin');await until('Usuários cadastrados');
@@ -102,7 +105,8 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
   await click('Visão Geral');await until('Usuários cadastrados');
   await client.command('Emulation.setDeviceMetricsOverride',{width:430,height:932,deviceScaleFactor:1,mobile:true});await shot('owner-mobile');
   assert.ok(await client.evaluate('document.documentElement.scrollWidth<=window.innerWidth+2'),'Mobile responsive width');
-  await navigate('/admin','admin');await until('Papel verificado: ADMIN');await until('Usuários cadastrados');assert.ok(!(await text()).includes('Planos e Preços'));assert.ok(!(await text()).includes('Administradores'));await shot('delegated-admin');
+  await click('Abrir navegação');await until('Navegação administrativa');await click('Auditoria');await until('Pesquisar nesta página da auditoria');
+  await navigate('/admin','admin');await until('Papel verificado: Administrador');await until('Usuários cadastrados');assert.ok(!(await text()).includes('Planos e Preços'));assert.ok(!(await text()).includes('Administradores'));await shot('delegated-admin');
   await navigate('/admin','user');await until('Acesso administrativo indisponível');assert.ok(!(await text()).includes('Usuários cadastrados'));await shot('direct-route-denied');
   await navigate('/settings','user');await until('Ajustes');await wait(500);assert.ok(!(await text()).includes('Abrir Aldus Admin'));
   await navigate('/admin','owner');await until('Usuários cadastrados');await enqueue(async()=>{await f.db.exec('reset role');await f.db.query('delete from auth.sessions where user_id=$1',[f.ids.owner]);});

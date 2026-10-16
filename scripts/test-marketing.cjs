@@ -1,0 +1,26 @@
+const fs=require('fs'),assert=require('assert/strict'),React=require('react');
+const {renderToStaticMarkup}=require('react-dom/server');
+const load=require('./community-test-loader.cjs')();
+const {LandingDocument}=load('src/marketing/LandingDocument.tsx');
+const {initialCatalogReference:plans}=load('src/marketing/catalogReference.generated.ts');
+const {publicSiteUrl}=load('src/marketing/seo.ts');
+const {buildPublicHtml}=require('./write-public-web.cjs');
+const initial=renderToStaticMarkup(React.createElement(LandingDocument));
+const visible=initial.replace(/<style>[\s\S]*?<\/style>/g,'').replace(/<[^>]*>/g,' ');
+for(const id of ['conteudo','experiencia','recursos','como-funciona','planos','perguntas'])assert.ok(initial.includes(`id="${id}"`));
+assert.equal((initial.match(/<h1[ >]/g)||[]).length,1);assert.match(initial,/href="\/auth\/signup"/);assert.match(initial,/href="\/auth\/login"/);
+assert.match(visible,/Referência inicial/);assert.match(visible,/500 MiB/);assert.match(visible,/10 GiB/);assert.match(visible,/Preço ainda não disponível/);assert.match(initial,/<button[^>]*disabled=""[^>]*>Contratação ainda indisponível/);
+assert.doesNotMatch(visible,/\b(Free|OWNER|ADMIN|Dashboard|Storage|Sync|Churn)\b/);
+assert.ok(!initial.includes('/admin'));assert.ok(!initial.includes('PRIVATE_CONTENT_CANARY'));
+const updated=plans.map(p=>({...p,limits:{...p.limits,syncedBooks:137},priceBrlCentavos:p.id==='pro'?3990:p.priceBrlCentavos}));
+const authed=renderToStaticMarkup(React.createElement(LandingDocument,{signedIn:true,catalog:updated}));
+assert.match(authed,/href="\/library"/);assert.match(authed,/Catálogo consultado com sua sessão/);assert.match(authed,/137/);assert.match(authed,/39,90/);assert.match(authed,/apenas informativo/);
+const template='<!doctype html><html lang="en"><head><title>Expo</title></head><body><div id="root"></div><script src="/entry.js"></script></body></html>';
+const absent=buildPublicHtml(template);assert.match(absent.html,/<html lang="pt-BR">/);assert.match(absent.html,/<h1/);assert.match(absent.html,/og:locale/);assert.equal(absent.sitemap,null);assert.ok(!absent.html.includes('rel="canonical"'));assert.match(absent.robots,/Disallow: \/admin/);assert.match(absent.html,/entry.js/);
+assert.match(absent.appHtml,/noindex,nofollow/);assert.doesNotMatch(absent.appHtml,/<h1/);assert.match(absent.appHtml,/id="root"><\/div>/);assert.match(absent.appHtml,/entry.js/);
+const known=buildPublicHtml(template,{siteUrl:'https://aldus.example.invalid/'});assert.match(known.html,/rel="canonical" href="https:\/\/aldus.example.invalid\/"/);assert.match(known.sitemap,/<loc>https:\/\/aldus.example.invalid\/<\/loc>/);assert.match(known.robots,/Sitemap:/);
+for(const invalid of ['javascript:alert(1)','https://user:secret@example.invalid/','https://example.invalid/?token=secret','https://example.invalid/#token','https://example.invalid/app']){assert.equal(publicSiteUrl(invalid),null);assert.throws(()=>buildPublicHtml(template,{siteUrl:invalid}),/Value redacted/);}
+assert.match(fs.readFileSync('app/index.tsx','utf8'),/Redirect href="\/library"/,'Native entry remains unchanged');
+assert.match(fs.readFileSync('app/_layout.tsx','utf8'),/Stack.Protected guard=\{appReady\}/);
+require('child_process').execFileSync(process.execPath,['scripts/generate-public-catalog.cjs','--check'],{stdio:'pipe'});
+console.log('PASS public landing SSR, login/signup/library links, localized initial and authenticated catalog, no active purchase, no private data, SEO with/without canonical and invalid URL rejection; Native entry/protected stack preserved. Browser/Android separate.');

@@ -41,15 +41,16 @@ function AppShell() {
   const insets = useSafeAreaInsets();
   const { palette, resolvedTheme } = useAppTheme();
   const { loading, session, profile } = useAuth();
-  const usePhoneFrame = Platform.OS === "web" && width > 480 && !['admin','plan'].includes(String(segments[0]));
+  const publicLanding = Platform.OS === 'web' && (!segments.length || String(segments[0]) === 'index');
+  const usePhoneFrame = Platform.OS === "web" && width > 480 && !publicLanding && !['admin','plan'].includes(String(segments[0]));
   const appReady = !loading && !!session && !!profile?.username && profile.account_status === "active";
   useEffect(()=>{
-    if(!appReady)return;
+    if(!appReady||publicLanding)return;
     const sync=appDependencies.librarySync;sync.start();
     const foreground=AppState.addEventListener('change',state=>{if(state==='active')sync.schedule(0);});
     const network=addNetworkStateListener(state=>{if(state.isConnected && state.isInternetReachable!==false)sync.schedule();});
     return()=>{foreground.remove();network.remove();sync.stop();};
-  },[appReady,session?.user.id]);
+  },[appReady,publicLanding,session?.user.id]);
   useEffect(() => {
     authDiagnostic("AUTH_GUARD_DECISION", { operationId: correlatedAuthDiagnostic(session?.user.id), correlation: "candidate", guard: "shell", decision: appReady ? "allowed" : "blocked",
       uuid: session?.user.id, session: !!session, profile: !!profile, username: !!profile?.username, accountStatus: profile?.account_status, loading, appReady });
@@ -57,6 +58,7 @@ function AppShell() {
 
   return (
     <>
+      {!publicLanding ? <Head><meta name="robots" content="noindex,nofollow" /></Head> : null}
       <StatusBar barStyle={resolvedTheme === "dark" ? "light-content" : "dark-content"} backgroundColor={palette.background} />
       <View style={usePhoneFrame ? [styles.webBackground, { backgroundColor: palette.background }] : [styles.fill, { backgroundColor: palette.background }]}>
         <View
@@ -70,7 +72,7 @@ function AppShell() {
             } : { backgroundColor: palette.background },
           ]}
         >
-          {loading ? <View style={styles.fontLoading}><ActivityIndicator color={palette.accent} /></View> :
+          {loading && !publicLanding ? <View style={styles.fontLoading}><ActivityIndicator color={palette.accent} /></View> :
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="legal/privacy" />

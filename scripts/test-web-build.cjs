@@ -16,6 +16,8 @@ assert.doesNotMatch(JSON.stringify(workflow), /secrets\.|vercel deploy|--prod/);
 assert.equal(config.outputDirectory, 'dist'); assert.equal(config.buildCommand, 'npm run build');
 assert.equal(config.framework, null); assert.ok(config.headers.some(rule => rule.source === '/build-info.json' && rule.headers.some(h => h.key === 'Cache-Control' && h.value === 'no-store')));
 assert.ok(config.rewrites.some(rule => rule.destination === '/index.html'));
+assert.ok(config.rewrites.some(rule => rule.source === '/' && rule.destination === '/index.html'));
+assert.ok(config.rewrites.some(rule => rule.destination === '/app.html'));
 assert.ok(!JSON.stringify(config).includes('unsafe-inline'));
 if (process.argv.includes('--exported')) {
   const metadata = JSON.parse(fs.readFileSync('dist/build-info.json', 'utf8'));
