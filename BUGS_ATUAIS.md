@@ -368,9 +368,34 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - Supabase Free: 50 MB/arquivo e 1 GB incluído por organização na Fase A, reconferir.
   Não equivale ao catálogo Aldus Free 500 MiB/Pro 10 GiB. Pro comercial não habilitado.
   Piloto remoto pequeno proposto, sem criação de projeto ou consumo pago.
-- PENDENTE AUTORIZAÇÃO: backup/exportação/restore isolado, incrementais/ledger, contas
-  descartáveis e Auth/RLS/Storage reais, bootstrap OWNER com UUID reconfirmado (separado)
+- Backup/exportação/restore isolado já autorizados posteriormente, ainda não concluídos;
+  não executados na Etapa 3. PENDENTE AUTORIZAÇÃO: incrementais/ledger, contas descartáveis
+  e Auth/RLS/Storage reais, bootstrap OWNER com UUID reconfirmado (separado)
   e deploy Web (separado). Proprietário participa do login/TOTP; conferir protocolo de
   uploads em clientes antigos antes de rollout. Sem mudanças remotas nesta missão.
 - Nenhum bug físico anterior encerrado. Sem APK/deploy/cobrança. Procedimento e evidência
   detalhados em PROJECT_CONTEXT.md; main permanece a branch oficial.
+
+### SaaS Etapa 3 — interface pronta, ativação e QA físico pendentes
+
+- IMPLEMENTADO/VALIDADO LOCALMENTE: Meu Plano e Comparar Planos, integrados a Ajustes,
+  Conta, catálogo autenticado e RPCs SaaS/quotas existentes. Sem limites comerciais
+  duplicados na UI, cache de entitlements, autopromoção ou contratação simulada.
+- Uso desconhecido continua null/“Em verificação”; reservas separadas de bytes armazenados,
+  progresso limitado a 0–100%, excesso e downgrade preservam os dados e a outbox.
+  Conflito/bloqueio de franquia agora aparecem nos estados centrais dos livros; metadata
+  sem remotePath confirmado não anuncia arquivo sincronizado na nuvem. Remoções atuais
+  mantidas, com acesso a Meu Plano e ao gerenciamento existente da biblioteca.
+- Sessão/rede/autorização/contrato inválido geram indisponibilidade recuperável. Fences
+  por identidade/geração descartam A→B→A e respostas tardias. Offline/background/logout
+  limpam a apresentação; reconexão/foco revalidam no servidor. Free nunca vira Pro local.
+- Evidência: typecheck/export Web e matriz 64/64 PASS; 27 cenários SQL/TS novos, componentes
+  Native e hook React controlados PASS; Chromium desktop/360px/claro/escuro/fonte ampliada,
+  teclado/AX, consumo, erros/retry, trocas de conta e navegação PASS. Regressões Web Library
+  (EPUB/Reader/IndexedDB/outbox) e Admin (TOTP/formulários) PASS. Dados sempre sintéticos.
+- PENDENTE: quatro migrations de produção, backend/Auth/Storage gerenciados autenticados,
+  recuperação real e autorizações já registradas. UI mostra serviço indisponível enquanto
+  backend não estiver ativo. Catálogo Pro informativo, sem comercialização/pagamentos.
+- Android físico permanece pendente; futuro build/instalação necessário para distribuir
+  o novo bundle. Nenhum APK/deploy/migration remota/backup real nesta etapa. A janela de
+  senha anterior foi encerrada sem leitura de credenciais. Bugs físicos anteriores intactos.

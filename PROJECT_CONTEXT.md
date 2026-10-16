@@ -965,3 +965,81 @@ Falha: parar e diagnosticar schema/ledger em leitura. Sem rollback de produção
 replay automático, relaxamento RLS, reset ou restore destrutivo não aprovado.
 Evidência ignorada: .expo/saas-homologation/result.json (hashes/locks/restore),
 deployment-plan.json, logs de testes/export e capturas admin-validation/library-sync-validation.
+
+## SaaS — Etapa 3: experiência de planos e armazenamento (15/10/2026)
+
+IMPLEMENTADO E VALIDADO LOCALMENTE. Início na main e109c89, limpa e alinhada a origin/main
+após fetch. Desenvolvimento em C:\Kindle; main continua o padrão. Não houve alteração de
+migrations, Reader, dependências nativas, pagamentos, serviços remotos ou dados reais.
+
+- Rotas protegidas /plan (Meu Plano) e /plan/compare (Comparar Planos), acessíveis pelos
+  Ajustes e pela Conta. A área de planos usa largura responsiva na Web, mantendo a moldura
+  das demais telas e a navegação principal. Ajustes preserva Sync, temas, privacidade,
+  exportação, Community e Admin; suas linhas ganharam rótulos/hints acessíveis explícitos.
+- Reuso de AccountPlanSnapshot e QuotaSnapshot. SupabaseAccountPlanRepository conserva
+  read() e acrescenta readExperience()/readCatalog(). Plano usa saas_account_snapshot;
+  uso/reservas usam SupabaseLibraryAdapter.quota()/saas_quota_snapshot existentes.
+  Catálogo consulta saas_plans e saas_plan_features autenticadas, sob RLS já implementada.
+  CatalogPlan é projeção tipada dessas tabelas no mesmo domínio, não catálogo local.
+  Nenhum novo RPC, setter de assinatura, cache persistido de permissões ou fonte JWT de plano.
+- Preços, limites e recursos vêm do servidor. Free mostra o zero do catálogo; Pro nulo
+  mostra “Preço ainda não disponível”. Preços mensal/anual configurados são informativos;
+  contratação permanece desabilitada, sem trial automático ou criação de assinatura.
+  Recursos essenciais Free preservados; benefícios premium futuros não são inventados.
+- Meu Plano apresenta plano efetivo, estado active/trialing/expired/revoked, origem da
+  concessão, prazo quando existente, benefícios implementados e horário da consulta.
+  Free é permanente; uma concessão administrativa Pro não comprova compra. Concessão
+  expirada/revogada pode coexistir com plano efetivo Free, explicitamente explicado.
+- Consumo: livros usados/restantes, bytes efetivamente registrados, objetos, bytes e
+  quantidade de reservas e saldo que já desconta reservas. Bytes/KiB/MiB/GiB formatados;
+  null é “Em verificação”, jamais zero. Barras limitadas a 0–100%, valores acessíveis
+  explícitos para Native/Web; excesso continua numericamente visível, inclusive um byte.
+  Alertas de limite/downgrade preservam leitura, importação, biblioteca, estudos e outbox.
+- Controller de apresentação somente em memória. Consultas canceladas no blur/background,
+  logout/troca de conta e atualização; identidade + geração protegem inclusive A→B→A
+  no mesmo ciclo de renderização. Dados anteriores somem antes de nova consulta. Offline
+  limpa a apresentação; reconexão/foco/foreground reconsulta. Prazo Pro aberto agenda
+  atualização ao vencer. Falha de sessão, autorização, rede, serviço ausente ou contrato
+  incoerente mostra indisponibilidade e retry, sem fabricar Free/Pro ou uso.
+- Classificação central LibrarySyncCoordinator agora distingue conflito e bloqueio pela
+  franquia. Reutiliza o ledger de quotaBlocks e sua comparação de assinatura, sem novo
+  mecanismo de Sync/retry. Metadata isolada não afirma bytes sincronizados: remotePath
+  precisa coincidir com a shadow confirmada. Local, pendente, transferindo, cloud-only,
+  sincronizado e erro conservam o fluxo existente. Link de bloqueio leva a Meu Plano.
+  Remoções/confirmadores atuais preservados; a tela de plano apenas abre a biblioteca.
+- LibrarySyncControls reutilizado em Meu Plano com resumo de quota suprimido para evitar
+  duplicação; Sincronizar agora, legado e conflitos conservados. Formatação compartilhada
+  corrige rótulos de unidades. Nenhum gate de plano foi inserido na leitura/importação.
+
+Validação desta etapa: typecheck/export Web PASS; matriz crítica 64/64 PASS, incluindo
+SaaS/quotas, Auth, Library Sync/SQLite/outbox, Admin, EPUB/PDF, Community e Flashcards/Battle.
+test:saas inclui 27 cenários novos de contrato/repository/controller com SQL original
+em PGlite, além de componentes Native controlados e hook React real (A→B→A em lote,
+resposta tardia, offline/reconexão, logout e cleanup). test:saas:web exercita o export no
+Chromium com HTTP/Auth sintéticos: navegação Ajustes/planos/biblioteca, catálogo alterado,
+Free/Pro, zero/parcial/exato/excesso/desconhecido/reservas, expiração, falhas/retry, trocas
+de identidade via SDK com redirecionamento do AuthGuard, retorno à área e resposta antiga,
+offline/reconexão real do navegador, teclado/AX, desktop/360px, claro/escuro e fonte 150%.
+As metadata grandes são fixtures históricas isoladas, não transferência física de GB.
+test:library:web PASS com EPUB real sintético, duas origens IndexedDB, importação offline,
+upload reservado/confirmado, Reader/download, remoção local, outbox e troca de conta.
+test:admin:web PASS com dez áreas, TOTP controlado e formulários/concessão/revogação.
+Capturas revisadas em .expo/saas-stage3-web, identificadas como dados sintéticos.
+Testes em navegador/primitivas controladas NÃO provam toque, gestos ou instalação Android.
+
+Operação: as quatro incrementais continuam pendentes em produção, conforme contexto do
+proprietário; nenhuma nova auditoria remota foi necessária para a interface. Sem backend
+SaaS ativo, as telas exibem indisponibilidade. Free 100/500 MiB e Pro 2.000/10 GiB continuam
+limites comerciais do catálogo, não garantia agregada da infraestrutura Supabase Free.
+Pro comercial/pagamentos não ativados. Nenhum deploy Web ou APK gerado.
+
+Backup real permanece pendente da intervenção local do proprietário e das condições de
+recuperação já registradas; exportação/restauração isolada já foram autorizadas nas tarefas
+anteriores, mas estão expressamente fora da execução da Etapa 3. A janela da tarefa anterior
+foi encerrada sem ler credenciais, evitando acionamento durante a Etapa 3. Clientes oficiais
+17.11 foram preparados fora do repositório na tarefa anterior; isso não é backup concluído.
+Workspace criptografado para restore e dependências do Vault continuam pendentes.
+Para receber as telas no Android instalado será necessário futuro build/instalação com o
+bundle atualizado; nenhuma dependência nativa mudou. Próximo passo: revisão/QA físico quando
+autorizado e implantação assistida do backend somente após recuperação comprovada e nova
+autorização específica. Publicação Web e bootstrap OWNER continuam operações separadas.
