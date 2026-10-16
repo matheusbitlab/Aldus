@@ -52,9 +52,18 @@ function load(file){if(cache.has(file))return cache.get(file);const exports={};c
   const builder=load('src/data/local/PdfReflowDocumentBuilder.ts');chapters=builder.toStoredReflowChapters('reflow-browser',builder.buildPdfReflowDocument(pages,pdf.numPages));console.log('REAL REFLOW',JSON.stringify({file:'sobre-o-ocio.pdf',sourcePages:pdf.numPages,chapters:chapters.length}));}finally{await task.destroy();}
  }
  const options={fontSize:16,fontFamily:'Georgia',marginSize:24,lineHeight:1.65,paragraphSpacing:1,textColor:'#222222',backgroundColor:'#f5ebd9'};
+ if(process.argv.includes('--lazy-images')){
+  const image=color=>'data:image/svg+xml;base64,'+Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="${color}"/></svg>`).toString('base64');
+  chapters=[{id:'synthetic-images',title:'Synthetic offscreen images',html:`<img src="${image('red')}"/>${paragraphs}<img src="${image('blue')}"/>`}];
+ }
  const html=createEpubReaderDocument(chapters,options).replace('<script>','<script>window.messages=[];window.ReactNativeWebView={postMessage:function(x){messages.push(JSON.parse(x));}};');
  const {frameTree}=await send('Page.getFrameTree');await send('Page.setDocumentContent',{frameId:frameTree.frame.id,html});
  await evaluate(`new Promise((resolve,reject)=>{let count=0;function step(){if(messages.some(m=>m.type==='page'&&m.layoutReady))return resolve(true);if(++count>600)return reject(Error('layout not ready'));requestAnimationFrame(step);}step();})`);
+ if(process.argv.includes('--lazy-images')){
+  const images=await evaluate(`Array.from(document.images).map(image=>({complete:image.complete,width:image.naturalWidth}))`);
+  assert.equal(images.length,2);assert.ok(images.every(image=>image.complete&&image.width===24));
+  console.log('PASS Chromium: offscreen EPUB images settle initial pagination without user navigation',JSON.stringify(images));
+ }
  if(!baseline){
   const fractional=await evaluate(`(()=>{const v=document.getElementById('reader-viewport');v.style.setProperty('width','419.727px','important');v.style.setProperty('min-width','0px','important');window.display();const page=Math.min(120,messages.filter(m=>m.type==='page').at(-1).totalPages);window.goToPage(page);const c=document.getElementById('reader-content'),width=c.getBoundingClientRect().width,x=new DOMMatrix(getComputedStyle(c).transform).m41;return {page,width,rounded:v.clientWidth,x,drift:Math.abs(x+(page-1)*width)};})()`);
   if(fractionalBaseline){assert.ok(fractional.drift>5,JSON.stringify(fractional));console.log('REPRODUCED integer viewport width accumulates column drift',JSON.stringify(fractional));return;}

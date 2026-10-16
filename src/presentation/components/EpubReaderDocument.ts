@@ -652,6 +652,9 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     return new Promise(function(resolve) {
       image.addEventListener("load", resolve, { once: true });
       image.addEventListener("error", resolve, { once: true });
+      // Offscreen columns cannot trigger lazy loading while initial restoration
+      // waits for every image. Request them after installing both listeners.
+      if (image.loading === "lazy") image.loading = "eager";
     });
   }
 
