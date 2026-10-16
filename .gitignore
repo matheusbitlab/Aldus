@@ -22,6 +22,7 @@ supabase/.temp/
 modules/*/android/.gradle/
 modules/*/android/build/
 modules/*/android/.cxx/
+android/.kotlin/
 *.aab
 credentials.json
 *.jks
