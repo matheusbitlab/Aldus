@@ -90,26 +90,38 @@ async function main() {
     report.results.push({ status: 'PASS físico', scenario: 'ADB autorizado e pacote presente', packagePresent: report.version.length > 0 });
   } else if (command === 'saas-unavailable') {
     // Start on Ajustes with the owner's existing session. Do not bypass Auth.
-    assert.ok(has(nodes(), 'Ajustes'), 'Start on Aldus Ajustes');
+    assert.ok(nodes().some(n=>n.label==='Meu Plano'), 'Start on Ajustes with Meu Plano row visible');
     await protectCaptures();
     scenario = 'SaaS unavailable navigation';
     tap('Meu Plano');
-    let all = await waitFor(all => has(all, 'Consulta indisponível'));
+    let all = await waitFor(all => has(all, 'Sua conta, sua biblioteca e o espaço privado na nuvem.') && has(all, 'Consulta indisponível'));
     assert.ok(!all.some(n => /Gratuito e permanente\.|Plano Pro/.test(n.text)), 'Unavailable backend cannot invent a plan');
     screenshot('my-plan-unavailable');
     tap('Tentar novamente');
     await waitFor(all => has(all, 'Consulta indisponível'));
     tap('Comparar Planos');
-    await waitFor(all => has(all, 'Consulta indisponível'));
+    await waitFor(all => has(all, 'A leitura é para todos. Compare a capacidade disponível no catálogo do Aldus.') && !has(all, 'Sua conta, sua biblioteca e o espaço privado na nuvem.') && has(all, 'Consulta indisponível'));
     screenshot('compare-unavailable');
     tap('Meu Plano');
-    await waitFor(all => has(all, 'Consulta indisponível'));
+    await waitFor(all => has(all, 'Sua conta, sua biblioteca e o espaço privado na nuvem.') && !has(all, 'A leitura é para todos. Compare a capacidade disponível no catálogo do Aldus.') && has(all, 'Consulta indisponível'));
     for (let attempt = 0; attempt < 6 && !has(nodes(), 'Voltar aos Ajustes'); attempt++) {
       input('swipe', Math.round(screenWidth * .8), Math.round(screenHeight * .8), Math.round(screenWidth * .8), Math.round(screenHeight * .35), 500);
     }
     tap('Voltar aos Ajustes');
-    await waitFor(all => has(all, 'Meu Plano'));
+    await waitFor(all => has(all, 'Ajustes') && all.some(n=>n.label==='Meu Plano'));
     report.results.push({ status: 'PASS físico', scenario: 'Meu Plano/Comparar: backend indisponível, retry e retorno', commerciallyAvailable: false });
+  } else if (command === 'admin-unavailable') {
+    await protectCaptures();
+    await waitFor(all=>has(all,'Sua Biblioteca')||has(all,'Meu Plano')||has(all,'Painel administrativo'));
+    scenario = 'Native direct Admin route unavailable/denied';
+    shell('am','start','-a','android.intent.action.VIEW','-d','aldus://admin',packageName);
+    const all=await waitFor(all=>has(all,'Acesso administrativo indisponível'));
+    assert.ok(!hasText(all,'Usuários cadastrados'));
+    assert.ok(!has(all,'Configurar autenticador TOTP'));
+    screenshot('admin-native-unavailable');
+    tap('Voltar aos Ajustes');
+    await waitFor(all=>has(all,'Ajustes')&&all.some(n=>n.label==='Meu Plano'));
+    report.results.push({status:'PASS físico',scenario,authorizedAdminNotTested:true,remoteOwnerNotProvisioned:true});
   } else if (command === 'saas-offline') {
     assert.ok(has(nodes(), 'Meu Plano'), 'Start on Ajustes with Meu Plano visible');
     await protectCaptures();
@@ -209,7 +221,7 @@ async function main() {
     }
     screenshot('amendoas-after-reopen');
   } else {
-    throw Error('Supported commands: inventory, saas-unavailable, saas-offline, reader-controls');
+    throw Error('Supported commands: inventory, saas-unavailable, admin-unavailable, saas-offline, reader-controls');
   }
 }
 main().catch(error => { report.results.push({ status: scenario === 'precondition' ? 'BLOQUEADO' : 'FAIL físico', scenario, reason: error.message }); process.exitCode = 1; }).finally(() => {

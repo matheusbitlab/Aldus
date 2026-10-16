@@ -11,6 +11,13 @@ Contexto permanente: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 APK release consolidado: pendente. Homologação debug física em 16/10 no Redmi Android 16;
 identidade do artefato, protocolo e limites de evidência em PROJECT_CONTEXT.md, seção 15.
 
+Interface de 16/10: landing pública Web, acabamento Admin e apresentação pt-BR implementados
+e homologados localmente; não encerram incidentes de Reader/Auth/Sync por inferência.
+Dados financeiros e telemetria ausentes permanecem indisponíveis. Capturas Admin usam
+fixtures identificadas, sem implantação remota ou provisionamento OWNER. Detalhes e
+limites de validação na seção “Interface pública, Aldus Admin e português brasileiro”
+de PROJECT_CONTEXT.md. Biblioteca mantém menu discreto e exportação nos Ajustes.
+
 ### Origem e escopo da campanha do caderno
 
 | Entradas | Origem comprovada | Tratamento nesta campanha |

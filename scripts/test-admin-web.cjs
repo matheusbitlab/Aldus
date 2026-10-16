@@ -88,6 +88,9 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
   assert.ok(!(await text()).includes('R$ 0'),'No invented financial zero');
   assert.ok(await client.evaluate('!(/\\b(OWNER|ADMIN|Free|Storage|Churn)\\b/.test(document.querySelector(\'[data-testid="admin-shell"]\').innerText))'),'Administrative labels in pt-BR');
   assert.ok(await client.evaluate('document.documentElement.scrollWidth<=window.innerWidth+2'),'Desktop responsive width');
+  await client.evaluate("localStorage.setItem('@kindle/appTheme','light')");await client.command('Page.reload');await until('Usuários cadastrados');
+  assert.ok(await client.evaluate('Number(getComputedStyle(document.querySelector(\'[data-testid="admin-shell"]\')).backgroundColor.match(/\\d+/)[0])>200'),'Light theme applies saved preference');await shot('owner-desktop-light');
+  await client.evaluate("localStorage.setItem('@kindle/appTheme','dark')");await client.command('Page.reload');await until('Usuários cadastrados');
   for(const [label,ready] of [['Assinaturas','Assinaturas e financeiro'],['Armazenamento','Armazenamento privado'],['Métricas','Cadastros por dia'],['Administradores','UUID da conta a promover'],['Auditoria','Auditoria administrativa'],['Saúde do Sistema','Banco de dados: conexão confirmada']]){await click(label);await until(ready);await click('Atualizar dados');await until(ready);}
   await click('Usuários');await until('Pesquisar usuários');await click('Gerenciar '+f.ids.user);await until('Informações da conta');await click('Conceder Pro temporário');await until('Digite CONFIRMAR');await confirm(f.ids.user);
   await enqueue(async()=>{await f.as('owner');const detail=await f.read('user',{id:f.ids.user});assert.equal(detail.data.subscription.grant_source,'trusted_backend');assert.ok(detail.data.subscription.ends_at);});

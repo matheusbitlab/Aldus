@@ -1118,3 +1118,99 @@ Para receber as telas no Android instalado será necessário futuro build/instal
 bundle atualizado; nenhuma dependência nativa mudou. Próximo passo: revisão/QA físico quando
 autorizado e implantação assistida do backend somente após recuperação comprovada e nova
 autorização específica. Publicação Web e bootstrap OWNER continuam operações separadas.
+
+## Interface pública, Aldus Admin e português brasileiro (16/10/2026)
+
+IMPLEMENTADO localmente a partir de main/origin/main 44c1d45, inicialmente limpas e
+alinhadas após fetch. Trabalho em C:\Kindle. Nenhuma migration, dependência nativa,
+estrutura persistida, permissão remota ou conteúdo do Reader foi alterado nesta tarefa.
+
+- Apresentação pt-BR centralizada em src/presentation/i18n/ptBR.ts: Gratuito/Pro,
+  Proprietário/Administrador, permissões, concessões, estados, ações e configurações.
+  Datas e números brasileiros; filtros DD/MM/AAAA e expiração DD/MM/AAAA HH:mm (UTC)
+  convertem para os contratos ISO existentes com validação de datas reais. Nomes
+  comerciais personalizados são preservados. IDs free/pro, OWNER/ADMIN, rotas,
+  tabelas, chaves premium_, nomes de livros/autores e termos Reader/deck/flashcard/
+  EPUB/PDF permanecem intactos. Auditoria AST cobre texto JSX e atributos visíveis
+  literais em app/src; regressões de rótulos cobrem os enums dinâmicos conhecidos.
+  A auditoria estática não certifica traduções de conteúdo externo arbitrário.
+- Aldus Admin mantém as dez seções e o mesmo repository/RPC/MFA. Desktop com menu
+  lateral recolhível e largura integral; celular com navegação expansível, indicadores
+  adaptáveis, tabela de usuários semântica no desktop e cartões em telas pequenas.
+  Foco, contraste, estados de seleção, confirmação rolável, feedback de envio e
+  atualização dos dados após salvar foram refinados. Controles da revisão anterior
+  são removidos enquanto o novo snapshot é consultado. Filtros e paginação conservados;
+  busca da auditoria é explicitamente restrita à página carregada.
+- Formulários reais existentes: conta ativa/desativada, concessão/revogação Pro e
+  permissões adicionais, catálogo/preços/franquias/propostas, configurações/revisões/
+  restauração e associação/delegação/revogação administrativa. Nenhuma ação concede
+  acesso somente pelo frontend. Mutação continua exigindo servidor, MFA recente,
+  motivo, confirmação, revisão e identificador idempotente. Não há acesso administrativo
+  ao conteúdo privado da biblioteca. Pro não concede papel administrativo.
+- Métricas: cadastros por dia e distribuição atual de planos usam somente o snapshot;
+  dados vazios não geram gráficos fictícios. Acessos não são chamados de usuários ativos.
+  Receita mensal/anual/total, conversão, cancelamentos e histórico de pagamentos exibem
+  “Aguardando integração de pagamentos.” Concessão manual não é venda. Crescimento
+  histórico de Storage e sondas operacionais ausentes são declarados indisponíveis.
+  Repository rejeita métricas incompletas, evitando zeros inventados; média de bytes
+  fracionária válida é formatada sem confundir tamanho real de arquivo com média.
+- Landing pública exclusiva Web em app/index.web.tsx e src/marketing, sem novo framework
+  ou biblioteca de animação. Cabeçalho/mobile menu, hero, prévia ilustrativa interativa,
+  recursos, etapas, planos, perguntas frequentes e rodapé legal. Entrar/Criar conta usam
+  Auth real; visitante autenticado tem acesso à biblioteca. Contratação Pro desabilitada,
+  preço indefinido explícito, nuvem em ativação e recursos sociais em homologação.
+  Leitura local continua gratuita. FAQ distingue offline Android de carregamento inicial
+  Web. Não foram inventados clientes, depoimentos, faturamento ou disponibilidade remota.
+- Catálogo público anônimo: referência inicial GERADA da migration SaaS imutável por
+  scripts/generate-public-catalog.cjs, validada pelo parser CatalogPlan existente.
+  Não é permissão, uso da conta ou consulta ao catálogo atual de produção. Usuário com
+  sessão elegível consulta readCatalog() existente e recebe mudanças do backend.
+  A referência inicial é identificada na página; não há API pública de catálogo criada,
+  grant novo ou migration. Free 100/500 MiB e Pro 2.000/10 GiB permanecem configuração
+  comercial, sem garantia de capacidade agregada no Supabase Free nem oferta Pro ativa.
+- Entrada Native app/index.tsx conservada. Root Web pública não fica no frame de celular
+  nem inicia Library Sync; demais rotas mantêm os guards e o mesmo coordenador. Menu de
+  três pontos da Biblioteca e exportação em Ajustes preservados: não foi reintroduzido
+  botão grande “Opções de…” ou “Backup da organização” na Biblioteca.
+- Animações CSS leves, entrada/revelação por rolagem, realces e hover/foco. Sem rolagem
+  artificial; respeita prefers-reduced-motion, inclusive mudança durante a sessão.
+  Prévia tem navegação por teclado, tabs/arrow/Home/End, temas ilustrativos e dados
+  explicitamente demonstrativos. Não apresenta biblioteca pessoal na página pública.
+- SEO: export:web gera HTML público indexável usando o MESMO LandingDocument, mesmo
+  sem JavaScript. Rotas privadas usam app.html sem conteúdo de marketing e noindex;
+  rewrites Vercel preparados localmente. Título, descrição, Open Graph, idioma pt-BR,
+  robots e imagem própria public/aldus-share.png. EXPO_PUBLIC_SITE_URL valida origem
+  HTTP(S) sem credenciais/caminho/query e habilita canonical/sitemap/imagem absoluta.
+  Domínio não foi inventado: configuração definitiva continua pendente. Contato legal
+  usa somente a configuração pública existente. Sem pixels, analytics ou deploy.
+
+Validação: typecheck, export Web e matriz crítica 69/69 PASS. Inclui Auth, SaaS/quotas,
+Library/SQLite/outbox, Admin, EPUB/PDF/Reflow/OCR, Community, Flashcards e Battle. Novas
+suítes test-pt-br, test-admin-presentation e test-marketing integradas à matriz. Export
+verificado também por test-web-build --exported. Chromium Admin PASS: dez áreas, TOTP
+sintético certo/errado, papel delegado, Pro negado, formulários, revogação, offline e
+desktop/mobile, incluindo leitura atrasada após salvar.
+Ambos os temas administrativos, claro e escuro, foram conferidos no Chromium; preferência
+salva foi usada para testar o tema, sem inferir cobertura de troca de tema do sistema.
+Chromium marketing PASS em
+320/360/430/768/1024/1440/1920: HTML sem JS, login/cadastro/biblioteca, catálogo autenticado
+alterado, rotas protegidas/Admin negado, menu, FAQ, teclado, foco e redução de movimento.
+SaaS Web e Library Web PASS (importação EPUB real sintética offline, duas origens
+IndexedDB, upload reservado, download/Reader, remoção local e outbox). Auth/HTTP/TOTP e
+Storage dos ensaios são controlados; SQL em PGlite não comprova serviço gerenciado nem
+concorrência PostgreSQL entre sessões independentes. Nenhuma escrita remota executada.
+
+Redmi USB Android 16: alterações JS recebidas pelo debug já instalado via Metro. Entrada
+continua Biblioteca; Meu Plano/Comparar com indisponibilidade/retry/retorno e acesso
+direto Admin negado/indisponível foram exercitados fisicamente. Não é prova do painel
+OWNER autorizado ou de SaaS remoto. Biblioteca com 36 livros preservada. Capturas e
+relatórios locais ignorados em .expo/marketing-validation, .expo/admin-validation e
+.expo/redmi-qa; capturas administrativas identificam dados sintéticos. Nenhum APK foi
+gerado ou instalado nesta tarefa; código nativo intacto. Debug usa Metro; distribuição
+Android futura precisa incorporar o novo bundle em build próprio autorizado.
+
+Pendências: recuperação do backup real, implantação incremental e validação autenticada
+Auth/RLS/Storage, bootstrap OWNER específico, TOTP real do proprietário, domínio/contato
+institucional definitivos e publicação Web autorizada. Produção não foi modificada.
+Continuar na main; não abrir janela de senha, aplicar migrations, conceder OWNER, ativar
+pagamentos ou publicar automaticamente em tarefas de interface.
