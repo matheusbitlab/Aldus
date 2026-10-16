@@ -15,8 +15,8 @@ config.resolver.blockList = [
   // exclusions do not cover all absolute Windows/module build paths.
   /(?:^|[\\/])android[\\/](?:build|\.gradle|\.cxx|\.kotlin|app[\\/]build)(?:[\\/]|$)/,
   /(?:^|[\\/])\.browser-[^\\/]+(?:[\\/]|$)/,
-  // Only this project's export, never a dependency's runtime dist directory.
-  new RegExp("^(?:" + projectRootPattern + "[\\\\/]|\\.[\\\\/])?dist(?:[\\\\/]|$)"),
+  // Only this project's export/delivery archives, never dependency runtime folders.
+  new RegExp("^(?:" + projectRootPattern + "[\\\\/]|\\.[\\\\/])?(?:dist|artifacts)(?:[\\\\/]|$)"),
 ];
 
 module.exports = config;

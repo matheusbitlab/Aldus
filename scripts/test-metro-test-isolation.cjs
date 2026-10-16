@@ -21,6 +21,8 @@ for (const root of ['C:\\Kindle\\', '/tmp/aldus/', '', '.\\']) {
   }
 }
 for (const generated of ['dist/assets/fixture.js', 'dist\\assets\\fixture.js', '.\\dist\\assets\\fixture.js', path.resolve(__dirname, '../dist/assets/fixture.js')]) assert.ok(blocked(generated), 'Exclude project export: ' + generated);
+for (const generated of ['artifacts/delivery/web-preview/_expo/entry.js', 'artifacts\\apk\\app.apk', '.\\artifacts\\delivery\\index.html', path.resolve(__dirname, '../artifacts/delivery/index.html')]) assert.ok(blocked(generated), 'Exclude local delivery archive: ' + generated);
+assert.equal(blocked(path.resolve(__dirname, '../node_modules/package/artifacts/runtime.js')), false, 'Dependency artifact folders remain available');
 assert.ok(config.resolver.assetExts.includes('epub'));
 assert.ok(config.resolver.assetExts.includes('wasm'));
 assert.ok(rules.length > 1, 'Keep Expo default exclusions');
