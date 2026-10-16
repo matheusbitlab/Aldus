@@ -1,13 +1,13 @@
-const assert=require('node:assert/strict');const {fixture}=require('./admin-test-fixture.cjs');
+const assert=require('node:assert/strict');const {fixture,ownerEmail}=require('./admin-test-fixture.cjs');
 (async()=>{
  const {db,as,change,read,session,ids,id,before,legacy}=await fixture();
  assert.deepEqual((await db.query('select * from public.profiles order by id')).rows,before);
  assert.deepEqual((await db.query('select * from public.user_library_items order by kind,id')).rows,legacy.items);
  assert.deepEqual((await db.query('select * from storage.objects order by id')).rows,legacy.objects);
- await assert.rejects(()=>db.query("select aldus_admin_private.bootstrap_owner('matheusborbaifc@gmail.com',$1)",[ids.second]),/no rows/);
+ await assert.rejects(()=>db.query('select aldus_admin_private.bootstrap_owner($1,$2)',[ownerEmail,ids.second]),/no rows/);
  await assert.rejects(()=>db.query("select aldus_admin_private.bootstrap_owner('unverified@example.invalid',$1)",[ids.unverified]),/no rows/);
- await db.query("select aldus_admin_private.bootstrap_owner('matheusborbaifc@gmail.com',$1)",[ids.owner]);
- await assert.rejects(()=>db.query("select aldus_admin_private.bootstrap_owner('matheusborbaifc@gmail.com',$1)",[ids.owner]),/already completed/);
+ await db.query('select aldus_admin_private.bootstrap_owner($1,$2)',[ownerEmail,ids.owner]);
+ await assert.rejects(()=>db.query('select aldus_admin_private.bootstrap_owner($1,$2)',[ownerEmail,ids.owner]),/already completed/);
  await as('user');await assert.rejects(session,/denied/);await assert.rejects(()=>read('users'),/denied/);
  assert.equal((await change('member','user',0,{role:'OWNER',active:true,permissions:[]})).ok,false,'master+Pro is not admin');
  await assert.rejects(()=>db.exec("update public.aldus_admin_members set role='OWNER'"),/permission denied/);

@@ -1,7 +1,8 @@
 const fs=require('node:fs'),path=require('node:path');
 const {PGlite}=require(path.resolve('.expo/library-db-test/node_modules/@electric-sql/pglite'));
+const ownerEmail='owner@aldus.example.invalid';
 const ids={owner:'11111111-1111-4111-8111-111111111111',admin:'22222222-2222-4222-8222-222222222222',user:'33333333-3333-4333-8333-333333333333',unverified:'44444444-4444-4444-8444-444444444444',second:'55555555-5555-4555-8555-555555555555'};
-async function fixture(){
+async function fixture({quota=false}={}){
  const db=new PGlite();
  await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
  create schema auth; create schema storage;
@@ -17,7 +18,7 @@ async function fixture(){
  grant usage on sequence storage.objects_id_seq to authenticated;`);
  for(const file of ['202610060001_profiles_and_features.sql','202610110001_private_account_library.sql','202610110002_private_library_file_recovery.sql','20261015160539_library_active_account_fences.sql','20261015190705_saas_plans_entitlements.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'));
  for(const [name,id] of Object.entries(ids)){
-  await db.query('insert into auth.users(id,email,email_confirmed_at) values($1,$2,$3)',[id,name==='owner'?'matheusborbaifc@gmail.com':name+'@example.invalid',name==='unverified'?null:new Date().toISOString()]);
+  await db.query('insert into auth.users(id,email,email_confirmed_at) values($1,$2,$3)',[id,name==='owner'?ownerEmail:name+'@example.invalid',name==='unverified'?null:new Date().toISOString()]);
   await db.query("insert into auth.sessions(id,user_id,factor_id,aal) values($1,$1,$1,'aal2')",[id]);
   await db.query("insert into auth.mfa_factors values($1,$1,'verified','totp')",[id]);
  }
@@ -34,6 +35,7 @@ async function fixture(){
  const legacy={items:(await db.query('select * from public.user_library_items order by kind,id')).rows,objects:(await db.query('select * from storage.objects order by id')).rows};
  const migration=fs.readdirSync('supabase/migrations').find(f=>f.endsWith('_aldus_admin.sql'));
  await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
+ if(quota)await db.exec(fs.readFileSync('supabase/migrations/20261015215745_saas_quota_reservations.sql','utf8'));
  const as=async(name='owner',mfa=true,opts={})=>{
   await db.exec('reset role');const uid=ids[name]??name;
   await db.query("select set_config('request.jwt.claim.sub',$1,false),set_config('request.jwt.claims',$2,false)",[uid??'',JSON.stringify({sub:uid,session_id:opts.sessionId??uid,aal:mfa?'aal2':'aal1',amr:mfa?[{method:'totp',timestamp:Math.floor(Date.now()/1000)-(opts.age??0)}]:[],...opts.claims})]);
@@ -45,6 +47,6 @@ async function fixture(){
   opts.requestId??id(),action,ids[target]??target,revision,JSON.stringify(payload),opts.reason??'Controlled local regression',opts.confirmation??'CONFIRMAR '+(ids[target]??target)])).rows[0].r;
  const read=async(section,filters={})=>(await db.query('select public.aldus_admin_read($1,$2) as r',[section,JSON.stringify(filters)])).rows[0].r;
  const session=async()=>(await db.query('select public.aldus_admin_session() as r')).rows[0].r;
- return{db,as,change,read,session,ids,id,before,legacy};
+ return{db,as,change,read,session,ids,id,before,legacy,ownerEmail};
 }
-module.exports={fixture,ids};
+module.exports={fixture,ids,ownerEmail};
