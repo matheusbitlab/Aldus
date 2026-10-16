@@ -27,6 +27,13 @@ const member=()=>({version:1,userId:'A',role:'OWNER',permissions:[],recentMfa:tr
  sdk=async()=>identity();fetcher=async()=>({ok:true,json:async()=>({version:1,section:'users',source:'cache',data:{rows:[]}})});await assert.rejects(repo.read('users',{},signal()),/inválida/);
  fetcher=async(url,opts)=>{const body=JSON.parse(opts.body);assert.equal(body.p_expected_revision,3);assert.equal(body.p_confirmation,'CONFIRMAR target');return {ok:true,json:async()=>({ok:false,code:'conflict'})}};
  assert.equal((await repo.change('request','target',3,{action:'benefit',payload:{mode:'revoke'}},'Reason','CONFIRMAR target',signal())).code,'conflict');
+ for(const data of [{},{registeredUsers:0},{usage:{storageBytes:null},registrationsByDay:[]}]){
+  fetcher=async()=>({ok:true,json:async()=>({version:1,section:'overview',source:'server_database',data})});
+  await assert.rejects(repo.read('overview',{},signal()),e=>e.code==='invalid'&&e.message.includes('incompletos'));
+ }
+ const {isAdminMetrics}=load('src/admin/domain/contracts.ts');
+ const metrics={registeredUsers:5,newUsers:0,recentSignIns:0,freeAccounts:5,proAccounts:0,activeSubscriptions:5,expiredSubscriptions:0,manualProGrants:0,syncOperations:0,usage:{books:1,objects:1,unknownSizeObjects:0,storageBytes:1},averageStorageBytes:.2,registrationsByDay:[],observedAt:new Date().toISOString(),payments:{status:'not_integrated',mrr:null,arr:null,totalRevenue:null,cancellations:null,churn:null,transactions:null,events:null,refunds:null}};
+ assert.ok(isAdminMetrics(metrics),'A fractional mean is real data');assert.ok(!isAdminMetrics({...metrics,registeredUsers:undefined}));assert.ok(!isAdminMetrics({...metrics,payments:{...metrics.payments,mrr:0}}),'Unknown finance cannot become zero');
  const frontend=fs.readdirSync('src/admin/presentation').filter(f=>f.endsWith('tsx')).map(f=>fs.readFileSync('src/admin/presentation/'+f,'utf8')).join('\n');
  assert.ok(!frontend.includes('matheusborbaifc@gmail.com'));assert.ok(!frontend.includes('service_role'));
  assert.ok(fs.readFileSync('src/admin/presentation/AdminScreen.tsx','utf8').includes('access.session?<AdminContent'));

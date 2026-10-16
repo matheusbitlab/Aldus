@@ -1,7 +1,7 @@
 import { supabase } from '@/src/data/remote/supabase';
 import { libraryAccountScope } from '@/src/data/library/LibraryAccountScope';
 import { throwIfAborted,withAbort } from '@/src/core/utils/cancellation';
-import { AdminChangeResult,AdminCommand,AdminFilters,AdminResults,parseAdminSession } from '../domain/contracts';
+import { AdminChangeResult,AdminCommand,AdminFilters,AdminResults,isAdminMetrics,parseAdminSession } from '../domain/contracts';
 
 export class AdminError extends Error {
  constructor(readonly code:'denied'|'unavailable'|'invalid',message:string){super(message);}
@@ -31,6 +31,7 @@ export class AdminRepository {
  async read<K extends keyof AdminResults>(section:K,filters:AdminFilters,signal:AbortSignal):Promise<AdminResults[K]>{
   const result=await this.rpc('aldus_admin_read',{p_section:section,p_filters:filters},signal) as {version?:number;section?:string;source?:string;data?:unknown}|null;
   if(!result||result.version!==1||result.section!==section||result.source!=='server_database'||!('data' in result))throw new AdminError('invalid','Resposta administrativa inválida.');
+  if(['overview','metrics','subscriptions','storage','health'].includes(section)&&!isAdminMetrics(result.data))throw new AdminError('invalid','Dados administrativos incompletos. Atualize para consultar novamente.');
   return result.data as AdminResults[K];
  }
  async change(requestId:string,target:string,revision:number,command:AdminCommand,reason:string,confirmation:string,signal:AbortSignal):Promise<AdminChangeResult>{

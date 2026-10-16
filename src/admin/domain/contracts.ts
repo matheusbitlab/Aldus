@@ -11,6 +11,18 @@ export interface AdminMetrics {
  payments:{status:'not_integrated';mrr:null;arr:null;totalRevenue:null;cancellations:null;churn:null;transactions:null;events:null;refunds:null};
  health:Record<string,string>;registrationsByDay:{day:string;count:number}[];from:string;until:string;observedAt:string;
 }
+/** Reject incomplete metric snapshots; absence must never become fabricated zero. */
+export function isAdminMetrics(value:unknown):value is AdminMetrics {
+ const record=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
+ const count=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
+ if(!record(value)||!record(value.usage)||!record(value.payments))return false;
+ if(!['registeredUsers','newUsers','recentSignIns','freeAccounts','proAccounts','activeSubscriptions','expiredSubscriptions','manualProGrants','syncOperations'].every(k=>count(value[k])))return false;
+ if(!['books','objects','unknownSizeObjects'].every(k=>count((value.usage as Record<string,unknown>)[k])))return false;
+ if(!(value.usage.storageBytes===null||count(value.usage.storageBytes))||!(value.averageStorageBytes===null||(typeof value.averageStorageBytes==='number'&&Number.isFinite(value.averageStorageBytes)&&value.averageStorageBytes>=0&&value.averageStorageBytes<=Number.MAX_SAFE_INTEGER)))return false;
+ if(value.payments.status!=='not_integrated'||!['mrr','arr','totalRevenue','cancellations','churn','transactions','events','refunds'].every(k=>(value.payments as Record<string,unknown>)[k]===null))return false;
+ if(typeof value.observedAt!=='string'||!Number.isFinite(Date.parse(value.observedAt)))return false;
+ return Array.isArray(value.registrationsByDay)&&value.registrationsByDay.length<=1000&&value.registrationsByDay.every(d=>record(d)&&typeof d.day==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.day)&&Number.isFinite(Date.parse(d.day))&&count(d.count));
+}
 export interface AdminUserRow { id:string;display_name:string;username:string|null;email:string;account_status:'active'|'disabled';created_at:string;last_sign_in_at:string|null;effective_plan:string;revision:number }
 export interface AdminUserDetail {
  account:{id:string;displayName:string;username:string|null;email:string;emailVerified:boolean;status:'active'|'disabled';createdAt:string;lastSignInAt:string|null};
