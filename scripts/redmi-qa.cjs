@@ -16,6 +16,9 @@ const serial = devices[0].split(/\s/)[0];
 const run = (args, binary = false) => exec(['-s', serial, ...args], binary);
 const shell = (...args) => run(['shell', ...args.map(String)]);
 const input = (...args) => shell('input', ...args);
+const screenSizes = [...shell('wm', 'size').matchAll(/(?:Physical|Override) size: (\d+)x(\d+)/g)];
+assert.ok(screenSizes.length, 'Screen size unavailable');
+const [, screenWidth, screenHeight] = screenSizes.at(-1).map(Number);
 fs.mkdirSync(output, { recursive: true });
 const report = {
   at: new Date().toISOString(), command,
@@ -33,14 +36,14 @@ function nodes() {
   return [...xml.matchAll(/<node\b[^>]+>/g)].map(([tag]) => {
     const get = key => new RegExp(key + '="([^"]*)"').exec(tag)?.[1] || '';
     return { text: get('text'), label: get('content-desc'), package: get('package'), bounds: get('bounds').match(/\d+/g)?.map(Number) };
-  }).filter(n => n.package === packageName && n.bounds && n.bounds[2] > n.bounds[0] && n.bounds[3] > n.bounds[1]);
+  }).filter(n => n.package === packageName && n.bounds && n.bounds[2] > n.bounds[0] && n.bounds[3] > n.bounds[1] && n.bounds[0] < screenWidth && n.bounds[1] < screenHeight && n.bounds[2] > 0 && n.bounds[3] > 0);
 }
 function tap(label) {
   const all = nodes();
   const n = all.find(n => n.label === label) || all.find(n => n.text === label) || all.find(n => n.label.startsWith(label));
   assert.ok(n, 'Missing control: ' + label);
   const [l,t,r,b] = n.bounds;
-  input('tap', Math.round((l+r)/2), Math.round((t+b)/2));
+  input('tap', Math.round((Math.max(0,l)+Math.min(screenWidth,r))/2), Math.round((Math.max(0,t)+Math.min(screenHeight,b))/2));
 }
 const has = (all, text) => all.some(n => n.text === text || n.label === text);
 async function waitFor(predicate, timeout = 45000) {
