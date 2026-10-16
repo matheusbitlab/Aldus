@@ -8,8 +8,8 @@ Todas as próximas implementações devem partir da main, com commits e push par
 origin/main, salvo instrução explícita em contrário. A integração da Etapa 2 foi
 consolidada por fast-forward de 9cb5a968f0e5de9af0185e70a1e4fe3a8eba3e8f para
 9b3c6198e2f89430c8b50f8e7f49349f853c2f01, preservando os quatro commits
-502abc6, 34c589e, 5474b9c e 9b3c619. A única edição posterior desta consolidação
-é este documento; o HEAD final é obtido pelo Git, sem hash autorreferente.
+502abc6, 34c589e, 5474b9c e 9b3c619. A homologação posterior parte de
+c3c14689ee2a7aea8e3a1dd177c94ed3e1957c2b; o HEAD atual é obtido pelo Git.
 
 Histórico da consolidação anterior (Etapa 1): após fetch, main/origin/main estavam em
 52456d9740a6234db94508b3a3ed48ba3012d060,
@@ -857,13 +857,111 @@ da main e ser enviadas a origin/main, salvo instrução explícita em contrário
   SQLite real e driver HTTP controlado PASS, além de regressões de Sync/coordenador/
   cancelamento/transferência e UI. Typecheck e export Web PASS. Limites de fronteira
   usam catálogo reduzido em fixtures; os valores Free/Pro iniciais também são verificados.
-- PGlite usa PostgreSQL em WASM e serializa conexões: solicitações sobrepostas foram
-  testadas, mas isso não comprova disputa de locks entre sessões independentes. PostgreSQL
-  nativo e Docker não estavam disponíveis no PATH. Concorrência multi-sessão e Storage
-  HTTP autenticado real permanecem pendentes. Não inferir prova Android dos testes locais.
+- PGlite serializa conexões e não comprova disputa de locks. A homologação posterior
+  abaixo acrescentou PostgreSQL nativo com sessões independentes, sem Docker/serviço
+  global. Storage HTTP gerenciado e Android continuam pendentes.
 - Inventário remoto somente leitura reconfirmou ledger com 20261015144958,
   20261015145012 e 20261015145018. Antes de implantação autorizada: reconciliar schema,
   ledger e RLS/ACL/Storage da instância com os pré-requisitos incrementais (incluindo
   perfis ativos, SaaS 1 e Admin quando aplicável), testar A/B/disabled e probe/conclusão,
   tamanho real, reservas concorrentes, cancelamento/expiração e downgrade reais.
   Nenhuma migration remota, deploy, cobrança, limpeza destrutiva ou APK desta etapa.
+
+## Preparação final de homologação gratuita — 15/10/2026
+
+IMPLEMENTADO / VALIDADO LOCALMENTE; SERVIÇOS GERENCIADOS E RECUPERAÇÃO DE PRODUÇÃO PENDENTES.
+Trabalho em C:\Kindle, main. Sem alteração de app, migrations ou dependências de produção.
+Nenhum usuário/plano real modificado, APK, deploy ou cobrança.
+
+Ambiente: `npm run test:saas:setup` instala somente ferramentas isoladas em
+.expo/saas-tools, ignorado pelo Git, com lifecycle scripts desativados:
+@embedded-postgres/windows-x64 17.6.0-beta.15 (PostgreSQL 17.6) e pg 8.23.1.
+`npm run test:saas:postgres` cria cluster loopback, porta/senha aleatórias e SCRAM;
+não aceita URL de produção. Seis identidades sintéticas @aldus.example.invalid:
+A/B Free, C Pro, D desativada, OWNER e ADMIN. Nenhuma identidade pessoal copiada.
+Sem Docker, instalação global ou serviço persistente. Artefatos/dados ficam em .expo.
+
+As quatro incrementais originais passam nesta ordem sobre baseline compatível com os
+objetos relevantes do inventário remoto, preservando perfis e biblioteca sintética anterior:
+
+1. 20261015160539_library_active_account_fences.sql: profiles/biblioteca/recovery.
+2. 20261015190705_saas_plans_entitlements.sql: conta ativa/biblioteca.
+3. 20261015194604_aldus_admin.sql: SaaS 1, Auth sessions/factors.
+4. 20261015215745_saas_quota_reservations.sql: biblioteca/hardening/SaaS 1.
+
+Ledger sintético conserva o mapeamento histórico remoto Battle=20261015144958,
+biblioteca=20261015145012 e recovery=20261015145018, mais SHA256 das fontes.
+Reexecução controlada confere hashes. Falha intermediária injetada em cópia em memória
+da SaaS 1 reverte a transação/dados; nenhum arquivo de migration foi alterado.
+
+PostgreSQL nativo: 19 cenários PASS; cinco esperas reais em pg_blocking_pids com
+PIDs/sessões distintos: fronteira de livros, bytes reservados, retry do mesmo caminho,
+CAS administrativo e revogação cruzada de OWNER. Verificados catálogo comercial original,
+contagem/idempotência, rollback/probe, falha de gravação, tamanho divergente, resposta
+perdida, expiração/cancelamento/retorno tardio, downgrade/upgrade e estudos existentes.
+RLS A/B/anon/desativado, autopromoção Pro/admin, MFA recente, auditoria e último OWNER PASS.
+Administrador não lê conteúdo privado alheio. Papéis/claims SQL são controlados, não JWT
+verificado por GoTrue/PostgREST. Storage reproduz UUID/campos/índices parciais relevantes
+do remoto com versionamento desativado, sem implementar S3/API. Fronteiras 500 MiB/10 GiB
+usam metadata sintética: objeto físico tem nove bytes; não houve transferência de GB.
+
+Admin Web exportado: HTTP local e migrations em PGlite, dez seções, desktop/mobile,
+formulários de assinatura/entitlement/conta/administrador/preço/configuração/rollback,
+revogação, Pro sem papel administrativo, sessão/offline e aviso nos Ajustes PASS.
+TOTP controlado cobre enrollment/challenge/código inválido/válido; vetores RFC6238 PASS.
+Não equivale ao enrollment real Supabase. Capturas identificam dados sintéticos.
+Receita/MRR indisponíveis, sem vendas fictícias. E-mail pessoal removido das fixtures.
+O backend HTTP do ensaio Web Library foi atualizado para usar RPCs SQL reais das quatro
+incrementais, substituindo protocolo de fixture anterior sem reservas. Bytes são fixture
+HTTP; não é validação de Storage gerenciado. Matriz crítica 62/62, typecheck, export Web,
+suítes SaaS/quotas/Admin PASS; testes Web são reportados separadamente dos gates estáticos.
+Library Web PASS: duas origens/IndexedDB independentes, EPUB real sintético importado
+offline e reaberto, upload reservado/confirmado via SQL, livro somente na nuvem,
+download ao abrir no Reader, remoção só do dispositivo/reabertura, rollback de outbox,
+troca de conta e exclusão permanente solicitada no próprio ensaio sintético.
+
+Backup: scripts/saas-local-backup.cjs aceita somente cluster sintético marcado sob .expo.
+Para o servidor antes de copiar PG/WAL/config, separa objetos físicos e gera SHA256.
+Restauração em NOVO cluster 17.6 confere Auth/perfis/biblioteca/ledger/auditoria/bytes;
+backup adulterado é rejeitado. PASS local. Não comprova recuperação de produção.
+Esta distribuição não inclui pg_dump/pg_restore; não houve exportação remota nem prova
+de PITR/restore gerenciado. Auth/SMTP/OAuth/secrets/configuração do provedor precisam de
+inventário recuperável separado; dump SQL não contém objetos físicos. Exportação remota
+de dados pessoais exige aprovação específica, destino privado fora do Git e teste de
+restauração isolado. Implantação permanece pendente sem recuperação comprovável.
+
+Revalidação remota mínima somente leitura: cmivracxuihtmsbmtuec conserva duas contas,
+zero linhas biblioteca/receipts e zero objetos privados. Não são fixtures disponíveis.
+Quatro incrementais ainda pendentes. Supabase Free: teto global 50 MB/arquivo e 1 GB
+incluído por organização conforme Fase A, reconferir configurações antes de aplicar.
+Bucket privado 512 MiB não supera teto global. Catálogo Aldus preservado: Free 100/500 MiB
+com Sync/Storage gratuitos, Pro 2.000/10 GiB sem ativação comercial. Franquia comercial
+não garante capacidade agregada máxima de todos os usuários no provedor gratuito.
+
+`npm run saas:deployment:plan` somente lê Git/fontes/evidência, sem conectar ou executar
+SQL. Registra hashes/dependências/gates e piloto PROPOSTO: seis usuários descartáveis,
+arquivo até 256 KiB e total até 5 MiB, apenas após aprovação; não muda planos comerciais.
+Sequência mínima futura, com autorização explícita e parada em qualquer divergência:
+
+1. Autorizar backup/exportação necessários e comprovar recuperação; inventário final
+   mínimo ledger/objetos/RLS/ACL/bucket/configuração, confrontando definições históricas.
+2. Autorizar/aplicar incrementais na ordem acima; validar objetos/grants/definers/
+   search_path/dados por transação e registrar versão REAL/hash no histórico adotado.
+   apply_migration não recebe versão explícita: mapear versão retornada, sem repair por
+   tentativa/erro, db push indiscriminado ou reaplicação dos três históricos equivalentes.
+3. Autorizar contas sintéticas remotas e sessões reais A/B/disabled/anon; service_role
+   não representa usuários. Pilotar Storage privado, probe/commit/tamanho real, bypass,
+   reservas concorrentes/cancel/retry/expiração e reconciliação sem limpeza destrutiva.
+4. Conferir clientes antigos: novos uploads exigem reserva/finalização. Leitura/downloads
+   e alterações existentes preservados. Android antigo pode exigir atualização futura,
+   não gerada aqui. Nunca relaxar RLS para contornar incompatibilidade.
+5. Bootstrap OWNER requer aprovação SEPARADA, UUID real reconfirmado/e-mail verificado/
+   perfil ativo e ausência de bootstrap anterior. Proprietário faz login/enrollment TOTP/
+   verify; confirmar associação no banco e sessão real /admin, MFA/revogação/auditoria.
+6. Deploy Web requer autorização separada; /admin publicado indisponível na Fase A.
+   Aplicar SQL não publica a interface. Validar painel com backend real antes de ativar.
+
+Falha: parar e diagnosticar schema/ledger em leitura. Sem rollback de produção presumido,
+replay automático, relaxamento RLS, reset ou restore destrutivo não aprovado.
+Evidência ignorada: .expo/saas-homologation/result.json (hashes/locks/restore),
+deployment-plan.json, logs de testes/export e capturas admin-validation/library-sync-validation.

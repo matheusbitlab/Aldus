@@ -1,6 +1,6 @@
 # Aldus Reader — Bugs Atuais
 
-Atualizado em 15/10/2026. Branch integration/comunidade-literaria.
+Atualizado em 15/10/2026. Branch oficial main; integração antiga é somente histórica.
 Referência funcional: HEAD da branch/commit que contém esta atualização.
 Reconciliação Git: 7f50a9048876aec350186b594006c24f2bc73a22 é ancestral de
 ea30fabe26405db6e1cf9f9870814ad903c3b9f3; ambos já presentes no remoto da integração.
@@ -339,13 +339,38 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   de arquivos existentes continuam. Downgrade acima da cota não exclui nem oculta dados.
 - Evidência local: matriz crítica 62/62 PASS; 19 cenários SQL PGlite, SQLite/outbox e driver
   com HTTP controlado PASS; typecheck/export Web PASS. PGlite serializa solicitações:
-  concorrência em sessões PostgreSQL independentes não foi validada. PostgreSQL nativo/
-  Docker ausentes no PATH. Testes locais não comprovam Storage HTTP/Supabase autenticado.
+  a homologação posterior acrescentou PostgreSQL nativo 17.6 com sessões independentes
+  (19 cenários/cinco locks reais). Storage HTTP/Supabase autenticado continua pendente.
 - Ledger remoto reconfirmado somente leitura: 20261015144958/20261015145012/20261015145018.
   Não aplicar a nova SQL diretamente sem reconciliar schema real, ledger, pré-requisitos,
   RLS/ACL e versão do Storage. Pendente autorização/implantação e validação real de A/B,
   disabled, bypass direto, probes, tamanho real, disputa de capacidade, cancelamento,
   conclusão tardia, objeto órfão, downgrade e recuperação da fila.
 - Nenhum bug físico anterior foi encerrado por estes testes; nenhuma produção alterada.
-  Nenhum APK foi iniciado nesta etapa e nenhum pagamento ativado. Campanha somente na
-  integration/comunidade-literaria, preservando o padrão geral main e seus commits.
+  Nenhum APK foi iniciado nesta etapa e nenhum pagamento ativado. A implementação original
+  na integração foi consolidada; novas implementações usam main.
+
+### Homologação gratuita SaaS/Admin — bloqueios remotos remanescentes
+
+- VALIDADO LOCALMENTE: quatro incrementais originais em PostgreSQL 17.6 isolado,
+  biblioteca sintética anterior preservada, RLS/grants/RPCs/A-B/disabled/anon,
+  autopromoção Pro/ADMIN negada, downgrade/upgrade, reservas/idempotência e falhas.
+  19 cenários PASS, cinco disputas reais entre sessões, incluindo último OWNER/CAS Admin.
+- Admin Web: dez áreas/formulários, TOTP controlado, OWNER/delegação/Pro negado,
+  revogação/offline, auditoria, desktop/mobile PASS. E-mail pessoal retirado de fixtures.
+  Auth/JWT/TOTP e bytes HTTP são controlados: não declarar validação GoTrue/S3 real.
+- Ensaio de recuperação sintética PASS: cluster parado, SHA256, restauração em cluster
+  novo, Auth/perfis/metadata/ledger/auditoria e bytes separados; corrupção rejeitada.
+  Recuperação de PRODUÇÃO não comprovada. Sem exportação pessoal autorizada, pg_dump/
+  pg_restore portátil ou restore gerenciado. Implantação depende dessa prova e aprovação.
+- Remoto revalidado por contagem: duas contas reais, zero biblioteca/receipts/objetos;
+  não usar contas reais como fixtures. Quatro incrementais continuam pendentes.
+- Supabase Free: 50 MB/arquivo e 1 GB incluído por organização na Fase A, reconferir.
+  Não equivale ao catálogo Aldus Free 500 MiB/Pro 10 GiB. Pro comercial não habilitado.
+  Piloto remoto pequeno proposto, sem criação de projeto ou consumo pago.
+- PENDENTE AUTORIZAÇÃO: backup/exportação/restore isolado, incrementais/ledger, contas
+  descartáveis e Auth/RLS/Storage reais, bootstrap OWNER com UUID reconfirmado (separado)
+  e deploy Web (separado). Proprietário participa do login/TOTP; conferir protocolo de
+  uploads em clientes antigos antes de rollout. Sem mudanças remotas nesta missão.
+- Nenhum bug físico anterior encerrado. Sem APK/deploy/cobrança. Procedimento e evidência
+  detalhados em PROJECT_CONTEXT.md; main permanece a branch oficial.
