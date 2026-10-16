@@ -1,6 +1,6 @@
 # Aldus Reader — Contexto do Projeto
 
-Atualizado em 15/10/2026. Fonte única de contexto permanente para IA.
+Atualizado em 16/10/2026. Fonte única de contexto permanente para IA.
 Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código: HEAD atual da branch,
 identificado pelo Git e pelo build-info.json do export, sem hash autorreferente inventado.
 Branch oficial de desenvolvimento: main, por decisão do usuário em 15/10/2026.
@@ -18,7 +18,8 @@ Consolidação por fast-forward preservou todos os 34 commits adicionais, inclui
 correções do caderno, Auth/segurança, Library Sync, Drive, Flashcards/Battle, EPUB/PDF Reflow,
 SaaS Etapa 1 e migrations incrementais. Os commits SaaS 7bc7487, 0930ec3 e e8a2940 são
 ancestrais da main. A branch antiga permanece preservada; BUGS_ATUAIS.md não foi alterado.
-APK: PENDENTE DE BUILD CONSOLIDADO; nenhum APK gerado nesta campanha.
+APK release consolidado: pendente. Homologação debug autorizada em 16/10/2026;
+protocolo permanente e resultados Android estão na seção 15.
 
 ## 1. Visão geral
 
@@ -646,11 +647,28 @@ dois contextos. Transitivos/artefatos nativos exigem revisão própria antes de 
 
 ## 15. Build Android
 
+### Homologação física contínua — autorização de 16/10/2026
+
+O Redmi conectado via USB é o dispositivo oficial de homologação Android. O Codex deve utilizá-lo autonomamente para testes físicos sempre que disponível e relevante, preservando dados e distinguindo testes reais de simulações.
+
+Usar ADB e preferir development build/Metro compatíveis. APK debug temporário é autorizado
+para homologação, sem publicar release. Antes de atualizar, conferir package, versão e
+certificado da instalação. Nunca desinstalar, limpar dados, trocar applicationId ou substituir
+assinatura incompatível sem autorização específica. USB unauthorized exige confirmação
+no aparelho; não contornar bloqueio de tela. Preservar livros, arquivos, contas, preferências,
+progresso e outbox. Não ampliar essa autorização para produção, pagamentos ou privilégios.
+Resultados físicos devem identificar aparelho/Android, fonte/artefato, cenário e evidência;
+usar PASS físico, FAIL físico, PASS controlado, NÃO EXECUTADO ou BLOQUEADO. Um bug original
+só é encerrado após reproduzir o cenário original e validar sua correção no aparelho.
+Configurações temporárias do sistema usadas nos ensaios devem ser registradas localmente
+e restauradas. Não versionar capturas com notificações externas ou conteúdo pessoal.
+
 Package com.aldus.reader, scheme aldus; applicationId antigo com.kindle.reader não compartilha
 automaticamente dados privados com o novo. Versão/code genéricos não identificam um commit.
 Infra local: android/ versionado, JDK 17 e SDK/build-tools/NDK declarados no Gradle.
 Comandos existentes: npm run build:apk:local, build:apk:archive e build:apk (EAS preview APK).
-Somente executar quando solicitado; não gerar APK por commit automaticamente.
+Build de distribuição somente quando solicitado; a autorização de homologação acima
+permite build debug quando necessário aos testes físicos, sem gerar release por commit.
 O guard de variáveis públicas é compartilhado entre export Web e wrapper Android,
 antes de embutir JS; configuração insegura impede build sem imprimir valores.
 
@@ -660,7 +678,8 @@ Artefatos ficam ignorados em artifacts/apk e não entram no Git; identidade exig
 tamanho, assinatura, package e fonte/bundle correspondente. Compilar não comprova instalação
 ou funcionamento. Atualização física preserva dados; não desinstalar/limpar como diagnóstico.
 JS pode usar Metro em development build compatível; APK release requer build consolidado
-futuro para incluir o novo bundle. Esta campanha explicitamente não gera APK.
+futuro para incluir o novo bundle. A missão SaaS anterior não gerou APK; os testes físicos
+autorizados em 16/10 permitem apenas o debug temporário descrito acima.
 
 Wrapper local Windows usa caminho absoluto de gradlew.bat, com quoting para espaços e
 windowsVerbatimArguments. Corrigido lookup quando NoDefaultCurrentDirectoryInExePath=1;
