@@ -11,6 +11,9 @@ export class AccountPlanController<T = AccountPlanView> {
   snapshot = () => this.state;
   private emit(state: PlanViewState<T>) { this.state = state; for (const fn of this.listeners) fn(); }
   cancel = () => { this.ticket++; this.pending?.abort(); this.pending = null; this.emit({ owner: null, generation: -1, loading: false, data: null, error: null, updatedAt: null }); };
+  unavailable = (error: PlanFailure) => {
+    this.cancel(); this.emit({ ...this.state, owner: this.scope.userId, generation: this.scope.generation, error });
+  };
   async refresh() {
     this.cancel(); const ticket = this.ticket, run = this.scope.capture(), controller = new AbortController(); this.pending = controller;
     if (!run.userId) return;

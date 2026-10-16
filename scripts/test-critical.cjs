@@ -3,7 +3,7 @@ const { spawnSync } = require('node:child_process');
 const tests = [
   'admin-security', 'admin-client',
   'saas-quotas', 'saas-quota-client', 'saas-quota-driver',
-  'saas-schema', 'saas-client', 'saas-compatibility',
+  'saas-schema', 'saas-client', 'saas-compatibility', 'saas-experience', 'saas-ui',
   'auth', 'auth-flows', 'auth-callback', 'username-login', 'integrated-security', 'battle-account',
   'flashcards', 'flashcard-scoring', 'flashcard-storage', 'flashcard-sessions', 'flashcard-ui', 'flashcard-battles',
   'library-account', 'library-sync', 'library-remote', 'library-cancellation', 'library-files', 'library-reading-sync', 'library-coordinator', 'library-restart', 'library-rls', 'library-ui', 'library-organization',

@@ -6,11 +6,12 @@ const makeLoader = require('./community-test-loader.cjs');
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const palette={text:'#111111',secondaryText:'#555555',accent:'#ab6543',surface:'#ffffff',panel:'#ffffff',border:'#dddddd',separator:'#dddddd'};
 let auth={user:{id:'A'},profile:{id:'A',username:'reader',account_status:'active'}}, availability='LOCAL_AND_CLOUD';
-const removed=[],deleted=[],shares=[],merged=[];
+const removed=[],deleted=[],shares=[],merged=[],routes=[];
 const record=id=>({bookId:id,favorite:true,collections:['Literatura'],tags:['Leitura'],series:'',volume:null,readingStatus:'reading',updatedAt:1,revision:1});
 let records={book:record('book')}, list=async()=>records;
 const sync={subscribe:()=>()=>{},version:0,availability:()=>availability,removeDeviceCopy:async id=>removed.push(id),schedule:()=>{}};
 const mocks={
+  'expo-router':{router:{push:route=>routes.push(route)}},
   react:React,'react/jsx-runtime':require('../.expo/auth-test-tools/node_modules/react/jsx-runtime'),
   'react-native':{View:'View',Text:'Text',Pressable:'Pressable',ScrollView:'ScrollView',Modal:'Modal',TextInput:'TextInput',Platform:{OS:'android'},Share:{share:async value=>shares.push(value)},StyleSheet:{create:x=>x}},
   '@expo/vector-icons':{Ionicons:'Ionicons'},
@@ -19,7 +20,7 @@ const mocks={
   '@/src/presentation/contexts/AuthContext':{useAuth:()=>auth},
   '@/src/presentation/services/dependencies':{appDependencies:{librarySync:sync,bookRepository:{softDelete:async id=>deleted.push(id),listActive:async()=>[{id:'book'}]}},libraryOrganization:{list:()=>list(),merge:async(...args)=>{merged.push(args);return {imported:1,conflicts:0};}}},
   '@/src/presentation/stores/libraryStore':{useLibraryStore:{getState:()=>({refresh:async()=>{}})}},
-  '@/src/data/library/LibrarySyncCoordinator':{availabilityLabels:{LOCAL_AND_CLOUD:'Neste dispositivo e na nuvem',UPLOADING:'Enviando',CLOUD_ONLY:'Na nuvem'}},
+  '@/src/data/library/LibrarySyncCoordinator':{availabilityLabels:{LOCAL_AND_CLOUD:'Neste dispositivo e na nuvem',UPLOADING:'Enviando',CLOUD_ONLY:'Na nuvem',QUOTA_BLOCKED:'Envio aguardando franquia'}},
   '@/src/data/library/LibrarySyncPayload':{libraryMutationEvents:{}},
   '@/src/presentation/components/legal/LegalDocumentScreen':{LegalDocumentScreen:({footer})=>React.createElement('View',null,footer)},
 };
@@ -38,6 +39,7 @@ async function render(component,props){if(renderer)await act(async()=>renderer.u
   await render(BookCloudControls,{book:{...book,bundledAssetId:'bundled'}});await press(`Ações de ${book.title}`);assert.equal(button('Remover deste dispositivo').props.disabled,true);
   availability='UPLOADING';await render(BookCloudControls,{book});await press(`Ações de ${book.title}`);assert.equal(button('Remover da minha biblioteca').props.disabled,true);
   availability='LOCAL_AND_CLOUD';
+  availability='QUOTA_BLOCKED';await render(BookCloudControls,{book});await press('Ver franquia em Meu Plano');assert.equal(routes.at(-1),'/plan');availability='LOCAL_AND_CLOUD';
 
   auth={user:null,profile:null};await render(DataScreen);assert.ok(!button('Exportar meus dados'),'public legal route does not export account data');
   auth={user:{id:'A'},profile:{id:'A',username:'reader',account_status:'active'}};await render(DataScreen);await press('Exportar meus dados');await press('Exportar organização');

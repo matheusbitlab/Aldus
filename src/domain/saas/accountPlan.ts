@@ -50,7 +50,7 @@ export function parsePlanCatalog(rows: unknown, featureRows: unknown): CatalogPl
         || !/^[a-z][a-z0-9_]{1,63}$/.test(item.feature) || ['__proto__', 'constructor', 'prototype'].includes(item.feature)
         || typeof item.enabled !== 'boolean') throw new Error('Recursos inválidos.');
       if (item.plan_id === row.id) {
-        if (Object.hasOwn(features, item.feature)) throw new Error('Recurso duplicado.');
+        if (Object.prototype.hasOwnProperty.call(features, item.feature)) throw new Error('Recurso duplicado.');
         features[item.feature] = item.enabled;
       }
     }

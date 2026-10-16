@@ -1,6 +1,6 @@
 import { supabase } from '@/src/data/remote/supabase';
 import { libraryAccountScope } from '@/src/data/library/LibraryAccountScope';
-import { SupabaseLibraryAdapter } from '@/src/data/library/SupabaseLibraryAdapter';
+import { LibraryRemoteError, SupabaseLibraryAdapter } from '@/src/data/library/SupabaseLibraryAdapter';
 import { throwIfAborted, withAbort } from '@/src/core/utils/cancellation';
 import { AccountPlanResolution, AccountPlanView, CatalogPlan, parseAccountPlan, parsePlanCatalog, PlanReadError } from '@/src/domain/saas/accountPlan';
 import { assertPlanUsage } from '@/src/domain/saas/planPresentation';
@@ -46,6 +46,8 @@ export class SupabaseAccountPlanRepository {
   }
   async readExperience(signal: AbortSignal): Promise<AccountPlanView> {
     const run = libraryAccountScope.capture();
+    throwIfAborted(signal);
+    if (!supabase || !run.userId) throw new PlanReadError('unavailable');
     try {
       const [account, quota] = await Promise.all([
         this.snapshot(signal), new SupabaseLibraryAdapter().quota(run.userId!, signal),
@@ -55,6 +57,7 @@ export class SupabaseAccountPlanRepository {
     } catch (error) {
       throwIfAborted(signal); run.check();
       if (error instanceof PlanReadError) throw error;
+      if (error instanceof LibraryRemoteError && error.code === 'contract') throw new PlanReadError('unavailable');
       const code = (error as { code?: string })?.code;
       throw new PlanReadError(code === 'session' || code === 'authorization' || code === 'network' ? code : 'contract');
     }

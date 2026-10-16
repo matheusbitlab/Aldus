@@ -19,6 +19,7 @@ export default function Account() {
       <Text style={{ color: palette.secondaryText }}>{user?.email}</Text>
     </View>
     <AuthButton title="Editar perfil" icon="create-outline" onPress={() => router.push("/account/edit-profile" as never)} />
+    <AuthButton title="Meu Plano" icon="cloud-outline" secondary onPress={() => router.push('/plan' as never)} />
     <AuthButton title="Alterar senha" icon="lock-closed-outline" secondary onPress={() => router.push("/account/change-password" as never)} />
     <AuthButton title="Sair" icon="log-out-outline" secondary onPress={() => void signOut().then(() => router.replace("/auth/login" as never)).catch(failure => setError(failure instanceof Error ? failure.message : "Não foi possível sair."))} />
     {error ? <Text accessibilityRole="alert" style={{ color: palette.accent }}>{error}</Text> : null}

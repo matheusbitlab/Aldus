@@ -10,7 +10,7 @@ export function formatBytes(value: number | null): string {
   if (value === null || !Number.isSafeInteger(value) || value < 0) return 'Em verificação';
   const units = ['bytes', 'KiB', 'MiB', 'GiB', 'TiB']; let size = value, unit = 0;
   while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit++; }
-  return `${size.toLocaleString('pt-BR', { maximumFractionDigits: unit ? 2 : 0 })} ${units[unit]}`;
+  return `${size.toLocaleString('pt-BR', { maximumFractionDigits: unit ? 2 : 0 })} ${unit === 0 && size === 1 ? 'byte' : units[unit]}`;
 }
 export const progressPercent = (used: number | null, limit: number): number | null =>
   used === null || !Number.isFinite(used) || used < 0 || !Number.isFinite(limit) || limit <= 0 ? null : Math.min(100, Math.max(0, used / limit * 100));
@@ -25,6 +25,7 @@ export function subscriptionLabel(plan: AccountPlanSnapshot, now = Date.now()): 
 }
 export function assertPlanUsage(plan: AccountPlanSnapshot, quota: QuotaSnapshot, now = Date.now()) {
   if (plan.userId !== quota.userId || plan.effectivePlan !== quota.effectivePlan
+    || plan.limits.syncedBooks <= 0 || plan.limits.storageBytes <= 0
     || plan.limits.syncedBooks !== quota.limits.syncedBooks || plan.limits.storageBytes !== quota.limits.storageBytes
     || (plan.effectivePlan !== 'free' && (plan.subscription.planId !== plan.effectivePlan
       || !['active', 'trialing'].includes(plan.subscription.status) || Date.parse(plan.subscription.startsAt) > now

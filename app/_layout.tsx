@@ -41,7 +41,7 @@ function AppShell() {
   const insets = useSafeAreaInsets();
   const { palette, resolvedTheme } = useAppTheme();
   const { loading, session, profile } = useAuth();
-  const usePhoneFrame = Platform.OS === "web" && width > 480 && String(segments[0]) !== "admin";
+  const usePhoneFrame = Platform.OS === "web" && width > 480 && !['admin','plan'].includes(String(segments[0]));
   const appReady = !loading && !!session && !!profile?.username && profile.account_status === "active";
   useEffect(()=>{
     if(!appReady)return;
@@ -93,6 +93,8 @@ function AppShell() {
                 <Stack.Screen name="account/index" />
                 <Stack.Screen name="account/edit-profile" />
                 <Stack.Screen name="account/change-password" />
+                <Stack.Screen name="plan/index" />
+                <Stack.Screen name="plan/compare" />
                 <Stack.Screen name="community" />
                 <Stack.Screen name="admin/index" />
               </Stack.Protected>

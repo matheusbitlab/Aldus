@@ -36,6 +36,10 @@ export default function Settings() {
       >
         <Text style={[styles.pageTitle, { color: palette.text }]}>Ajustes</Text>
         <AdminEntry />
+        <Section title="MEU PLANO" color={palette.secondaryText}><View style={[styles.group,{backgroundColor:palette.surface,borderColor:palette.border}]}>
+          <SettingsRow icon="cloud-outline" title="Meu Plano" description="Plano, armazenamento privado e franquias" color={palette.text} secondaryColor={palette.secondaryText} onPress={()=>router.push('/plan' as never)}/>
+          <SettingsRow icon="layers-outline" title="Comparar Planos" description="Capacidade e benefícios do catálogo Aldus" color={palette.text} secondaryColor={palette.secondaryText} onPress={()=>router.push('/plan/compare' as never)} last/>
+        </View></Section>
         <Section title="BIBLIOTECA DA CONTA" color={palette.secondaryText}><View style={[styles.group,{backgroundColor:palette.surface,borderColor:palette.border}]}><LibrarySyncControls/></View></Section>
 
         <Section title="APARÊNCIA" color={palette.secondaryText}>
@@ -194,7 +198,7 @@ function SettingsRow({
   last?: boolean;
 }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.actionRow}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityHint={description} onPress={onPress} style={styles.actionRow}>
       <Ionicons name={icon} size={21} color={color} />
       <View style={styles.actionCopy}>
         <Text style={[styles.rowTitle, { color }]}>{title}</Text>
