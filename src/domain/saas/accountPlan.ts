@@ -1,3 +1,4 @@
+import type { QuotaSnapshot } from './quota';
 /** Server-owned quotas. No local catalog, subscription writes or JWT plan claims. */
 export const BASE_FEATURES = [
   'local_reading', 'book_import', 'library_sync', 'progress_sync',
@@ -22,6 +23,44 @@ export interface AccountPlanSnapshot {
 export type AccountPlanResolution =
   | { source: 'server_database'; snapshot: AccountPlanSnapshot }
   | { source: 'unavailable'; snapshot: null };
+
+/** Read-only projection of the existing server catalog, shared with Aldus Admin. */
+export interface CatalogPlan {
+  id: string; name: string; priceBrlCentavos: number | null; annualBrlCentavos: number | null;
+  limits: AccountPlanSnapshot['limits']; features: AccountPlanSnapshot['features'];
+}
+export type PlanFailure = 'session' | 'authorization' | 'unavailable' | 'network' | 'contract';
+export class PlanReadError extends Error { constructor(readonly code: PlanFailure) { super(code); } }
+export interface AccountPlanView { account: AccountPlanSnapshot; quota: QuotaSnapshot; }
+export function parsePlanCatalog(rows: unknown, featureRows: unknown): CatalogPlan[] {
+  if (!Array.isArray(rows) || !Array.isArray(featureRows) || !rows.length) throw new Error('Catálogo indisponível.');
+  if (rows.some(row => !record(row) || typeof row.available !== 'boolean') || rows.length >= 100 || featureRows.length >= 10000) throw new Error('Catálogo incompleto.');
+  const ids = new Set<string>();
+  const plans = rows.filter(row => record(row) && row.available === true).map(row => {
+    if (!record(row) || typeof row.id !== 'string' || !/^[a-z][a-z0-9_]{1,63}$/.test(row.id)
+      || ids.has(row.id) || typeof row.name !== 'string' || !row.name.trim()
+      || !(row.price_brl_centavos === null || count(row.price_brl_centavos))
+      || !(row.annual_brl_centavos == null || count(row.annual_brl_centavos))
+      || !count(row.synced_books) || !count(row.storage_bytes) || !row.synced_books || !row.storage_bytes
+      || (row.id === 'free' && row.price_brl_centavos !== 0)) throw new Error('Catálogo inválido.');
+    ids.add(row.id);
+    const features: Record<string, boolean> = {};
+    for (const item of featureRows) {
+      if (!record(item) || typeof item.plan_id !== 'string' || typeof item.feature !== 'string'
+        || !/^[a-z][a-z0-9_]{1,63}$/.test(item.feature) || ['__proto__', 'constructor', 'prototype'].includes(item.feature)
+        || typeof item.enabled !== 'boolean') throw new Error('Recursos inválidos.');
+      if (item.plan_id === row.id) {
+        if (Object.hasOwn(features, item.feature)) throw new Error('Recurso duplicado.');
+        features[item.feature] = item.enabled;
+      }
+    }
+    if (BASE_FEATURES.some(feature => features[feature] !== true)) throw new Error('Recursos essenciais indisponíveis.');
+    return { id: row.id, name: row.name, priceBrlCentavos: row.price_brl_centavos, annualBrlCentavos: row.annual_brl_centavos ?? null,
+      limits: { syncedBooks: row.synced_books, storageBytes: row.storage_bytes }, features } as CatalogPlan;
+  });
+  if (!plans.length) throw new Error('Catálogo indisponível.');
+  return plans.sort((a, b) => a.id === 'free' ? -1 : b.id === 'free' ? 1 : a.limits.syncedBooks - b.limits.syncedBooks);
+}
 
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

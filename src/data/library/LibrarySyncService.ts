@@ -90,7 +90,10 @@ export class LibrarySyncService {
     });
   }
   async quotaBlock(key: string, snapshot?: LibrarySyncState | null): Promise<string | null> {
-    const state=snapshot===undefined?await this.snapshot():snapshot,block=state?.quotaBlocks?.[key];
+    return this.quotaBlockMessage(key,snapshot===undefined?await this.snapshot():snapshot);
+  }
+  quotaBlockMessage(key: string, state: LibrarySyncState | null): string | null {
+    const block=state?.quotaBlocks?.[key];
     return block && (this.quotaKey==='unavailable' || block.signature===this.quotaKey) ? block.message : null;
   }
   async blockQuota(key: string, message: string) {

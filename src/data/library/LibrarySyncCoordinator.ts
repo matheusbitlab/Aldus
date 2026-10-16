@@ -9,8 +9,8 @@ import { LibraryAccountScope, libraryAccountScope } from './LibraryAccountScope'
 import { libraryMutationEvents } from './LibrarySyncPayload';
 import { findBundledAsset } from './BundledBookIdentity';
 
-export type LibraryAvailability = 'LOCAL' | 'SYNC_PENDING' | 'UPLOADING' | 'SYNCED' | 'CLOUD_ONLY' | 'DOWNLOADING' | 'ERROR';
-export const availabilityLabels: Record<LibraryAvailability,string> = { LOCAL:'Neste dispositivo', SYNC_PENDING:'Sincronização pendente', UPLOADING:'Enviando arquivo…', SYNCED:'Sincronizado', CLOUD_ONLY:'Na nuvem · baixar ao abrir', DOWNLOADING:'Baixando arquivo…', ERROR:'Falha na sincronização' };
+export type LibraryAvailability = 'LOCAL' | 'SYNC_PENDING' | 'UPLOADING' | 'SYNCED' | 'CLOUD_ONLY' | 'DOWNLOADING' | 'ERROR' | 'CONFLICT' | 'QUOTA_BLOCKED';
+export const availabilityLabels: Record<LibraryAvailability,string> = { LOCAL:'Neste dispositivo', SYNC_PENDING:'Sincronização pendente', UPLOADING:'Enviando arquivo…', SYNCED:'Sincronizado na nuvem', CLOUD_ONLY:'Na nuvem · baixar ao abrir', DOWNLOADING:'Baixando arquivo…', ERROR:'Falha na sincronização', CONFLICT:'Conflito · revisar sincronização', QUOTA_BLOCKED:'Envio aguardando franquia' };
 
 /** Account-scoped orchestration. UI never accesses Storage or database REST directly. */
 export class LibrarySyncCoordinator {
@@ -38,11 +38,16 @@ export class LibrarySyncCoordinator {
   private needsFile(book:LibraryBook){return !book.isDeleted && book.importComplete!==false && !book.remotePath && !!book.filePath && !(book.bundledAssetId && findBundledAsset(book.bundledAssetId)?.hash===book.fileHash);}
   async refresh(){const run=this.scope.capture();const [state,books]=await Promise.all([this.engine.snapshot(),this.books.listOwned()]);run.check();this.state=state;this.status={...this.status,pendingFiles:books.filter(book=>this.needsFile(book)||(book.isDeleted&&!book.remoteCleanupDone)).length};await this.engine.refreshStatus();run.check();this.emit();}
   availability(book:LibraryBook):LibraryAvailability {
-    const transfer=this.files.states.get(book.id);if(transfer)return transfer.state;
+    if(book.ownerUserId!==this.scope.userId)return 'LOCAL';
     const entries=Object.values(this.state?.entries??{}).filter(e=>e.bookId===book.id);
-    if(!book.filePath)return 'CLOUD_ONLY';
+    if(entries.some(e=>e.conflict))return 'CONFLICT';
+    if(this.engine.quotaBlockMessage('file:'+book.id,this.state) || entries.some(e=>this.engine.quotaBlockMessage(e.key,this.state)))return 'QUOTA_BLOCKED';
+    const transfer=this.files.states.get(book.id);if(transfer)return transfer.state;
+    const confirmed=this.state?.entries[syncKey('book',book.id)]?.shadow;
+    const cloudConfirmed=!!book.remotePath && !confirmed?.deleted_at && confirmed?.payload.remotePath===book.remotePath;
+    if(!book.filePath)return cloudConfirmed?'CLOUD_ONLY':'SYNC_PENDING';
     if(book.syncUnjournaled || entries.some(e=>e.dirty||e.conflict) || this.needsFile(book))return 'SYNC_PENDING';
-    return this.state?.entries[syncKey('book',book.id)]?.shadow ? 'SYNCED':'LOCAL';
+    return cloudConfirmed ? 'SYNCED':'LOCAL';
   }
   async retryQuota(){await this.engine.retryQuota();return this.syncNow();}
   syncNow():Promise<void>{
