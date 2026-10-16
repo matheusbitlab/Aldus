@@ -10,6 +10,7 @@ import { libraryMutationEvents } from '@/src/data/library/LibrarySyncPayload';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { formatBytes } from '@/src/domain/saas/planPresentation';
+import { planLabel,numberLabel } from '@/src/presentation/i18n/ptBR';
 
 export function useLibrarySync(){const sync=appDependencies.librarySync;useSyncExternalStore(sync.subscribe,()=>sync.version,()=>sync.version);return sync;}
 const entityLabels:Record<LibraryEntityKind,string>={book:'Livro',progress:'Posição de leitura',bookmark:'Marcador e nota',highlight:'Grifo e comentário',organization:'Organização',pdf_position:'Posições do PDF'};
@@ -24,12 +25,12 @@ export function LibrarySyncControls({showPlanLink=true,showQuotaSummary=true}:{s
   const pending=sync.engine.status.pending+sync.status.pendingFiles;
   return <View style={{gap:10}}>
     <Text style={{color:palette.text,fontWeight:'600'}}>Sincronização da biblioteca</Text>
-    <Text style={{color:palette.secondaryText}}>{sync.status.running?'Sincronizando…':pending?`${pending} operações pendentes`:sync.engine.status.lastSync?'Sincronizada':'Ainda não sincronizada'}{sync.engine.status.conflicts?` · ${sync.engine.status.conflicts} conflitos`:''}</Text>
+    <Text style={{color:palette.secondaryText}}>{sync.status.running?'Sincronizando…':pending?`${numberLabel(pending)} ${pending===1?'operação pendente':'operações pendentes'}`:sync.engine.status.lastSync?'Sincronizada':'Ainda não sincronizada'}{sync.engine.status.conflicts?` · ${numberLabel(sync.engine.status.conflicts)} ${sync.engine.status.conflicts===1?'conflito':'conflitos'}`:''}</Text>
     <Text style={{color:palette.secondaryText,fontSize:12}}>Última sincronização: {sync.engine.status.lastSync?new Date(sync.engine.status.lastSync).toLocaleString('pt-BR'):'—'}</Text>
     <Text style={{color:palette.secondaryText,fontSize:12}}>Livros e dados de leitura são sincronizados privadamente com sua conta. Sem conexão, alterações ficam pendentes; arquivos de outro dispositivo são baixados ao abrir.</Text>
     {(error||sync.status.error||sync.engine.status.error||libraryMutationEvents.error)?<Text accessibilityRole="alert" style={{color:palette.accent}}>{error||sync.status.error||sync.engine.status.error||libraryMutationEvents.error}</Text>:null}
     {showQuotaSummary&&sync.engine.quota?<Text style={{color:palette.secondaryText,fontSize:12}}>
-      {'Plano '+sync.engine.quota.effectivePlan+': '+sync.engine.quota.usage.syncedBooks+'/'+sync.engine.quota.limits.syncedBooks+' livros. '}
+      {'Plano '+planLabel(sync.engine.quota.effectivePlan)+': '+numberLabel(sync.engine.quota.usage.syncedBooks)+'/'+numberLabel(sync.engine.quota.limits.syncedBooks)+' livros. '}
       {formatBytes(sync.engine.quota.usage.storageBytes)+' usados'}
       {'. '+formatBytes(sync.engine.quota.usage.reservedBytes)+' reservados em '+sync.engine.quota.usage.reservedUploads+' envios. '}
       {formatBytes(sync.engine.quota.remaining.storageBytes)+' disponíveis'}

@@ -1,3 +1,4 @@
+import { planLabel } from '@/src/presentation/i18n/ptBR';
 import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -77,11 +78,11 @@ export function MyPlanScreen() {
     <View style={styles.actions}><PlanButton title="Atualizar plano e consumo" disabled={state.loading} onPress={() => void state.refresh()} /><PlanButton title="Comparar Planos" onPress={() => router.push('/plan/compare' as never)} /></View>
     {state.loading ? <View accessibilityLiveRegion="polite" style={styles.loading}><ActivityIndicator color={palette.accent} /><Copy>Consultando plano e consumo…</Copy></View> : !data ? <Failure error={state.error} refresh={state.refresh} /> : null}
     {account && quota ? <>
-      <Section title={account.plan.name}>
-        <Copy>Plano efetivo · {account.plan.name}</Copy><Copy>Estado da assinatura · {subscriptionLabel(account)}</Copy>
-        {account.effectivePlan === 'free' ? <Copy muted>Free é um plano permanente e gratuito. Sync e armazenamento privado fazem parte dele.</Copy> : <Copy muted>Este acesso não comprova pagamento. A contratação comercial ainda não está disponível.</Copy>}
+      <Section title={planLabel(account.effectivePlan, account.plan.name)}>
+        <Copy>Plano efetivo · {planLabel(account.effectivePlan, account.plan.name)}</Copy><Copy>Estado da assinatura · {subscriptionLabel(account)}</Copy>
+        {account.effectivePlan === 'free' ? <Copy muted>O plano Gratuito é permanente. Sincronização e armazenamento privado fazem parte dele.</Copy> : <Copy muted>Este acesso não comprova pagamento. A contratação comercial ainda não está disponível.</Copy>}
         <Copy muted>{account.subscription.grantSource === 'trusted_backend' ? 'Origem da concessão: administração do Aldus.' : 'Origem da concessão: atribuição automática do servidor.'}</Copy>
-        {account.subscription.planId !== account.effectivePlan ? <Copy muted>A concessão de {account.subscription.planId} não está vigente. O plano efetivo acima determina a franquia atual.</Copy> : null}
+        {account.subscription.planId !== account.effectivePlan ? <Copy muted>A concessão de {planLabel(account.subscription.planId)} não está vigente. O plano efetivo acima determina a franquia atual.</Copy> : null}
         {account.subscription.endsAt ? <Copy>Fim da concessão: {dateLabel(account.subscription.endsAt)}</Copy> : null}
         <Copy muted>Fonte: servidor autenticado · Consultado em {state.updatedAt ? new Date(state.updatedAt).toLocaleTimeString('pt-BR') : '—'}</Copy>
       </Section>
@@ -90,7 +91,7 @@ export function MyPlanScreen() {
         <Copy muted>Livros disponíveis na franquia: {quota.remaining.syncedBooks.toLocaleString('pt-BR')}</Copy>
         <View style={[styles.divider, { backgroundColor: palette.border }]} />
         <Meter title="Armazenamento utilizado" used={quota.usage.storageBytes} limit={quota.limits.storageBytes} reserved={quota.usage.reservedBytes} bytes />
-        <Copy>Reservado para uploads: {formatBytes(quota.usage.reservedBytes)} · {quota.usage.reservedUploads} uploads reservados</Copy>
+        <Copy>Reservado para envios: {formatBytes(quota.usage.reservedBytes)} · {quota.usage.reservedUploads.toLocaleString('pt-BR')} {quota.usage.reservedUploads===1?'envio reservado':'envios reservados'}</Copy>
         <Copy>Espaço disponível: {formatBytes(quota.remaining.storageBytes)}</Copy>
         <Copy muted>Arquivos registrados na nuvem: {quota.usage.objects.toLocaleString('pt-BR')}</Copy>
         {quota.usage.storageBytes !== null && quota.usage.storageBytes > quota.limits.storageBytes ? <Copy>Excesso de armazenamento: {formatBytes(quota.usage.storageBytes - quota.limits.storageBytes)}</Copy> : null}
@@ -108,7 +109,7 @@ export function MyPlanScreen() {
 function CatalogCard({ plan }: { plan: CatalogPlan }) {
   const { palette } = useAppTheme();
   return <View style={[styles.catalog, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-    <Text accessibilityRole="header" style={[styles.sectionTitle, { color: palette.text }]}>{plan.name}</Text>
+    <Text accessibilityRole="header" style={[styles.sectionTitle, { color: palette.text }]}>{planLabel(plan.id, plan.name)}</Text>
     <Text style={{ color: palette.text, fontSize: 22, fontWeight: '600' }}>{catalogPrice(plan)}</Text>
     {plan.priceBrlCentavos !== null && plan.id !== 'free' ? <Copy muted>Valor mensal de catálogo, apenas informativo.</Copy> : null}
     {plan.annualBrlCentavos !== null ? <Copy muted>Catálogo anual: {(plan.annualBrlCentavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Valor informativo.</Copy> : null}
@@ -123,7 +124,7 @@ export function ComparePlansScreen() {
   return <Layout title="Comparar Planos" subtitle="A leitura é para todos. Compare a capacidade disponível no catálogo do Aldus.">
     <View style={styles.actions}><PlanButton title="Meu Plano" onPress={() => router.push('/plan' as never)} /><PlanButton title="Atualizar catálogo" disabled={state.loading} onPress={() => void state.refresh()} /></View>
     {state.loading ? <View accessibilityLiveRegion="polite" style={styles.loading}><ActivityIndicator color={palette.accent} /><Copy>Consultando catálogo…</Copy></View> : state.data ? <View style={styles.catalogs}>{state.data.map(plan => <CatalogCard key={plan.id} plan={plan} />)}</View> : <Failure error={state.error} refresh={state.refresh} />}
-    <Copy muted>Leitura e importação local são gratuitas. Sync e armazenamento privado também fazem parte do Free. Nenhum plano pode ser contratado por esta tela.</Copy>
+    <Copy muted>Leitura e importação local são gratuitas. Sincronização e armazenamento privado também fazem parte do plano Gratuito. Nenhum plano pode ser contratado por esta tela.</Copy>
     <Copy muted>As franquias de catálogo representam o produto Aldus. A disponibilidade operacional da nuvem depende da infraestrutura ativa; esta comparação não promete ativação comercial do Pro.</Copy>
   </Layout>;
 }

@@ -6,11 +6,12 @@ export const featureLabels: Record<string, string> = {
   progress_sync: 'Progresso de leitura sincronizado', study_sync: 'Notas e grifos sincronizados',
   organization_sync: 'Organização sincronizada', private_storage: 'Armazenamento privado na nuvem', basic_study: 'Ferramentas básicas de estudo',
 };
-export function formatBytes(value: number | null): string {
-  if (value === null || !Number.isSafeInteger(value) || value < 0) return 'Em verificação';
+export function formatBytes(value: number | null, allowFraction = false): string {
+  if (value === null || !Number.isFinite(value) || value > Number.MAX_SAFE_INTEGER || (!allowFraction && !Number.isSafeInteger(value)) || value < 0) return 'Em verificação';
   const units = ['bytes', 'KiB', 'MiB', 'GiB', 'TiB']; let size = value, unit = 0;
   while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit++; }
-  return `${size.toLocaleString('pt-BR', { maximumFractionDigits: unit ? 2 : 0 })} ${unit === 0 && size === 1 ? 'byte' : units[unit]}`;
+  if (unit === 0 && size > 0 && size < .01) return 'Menos de 0,01 byte';
+  return `${size.toLocaleString('pt-BR', { maximumFractionDigits: unit || allowFraction ? 2 : 0 })} ${unit === 0 && size === 1 ? 'byte' : units[unit]}`;
 }
 export const progressPercent = (used: number | null, limit: number): number | null =>
   used === null || !Number.isFinite(used) || used < 0 || !Number.isFinite(limit) || limit <= 0 ? null : Math.min(100, Math.max(0, used / limit * 100));
