@@ -1,13 +1,15 @@
 # Aldus Reader — Bugs Atuais
 
-Atualizado em 15/10/2026. Branch oficial main; integração antiga é somente histórica.
+Atualizado em 16/10/2026. Branch oficial main; integração antiga é somente histórica.
 Referência funcional: HEAD da branch/commit que contém esta atualização.
 Reconciliação Git: 7f50a9048876aec350186b594006c24f2bc73a22 é ancestral de
 ea30fabe26405db6e1cf9f9870814ad903c3b9f3; ambos já presentes no remoto da integração.
 Oito incidentes originais mantidos, além dos três problemas ativos adicionais 11–13;
 nenhum encerramento é inferido de merge, export ou teste controlado.
-Somente problemas ativos. Contexto permanente: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
-APK: PENDENTE DE BUILD CONSOLIDADO, por decisão do usuário. Nenhuma validação física nova.
+Problemas ativos e validações recentes da campanha, sempre limitadas ao cenário executado.
+Contexto permanente: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
+APK release consolidado: pendente. Homologação debug física em 16/10 no Redmi Android 16;
+identidade do artefato, protocolo e limites de evidência em PROJECT_CONTEXT.md, seção 15.
 
 ### Origem e escopo da campanha do caderno
 
@@ -24,9 +26,10 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 
 ## BUG 01 — Importação do EPUB Amêndoas congela
 
-- Prioridade: CRÍTICA. Status: IMPLEMENTADO / VALIDAÇÃO ANDROID PENDENTE.
+- Prioridade original: CRÍTICA. Status: VALIDADO FÍSICO no cenário Amêndoas/Redmi de 16/10.
 - Sintoma/reprodução: importar Amêndoas mantém “Lendo arquivo…” e Cancelar não responde;
-  outro EPUB importa. O arquivo pessoal não foi localizado nesta máquina.
+  outro EPUB importa. Na campanha anterior o arquivo pessoal não foi localizado no computador;
+  em 16/10 foi encontrado no Downloads do Redmi, sem copiar seu conteúdo para o Git.
 - Evidência: parser do baseline repetia CSS/fontes por capítulo e não recebia signal.
   Fixture de 91 capítulos: HTML 127.262.661 → 1.422.501 bytes; fontes 182→2 leituras,
   CSS 91→1 e leituras simultâneas 182→1. Não é medição do arquivo Amêndoas.
@@ -46,9 +49,25 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   PASS; Freud saudável com 26 capítulos PASS; test-book-import/test-catalogs PASS.
   Baseline 25.767 ms e primeira revisão 1.339 ms sob carga concorrente; revisão final 318 ms
   e Freud 402 ms em outra carga desktop. Não usar como promessa de desempenho Android.
-- Testes pendentes: mesmo Amêndoas real, Android/WebView, fonte/imagens/offline/reopen,
-  cancelamento e memória no aparelho. Uma descompressão ZIP já iniciada pode terminar internamente.
-- Dependências externas: arquivo original e validação no próximo build consolidado.
+- Validação física em 16/10: EPUB original de 1.331.333 bytes importou em 16.295 ms no debug;
+  nova tentativa cancelou durante reading em 3.986 ms, com terminal cancelled e sem livro
+  adicional. Biblioteca 35→36 pela importação concluída; original conservou seu SHA-256.
+  Foram encontradas quatro cópias locais com esse hash, sem baseline por arquivo que permita
+  atribuir sua origem. Nenhuma foi apagada; não declarar limpeza física do cancelamento comprovada.
+  Abertura/reabertura após parar e relançar o processo confirmou 15/728; runner final
+  repetiu controles e reabertura a frio em 18/728, com 36 livros preservados.
+- Nova falha física identificada na abertura: “Calculando páginas…” permanecia indefinidamente.
+  Oito imagens lazy fora da coluna não eram solicitadas, mas a barreira layoutReady esperava
+  todas. Contraprova diagnóstica solicitou as imagens e liberou 1/728; não é o teste final.
+  Correção 101395c em EpubReaderDocument.ts instala listeners load/error antes de promover
+  imagens pendentes a eager. Reabertura normal em outra WebView, sem intervenção no DOM,
+  carregou as dez imagens e confirmou paginação. FontFaceSet estava loaded (nove declarações).
+  Recursos não foram removidos. Novo test-epub-image-readiness falha no baseline f851b3a,
+  passa corrigido; Chromium com imagem fora da coluna, matriz 66/66, typecheck/export PASS.
+- Limites: desempenho medido no debug, não release; sem certificação de EPUBs ilimitados ou
+  de todos os aparelhos. Uma descompressão ZIP já iniciada pode terminar internamente.
+- Dependências externas do cenário original: arquivo e Redmi disponíveis; demais regressões
+  físicas e resultados específicos continuam discriminados nos respectivos itens.
 - Não regredir: metadata, spine, CSS/fontes/imagens, links, rollback, conta e EPUBs saudáveis.
 
 ## BUG 02 — Library Sync implantado, validação autenticada pendente
@@ -155,6 +174,11 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   com fixtures passou árvore/breadcrumbs/busca source-wide/import/offline/rollback.
 - Testes pendentes: API Drive autorizada e trace da mesma tentativa no Android, distinguindo
   authorize/root/list/página/queue/persistência/publicação. Página pública não equivale à API.
+- Redmi/Android 16 em 16/10: Ajustes→Minhas fontes→biblioteca existente→gerenciador→
+  fechar/retornar funcionaram. Fonte preservada com catálogo local vazio e mensagem
+  explícita de reconexão necessária. Não havia grant válido para atualizar/indexar;
+  API/indexação e cancelamento em andamento BLOQUEADOS nesta execução. Nenhum OAuth,
+  consentimento, desativação, remoção ou alteração de arquivos foi realizado.
 - Dependências externas: conta/grant e aparelho. Roteiro humano em
   [GOOGLE_AUTH_DRIVE_DEPLOYMENT.md](GOOGLE_AUTH_DRIVE_DEPLOYMENT.md); sem reabrir OAuth por hipótese.
 - Não regredir: ROOT/árvore/atalhos de pasta/ciclos, fuzzy local, snapshot offline e download escolhido.
@@ -162,7 +186,7 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 
 ## BUG 06 — Reflow grande demora em 98–100% e cancelamento final sem fechamento
 
-- Prioridade: ALTA. Status: IMPLEMENTADO / VALIDADO CONTROLADO E WEB / ANDROID PENDENTE.
+- Prioridade: ALTA. Status: IMPLEMENTADO / ANDROID PARCIAL: CANCELAR, CONCLUSÃO E CACHE PASS.
 - Sintoma/reprodução: histórico físico Weber 584 páginas parado em 582/584; cancelar/Back
   atrasados. Arquivo original de 969 páginas não identificado. Travamento físico não reproduzido.
 - Evidência/primeira divergência: execução Weber eventualmente publicou cache; await exato
@@ -197,13 +221,26 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   Regressão de cancelamento OCR confirmada no componente Native: write temporária podia
   terminar após unmount sem cleanup. Nome agora único, limpeza do retorno tardio/parcial;
   test-reflow-native-lifecycle --ocr-temp-baseline falha no e54bf50 e versão corrigida passa.
-- Testes pendentes: mesmo PDF/build, fases 98–100%, memória/thread JS, cancel/Back e reopen.
-- Dependências externas: arquivo/aparelho e próximo build consolidado.
+- Redmi/Android 16 em 16/10, Weber 584p/5.265.071 bytes: extração chegou a 584/584;
+  Cancelar durante “Validando texto extraído” removeu overlay e retornou ao Original
+  1/584. Repetição concluiu validação→montagem→finalização→SUCCESS em 212.227ms pelos
+  eventos START/SUCCESS (observação UI terminal em cerca de 225s), exibindo 1/2098.
+  Voltar à biblioteca e reabrir recuperou 1/2098 sem novo START de extração: cache
+  reutilizado. Não foi necessário alterar o processador nesta campanha.
+  Tempo de preparo continua alto no debug; amostras PSS do processo aproximadamente
+  1,3–1,6 GiB, sem medição de pico/conjunto de renderers ou diagnóstico de vazamento.
+  Uma tentativa anterior ficou sem acompanhamento durante a pausa; a retomada encontrou
+  Metro indisponível e modo Original, sem diagnóstico da causa. Não prova conclusão ou
+  falha específica de cache. Relatórios locais ignorados:
+  .expo/redmi-qa/reflow-summary.json e reflow-resume-observation.jsonl.
+- Testes pendentes: Back especificamente na finalização, OCR físico (Weber tem texto),
+  PDF original de 969p não identificado e desempenho em distribuição consolidada.
+- Dependências externas: arquivo original; build release somente sob pedido específico.
 - Não regredir: Original independente, cache validado, posição, cleanup e terminal único.
 
-## BUG 07 — Rolagem do painel Preferências no Android ainda sem fechamento
+## BUG 07 — Rolagem do painel Preferências no Android
 
-- Prioridade: MÉDIA. Status: ABERTO.
+- Prioridade: MÉDIA. Status: ROLAGEM VALIDADA FISICAMENTE / REPAGINAÇÃO PARCIAL.
 - Sintoma/reprodução: demonstração física de 09/10 registrou falha de rolagem global do painel.
 - Evidência/primeira divergência: contraprova de backdrop/painel foi compilada; última nota
   ainda dizia teste em execução, sem resultado físico conclusivo. Slider/controles positivos
@@ -217,8 +254,22 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   e equivalente a fonte ampliada) passaram. Slider real mantém gesto vertical no ScrollView.
   Nenhuma divergência de layout/contrato reproduzida; não foi feita alteração especulativa
   no painel, na paginação ou na WebView. Yoga/React não exercitam toques físicos Android.
-- Testes pendentes: painel longo, arraste vertical/slider, fontes ampliadas, safe area e Android.
-- Dependências externas: aparelho/build consolidado.
+- Redmi 23117RA68G/Android 16, development build compatível + Metro em 16/10:
+  painel longo rolou de fonte até margens/modo anti-enjoo; arraste vertical iniciado
+  sobre o slider rolou o painel sem alterar fonte 26px nem deslocamento do documento.
+  Arraste horizontal alterou efetivamente a fonte para 22px; retorno a 26px confirmado
+  na WebView. Claro e Sépia aplicaram cores distintas; Sépia original restaurado.
+  Abrir/fechar o painel sem ajustes preservou 18/728 no runner físico. No ciclo de
+  fonte 26→22→26 a página final foi 17/728: não comprova preservação exata da âncora.
+  Nenhuma correção especulativa de layout foi feita. Evidências locais ignoradas:
+  .expo/redmi-qa/reader-controls-result.json e preferences-*.json/PNG.
+- Fonte do sistema 130%: navegação Meu Plano/Comparar e rolagem longa das Preferências
+  PASS físico, com screenshots revisados; 100% original restaurado. Pedido de rotação
+  via sistema manteve aplicativo em retrato (1080×2400), conforme bloqueio declarado,
+  e configurações originais restauradas. Isso não testa gesto físico de girar o aparelho.
+- Testes pendentes: precisão da âncora após repaginação, sensor/orientação física e
+  TalkBack real. A validação da rolagem não encerra esses cenários independentes.
+- Dependências externas: distribuição futura com bundle consolidado; debug usa Metro.
 - Não regredir: texto/posição/instância do viewer e separação de gesto do painel/documento.
 
 ## BUG 08 — Incidentes email/cadastro/recovery ainda sem fechamento real

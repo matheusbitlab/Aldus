@@ -663,6 +663,62 @@ só é encerrado após reproduzir o cenário original e validar sua correção n
 Configurações temporárias do sistema usadas nos ensaios devem ser registradas localmente
 e restauradas. Não versionar capturas com notificações externas ou conteúdo pessoal.
 
+Execução física de 16/10/2026: Redmi 23117RA68G, Android 16/API 36, ARM64,
+com.aldus.reader 1.0.0/code 1. Debug temporário atualizado com install -r após comparar
+package/certificado; firstInstallTime e 35 livros anteriores preservados, sem uninstall/clear.
+APK debug em android/app/build/outputs/apk/debug/app-debug.apk, 106.185.143 bytes,
+SHA-256 BC28BAB08CC720BB17096E62CC49C710DB16EA567615249CE8FBDC79393590DE.
+Certificado SHA-256 fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c.
+Esse APK carrega JS pelo Metro/USB: hash do APK não identifica o bundle dinâmico.
+Fonte nativa f851b3a; correção JS 101395c validada via Metro, sem recompilação nativa.
+Não foi gerado release. O development build depende do Metro para retomar o projeto.
+
+PASS físico: arquivo original Amêndoas disponível no aparelho; importação em 16,295s,
+cancelamento durante leitura em 3,986s sem livro adicional, biblioteca 35→36 apenas pela
+importação concluída. Bytes originais preservados (SHA-256 nos relatórios locais).
+Foi reproduzido bloqueio de paginação por imagens lazy fora da tela: readiness aguardava
+recursos que o Chromium não solicitava. waitForImage instala listeners antes de promover
+loading=lazy para eager; nova WebView normal carregou as dez imagens e paginou sem intervenção.
+Controles Buscar/Sumário/Aparência/Estudos, anterior/próxima, retorno à biblioteca e reabertura
+após encerramento do processo preservaram 18/728. Rolagem longa de Preferências e gesto
+vertical iniciado no slider funcionaram sem alterar fonte/documento. Fonte 26→22→26 e
+temas Claro/Sépia funcionaram, com valores originais restaurados; ciclo tipográfico terminou
+17/728, portanto precisão da âncora continua parcial. Quatro cópias locais iguais ao EPUB
+foram encontradas sem baseline por arquivo; origem/limpeza inconclusivas, nada apagado.
+
+PASS controlado: matriz crítica 66/66, typecheck, export Web e Chromium com documento
+gerado/imagens lazy; regressão de readiness falha no baseline anterior e passa com a correção.
+Ferramentas Metro excluem artefatos gerados preservando fontes/dependency dist/entry virtual.
+Automação física reproduzível: scripts/redmi-qa.cjs; evidências/capturas ignoradas em
+.expo/redmi-qa. Falhas de seletor/espera do harness foram corrigidas e repetidas; não foram
+tratadas como falhas do Reader. Ausência de crash nos logs amostrados não certifica todos
+os cenários. BUGS_ATUAIS.md mantém resultados parciais e dependências externas por cenário.
+
+SaaS 3 PASS físico: Ajustes→Meu Plano→retry→Comparar→retorno; backend ainda indisponível,
+sem fabricar Free/Pro ou consumo zero. Com Wi-Fi e dados móveis temporariamente desligados,
+ambas as telas mostraram erro de conexão; EPUB local abriu, avançou 17→18/728 e reabriu
+em 18/728. Rede original (ambas habilitadas) restaurada e conferida. JS via USB continuou
+disponível; não certifica cold start offline de release. Drive: navegação/gerenciador/retorno
+PASS físico, fonte existente preservada; indexação/API/cancelamento em andamento BLOQUEADOS
+por reconexão necessária, sem renovar OAuth nem modificar arquivos/contas.
+
+PDF Reflow PASS físico parcial: Weber 584 páginas/5.265.071 bytes; cancelamento após
+extração completa durante validação retornou ao Original 1/584. Repetição passou por
+montagem/validação/finalização e SUCCESS em 212.227ms no debug; primeira paginação 1/2098.
+Voltar à biblioteca/reabrir reutilizou cache, sem novo START de extração. A latência segue
+alta; amostras PSS do processo em torno de 1,3–1,6 GiB não provam pico nem vazamento.
+Back durante finalização permanece inconclusivo; OCR físico e arquivo original de 969p
+não foram validados. Nenhum cache/livro anterior foi apagado para forçar novos testes.
+Fonte do sistema 130% PASS físico em Meu Plano/Comparar/rolagem longa das Preferências,
+com capturas revisadas; 100% restaurado. Solicitação de rotação pelo sistema manteve o
+app em retrato 1080×2400, como declarado no manifesto; não prova giro físico/sensor.
+TalkBack físico não executado; labels de navegação foram usados pela automação Native.
+Conferência final: biblioteca 36 livros; PDF Original do Weber restaurado em 1/584,
+cache Reflow mantido; hash do EPUB original inalterado. Rede, fonte do sistema, rotação
+e heads-up notifications coincidiram integralmente com o baseline. Forward CDP temporário
+removido; reverse USB/Metro mantidos para usar o development build. Buffer consultado
+do PID final sem assinaturas FATAL/erro JS/ANR, sem inferir ausência em todo o histórico.
+
 Package com.aldus.reader, scheme aldus; applicationId antigo com.kindle.reader não compartilha
 automaticamente dados privados com o novo. Versão/code genéricos não identificam um commit.
 Infra local: android/ versionado, JDK 17 e SDK/build-tools/NDK declarados no Gradle.
