@@ -1214,3 +1214,40 @@ Auth/RLS/Storage, bootstrap OWNER específico, TOTP real do proprietário, domí
 institucional definitivos e publicação Web autorizada. Produção não foi modificada.
 Continuar na main; não abrir janela de senha, aplicar migrations, conceder OWNER, ativar
 pagamentos ou publicar automaticamente em tarefas de interface.
+
+### Livro 3D interativo da landing — 16/10/2026
+
+- Implementação Web a partir da main 761c28d, alinhada ao remoto após fetch. Os dois
+  documentos oficiais já continham registros operacionais posteriores; essas alterações
+  foram preservadas separadamente das mudanças de interface desta etapa.
+- ScrollBookStory substitui a prévia por UM livro: capa verde com espessura, lombada,
+  miolo/arestas, marcador terracota e quatro folhas com quatro segmentos conectados cada.
+  Faces frente/verso e dobradiças em preserve-3d, sem imagem esticada, vídeo, canvas ou
+  dependência gráfica nova. Biblioteca, Reader, estudo, planos e convite final aparecem
+  impressos nas páginas; conteúdo demonstrativo identificado e sem bibliotecas privadas.
+- bookMotion.ts contém a geometria pura, contínua e reversível. Progresso calculado pelo
+  scrollTop da região data-landing-scroll/.al-page-scroll e posições reais da trilha,
+  cabeçalho e sticky. Eventos passivos/RAF sob demanda e ResizeObserver; nenhuma animação
+  autônoma ou atualização React por frame. Parar mantém a pose; voltar ao topo fecha.
+- Navegação explícita por etapas e opção Pular demonstração. Legenda acessível anuncia
+  somente mudanças de capítulo; geometria duplicada oculta da árvore assistiva. Redução
+  de movimento elimina a trilha longa e usa composição estática com navegação, inclusive
+  se a preferência mudar durante a visita. Sem JS: livro estático/conteúdo indexável,
+  instrução pt-BR, fallback de redução de movimento e demais seções disponíveis.
+- Desktop, celular, tablet e telas baixas usam proporções coerentes; paisagem curta
+  apresenta duas colunas. Bordas reais das folhas, inclusive curvas, foram verificadas
+  contra título, viewport e cabeçalho. Nenhum bloqueio ou interceptação da rolagem nativa.
+- Planos usam o MESMO CatalogPlan recebido pela landing e a referência inicial gerada
+  existente, sem copiar limites para regras novas. Gratuito conserva Sync/Storage; Pro
+  sem contratação/preço inventado. Franquia não é uso real nem promessa de infraestrutura.
+- Metro passou a excluir somente artifacts da raiz do projeto, além de dist; entregas
+  locais não pertencem ao grafo runtime. Regressão preserva pastas homônimas de dependências.
+- Gates locais: typecheck, export Web e 69/69 críticas; SSR/geometria/pt-BR e Chromium com
+  roda nativa, scroll real interno (window.scrollY permanece zero), pausa, reversão,
+  botões/teclado, redução de movimento em runtime/sem JS, Auth/SEO e rotas protegidas.
+  Dez viewports: 320x568/800, 360x800, 430x932, 768x1024, 844x390, 1024x800, 1440x540/1000
+  e 1920x1080. Ensaios HTTP/Auth controlados; não comprovam sessões reais do Supabase.
+- Capturas locais ignoradas em .expo/marketing-validation: landing-desktop/mobile,
+  book-library/reader/study/plans/final e book-nojs-reduced-motion. Nenhum novo deploy,
+  alteração Supabase, bootstrap, cobrança, APK ou teste físico Android nesta etapa.
+  Entrada Native e Reader intactos; não exige recompilação nativa para esse recurso Web.
