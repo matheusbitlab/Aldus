@@ -34,9 +34,9 @@ export const drivePlatformAuth: DriveAuthorizationProvider = {
     }).catch(error => { preparation = undefined; throw error; });
     return preparation;
   },
-  authorize: signal => {
+  authorize: (signal, correlationId) => {
     try { throwIfAborted(signal); } catch (error) { return Promise.reject(error); }
-    const operationId = driveOperationId();
+    const operationId = correlationId && /^(?:source|drive)-[a-z0-9]+-\d+$/.test(correlationId) ? correlationId : driveOperationId();
     const implementation = Platform.OS === "web" ? "GIS_WEB" : Platform.OS === "android" ? "AUTHORIZATION_CLIENT" : "UNAVAILABLE";
     driveDiagnostic({ operationId, implementation, callbackReceived: false, authorizationResult: "started" });
     if (Platform.OS === "web") {

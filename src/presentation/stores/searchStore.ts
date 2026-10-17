@@ -9,6 +9,7 @@ const sourceRepository = new UserSourceRepository();
 import { withAbort } from "@/src/core/utils/cancellation";
 import { searchDiagnostic } from "@/src/utils/searchDiagnostics";
 import { rankCatalogBooks } from "@/src/domain/search/catalogRanking";
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 let requestVersion = 0;
 let activeRequest: AbortController | null = null;
 type SearchStatus = "idle" | "loading" | "success" | "empty" | "partial" | "error" | "cancelled";
@@ -151,3 +152,9 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 		}
 	},
 }));
+
+libraryAccountScope.subscribe(() => {
+	requestVersion++; activeRequest?.abort(); activeRequest = null;
+	useSearchStore.setState({ results: [], sourceStatuses: [], pendingSources: [], nextPageUrl: null,
+		nextPageSource: null, selectedSource: "Todos", isSearching: false, status: "idle", error: null });
+});

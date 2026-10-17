@@ -76,7 +76,7 @@ const book = (i, title = `Livro ${String(i).padStart(4, '0')}.epub`) => ({ sourc
   const oldWrite = queued.refresh(source); await entered.promise; remote = [book(102)]; const newWrite = queued.refresh(source); saveGate.resolve(); await Promise.all([oldWrite, newWrite]);
   assert.equal((await repo.get(source.id)).items[0].remoteBookId, 'file102');
   const late = deferred(); const removing = new SourceCatalogService(repo, { ...remoteAdapter, list: () => late.promise }, async () => currentSource);
-  const pending = removing.refresh(source); currentSource = undefined; await removing.remove(source.id); late.resolve([book(300)]); await pending;
+  const pending = removing.refresh(source); await removing.remove(source.id); currentSource = undefined; late.resolve([book(300)]); await pending;
   assert.equal(await repo.get(source.id), null); assert.deepEqual(await repo.links(source.id), []);
   assert.equal(db.prepare('SELECT percentage FROM reading_progress').get().percentage, 65);
   assert.equal(db.prepare('SELECT note FROM bookmarks').get().note,'Nota pessoal');

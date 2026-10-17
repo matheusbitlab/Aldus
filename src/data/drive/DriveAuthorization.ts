@@ -6,7 +6,7 @@ export interface DriveAuthorizationProvider {
   /** Native cache clearing must finish first; Web must preserve its click gesture. */
   clearBeforeAuthorize?: boolean;
   prepare(): Promise<void>;
-  authorize(signal?: AbortSignal): Promise<DriveGrant>;
+  authorize(signal?: AbortSignal, correlationId?: string): Promise<DriveGrant>;
   clearToken?(token: string): Promise<void>;
   revoke(token: string): Promise<void>;
 }
@@ -16,7 +16,7 @@ export class DriveAuthorization {
   private readonly generations = new Map<string, number>();
   constructor(private readonly provider: DriveAuthorizationProvider) {}
   prepare() { return this.provider.prepare(); }
-  async connect(sourceId: string, signal?: AbortSignal): Promise<void> {
+  async connect(sourceId: string, signal?: AbortSignal, correlationId?: string): Promise<void> {
     const generation = (this.generations.get(sourceId) ?? 0) + 1;
     this.generations.set(sourceId, generation);
     const previous = this.grants.get(sourceId);
@@ -27,7 +27,7 @@ export class DriveAuthorization {
     }
     throwIfAborted(signal);
     if (this.generations.get(sourceId) !== generation) throw new DriveError("disconnected");
-    const grant = await withAbort(this.provider.authorize(signal), signal);
+    const grant = await withAbort(this.provider.authorize(signal, correlationId), signal);
     throwIfAborted(signal);
     if (this.generations.get(sourceId) !== generation) throw new DriveError("disconnected");
     if (!grant.accessToken || !Number.isFinite(grant.expiresAt) || grant.expiresAt <= Date.now()) throw new DriveError("expired");

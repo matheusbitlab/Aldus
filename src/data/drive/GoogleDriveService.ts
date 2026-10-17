@@ -1,10 +1,11 @@
 import { UserSource } from "@/src/domain/types/sources";
 import { ScrapedLink } from "@/src/domain/types/search";
-import { SourceCatalogListing, SourceFolder } from "@/src/domain/types/sourceCatalog";
+import { SourceCatalogListing, SourceFolder, SourceOperationContext } from "@/src/domain/types/sourceCatalog";
 import { throwIfAborted, withAbort } from "@/src/core/utils/cancellation";
 import { DriveAuthorization } from "./DriveAuthorization";
 import { assertDriveResponse, DriveError } from "./DriveErrors";
 import { parseDriveFolder } from "./driveFolder";
+import { sourceOperationContext, sourceOperationErrorCode, sourceProgress } from "@/src/utils/sourceDiagnostics";
 
 interface DriveFile {
   id: string; name: string; mimeType: string; size?: string; modifiedTime?: string;
@@ -23,9 +24,12 @@ export class GoogleDriveService {
   private readonly indexes = new Map<string, Index>();
   private readonly generations = new Map<string, number>();
   constructor(public readonly authorization: DriveAuthorization, private readonly request: typeof fetch = (...args) => fetch(...args)) {}
-  async connect(source: UserSource, signal?: AbortSignal): Promise<void> {
+  async connect(source: UserSource, signal?: AbortSignal, context?: SourceOperationContext): Promise<void> {
+    const operation = sourceOperationContext(context);
     this.clearIndex(source.id);
-    await this.authorization.connect(source.id, signal);
+    sourceProgress(operation, "authorizing");
+    try { await this.authorization.connect(source.id, signal, operation.operationId); }
+    catch (error) { sourceProgress(operation, signal?.aborted || (error as Error)?.name === "AbortError" ? "cancelled" : "error", {}, sourceOperationErrorCode(error)); throw error; }
   }
   clearIndex(sourceId: string): void {
     this.indexes.delete(sourceId);
@@ -45,10 +49,22 @@ export class GoogleDriveService {
     return { folderId: parsed.folderId, resourceKey: source.resourceKey ?? parsed.resourceKey };
   }
   /** Connection probe validates only the root; the explicit refresh performs one full traversal. */
-  async validateRoot(source: UserSource, signal?: AbortSignal): Promise<void> {
+  async validateRoot(source: UserSource, signal?: AbortSignal, context?: SourceOperationContext): Promise<void> {
     throwIfAborted(signal);
+    sourceProgress(context, "verifying");
     const folder = this.folder(source);
     await this.folderMetadata(source.id, folder.folderId, folder.resourceKey, signal);
+  }
+  async describeRoot(source: UserSource, signal?: AbortSignal, context?: SourceOperationContext): Promise<{ name: string }> {
+    const operation = sourceOperationContext(context);
+    sourceProgress(operation, "verifying");
+    try {
+      throwIfAborted(signal);
+      const folder = this.folder(source), metadata = await this.folderMetadata(source.id, folder.folderId, folder.resourceKey, signal);
+      throwIfAborted(signal);
+      if (typeof metadata.name !== "string" || !metadata.name.trim()) throw new DriveError("api");
+      return { name: metadata.name };
+    } catch (error) { sourceProgress(operation, signal?.aborted || (error as Error)?.name === "AbortError" ? "cancelled" : "error", {}, sourceOperationErrorCode(error)); throw error; }
   }
   private async folderMetadata(sourceId: string, id: string, key?: string, signal?: AbortSignal): Promise<DriveFile> {
     const metadata = await this.json<DriveFile>(sourceId, `${API}/${encodeURIComponent(id)}?fields=id,name,mimeType,driveId,trashed,modifiedTime&supportsAllDrives=true`, resourceHeaders(id, key), signal);
@@ -60,12 +76,20 @@ export class GoogleDriveService {
   async list(source: UserSource, signal?: AbortSignal, refresh = false): Promise<ScrapedLink[]> {
     return (await this.listCatalog(source, signal, refresh)).items;
   }
-  async listCatalog(source: UserSource, signal?: AbortSignal, refresh = false): Promise<SourceCatalogListing> {
+  async listCatalog(source: UserSource, signal?: AbortSignal, refresh = false, context?: SourceOperationContext): Promise<SourceCatalogListing> {
+    const operation = sourceOperationContext(context);
+    try { return await this.indexCatalog(source, signal, refresh, operation); }
+    catch (error) { sourceProgress(operation, signal?.aborted || (error as Error)?.name === "AbortError" ? "cancelled" : "error", {}, sourceOperationErrorCode(error)); throw error; }
+  }
+  private async indexCatalog(source: UserSource, signal: AbortSignal | undefined, refresh: boolean, context: SourceOperationContext): Promise<SourceCatalogListing> {
     throwIfAborted(signal);
     this.authorization.token(source.id); // Never serve a private index after disconnection/expiry.
     const folder = this.folder(source);
     const cached = this.indexes.get(source.id);
-    if (!refresh && cached?.rootFolderId === folder.folderId && Date.now() - cached.updatedAt < 300000) return cached;
+    if (!refresh && cached?.rootFolderId === folder.folderId && Date.now() - cached.updatedAt < 300000) {
+      sourceProgress(context, "indexing", { booksFound: cached.items.length, foldersScanned: cached.folders.length, foldersDiscovered: cached.folders.length });
+      return cached;
+    }
     const generation = (this.generations.get(source.id) ?? 0) + 1;
     this.generations.set(source.id, generation);
     const books = new Map<string, ScrapedLink>();
@@ -73,6 +97,9 @@ export class GoogleDriveService {
     // Queue only children and explicit folder-shortcut targets; never enumerate all Drive.
     const queue = [{ id: folder.folderId, resourceKey: folder.resourceKey, relativePath: "" }];
     const scheduledFolderIds = new Set([folder.folderId]), visitedFolderIds = new Set<string>();
+    let foldersScanned = 0;
+    const progress = () => sourceProgress(context, "indexing", { booksFound: books.size, foldersScanned, foldersDiscovered: scheduledFolderIds.size });
+    sourceProgress(context, "verifying", { booksFound: 0, foldersScanned: 0, foldersDiscovered: 1 });
     for (let cursor = 0; cursor < queue.length; cursor++) {
       throwIfAborted(signal);
       if (this.generations.get(source.id) !== generation) throw new DriveError("disconnected");
@@ -81,6 +108,7 @@ export class GoogleDriveService {
       visitedFolderIds.add(current.id);
       const headers = resourceHeaders(current.id, current.resourceKey);
       const metadata = await this.folderMetadata(source.id, current.id, current.resourceKey, signal);
+      progress();
       if (cursor === 0) folders.set(current.id, { id: current.id, sourceId: source.id, remoteFolderId: current.id, parentFolderId: null, name: metadata.name ?? source.name, relativePath: "", isShortcut: false, updatedAt: metadata.modifiedTime });
       const pages = new Set<string>();
       let pageToken: string | undefined;
@@ -125,7 +153,10 @@ export class GoogleDriveService {
         pageToken = page.nextPageToken;
         if (pageToken && (pages.has(pageToken) || pages.size >= 10000)) throw new DriveError("api");
         if (pageToken) pages.add(pageToken);
+        progress();
       } while (pageToken);
+      foldersScanned++;
+      progress();
     }
     throwIfAborted(signal);
     if (this.generations.get(source.id) !== generation) throw new DriveError("disconnected");

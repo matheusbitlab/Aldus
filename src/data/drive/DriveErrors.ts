@@ -7,20 +7,20 @@ const categories: Record<DriveErrorCode, DriveErrorCategory> = {
   unsupported: "INVALID_FOLDER", configuration: "UNKNOWN", busy: "UNKNOWN",
 };
 const messages: Record<DriveErrorCode, string> = {
-  disconnected: "Drive desconectado. Use Conectar/Reconectar em Minhas fontes.",
+  disconnected: "Drive desconectado. Use Conectar ou Reconectar em Minhas bibliotecas.",
   expired: "A autorização do Drive expirou ou foi revogada. Reconecte o Drive.",
   cancelled: "A autorização do Google Drive foi cancelada. Toque em Reconectar para tentar novamente.",
   "popup-blocked": "O navegador bloqueou a janela de autorização Google. Permita pop-ups para este site e toque em Reconectar.",
   "auth-denied": "O Google não concedeu a autorização Drive. Confira o consentimento e se sua conta está autorizada a usar o aplicativo.",
   "api-disabled": "A API Google Drive está desabilitada para este aplicativo. A configuração do serviço precisa ser concluída pelo responsável.",
   permission: "Esta conta Google não tem permissão para acessar a pasta ou baixar este arquivo. Confira o compartilhamento da pasta.",
-  "not-found": "Pasta ou arquivo não encontrado, ou não visível para esta conta Google (404).",
+  "not-found": "Pasta ou arquivo não encontrado, ou não visível para esta conta Google.",
   "rate-limit": "Limite de consultas do Drive atingido. Aguarde e tente atualizar novamente.",
   network: "Não foi possível contatar o Drive. Confira a rede e tente novamente.",
   api: "Não foi possível concluir a consulta ao Drive. A causa não foi identificada; tente atualizar novamente.",
-  "invalid-folder": "Informe o ID ou um link de pasta válido do Google Drive.",
+  "invalid-folder": "Informe um link de pasta válido do Google Drive.",
   unsupported: "O destino não é uma pasta do Google Drive. Use uma pasta real; atalhos para arquivos não são percorridos.",
-  configuration: "A autorização Google Drive não está configurada nesta plataforma/build.",
+  configuration: "Não foi possível preparar a conexão com o Google Drive neste aplicativo.",
   busy: "Já existe uma autorização Drive em andamento. Conclua ou cancele a janela do Google e tente novamente.",
 };
 export class DriveError extends Error {

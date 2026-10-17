@@ -26,6 +26,19 @@ export interface SourceFolder {
 }
 export interface SourceCatalogListing { items: ScrapedLink[]; rootFolderId?: string; folders?: SourceFolder[]; }
 export type SourceCatalogStatus = "loading" | "empty" | "ready" | "refreshing" | "stale" | "offline" | "error" | "auth_required";
+export type SourceOperationPhase = "preparing" | "authorizing" | "verifying" | "indexing" | "organizing" | "saving" | "success" | "error" | "cancelled";
+export interface SourceOperationProgress {
+  operationId: string;
+  phase: SourceOperationPhase;
+  booksFound?: number;
+  foldersScanned?: number;
+  foldersDiscovered?: number;
+}
+/** Correlation and aggregate progress only; never credentials or remote identities. */
+export interface SourceOperationContext {
+  operationId: string;
+  onProgress?: (progress: SourceOperationProgress) => void;
+}
 export interface SourceCatalog {
   sourceId: string;
   sourceName: string;
@@ -43,6 +56,7 @@ export interface SourceCatalogView {
   catalog: SourceCatalog | null;
   status: SourceCatalogStatus;
   error: string | null;
+  operation?: SourceOperationProgress;
 }
 export interface SourceImportLink { sourceId: string; remoteBookId: string; bookId: string; }
 export type SourceAcquisitionState = "remote_only" | "downloading" | "imported" | "unavailable";

@@ -12,7 +12,7 @@ export type DriveDiagnosticFields = {
 export function driveDiagnostic(fields: DriveDiagnosticFields): void {
   if (process.env.EXPO_PUBLIC_DRIVE_DIAGNOSTICS !== "1" && process.env.EXPO_PUBLIC_AUTH_DIAGNOSTICS !== "1") return;
   try {
-    if (!/^drive-[a-z0-9]+-\d+$/.test(fields.operationId)) return;
+    if (!/^(?:drive|source)-[a-z0-9]+-\d+$/.test(fields.operationId)) return;
     const clean: Record<string, string | boolean> = { operationId: fields.operationId, flow: "DRIVE", platform: Platform.OS,
       initialRedirectScheme: "none", appState: AppState.currentState ?? "unknown" };
     if (["AUTHORIZATION_CLIENT", "GIS_WEB", "UNAVAILABLE"].includes(fields.implementation)) clean.implementation = fields.implementation;

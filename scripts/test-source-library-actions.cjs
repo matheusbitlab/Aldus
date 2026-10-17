@@ -64,8 +64,11 @@ const file = (id, name = `Livro ${id}.epub`) => ({ id, name, mimeType: 'applicat
   failLink=true; await downloads.getState().enqueue({...job,id:'failed-association',source:{...job.source,remoteBookId:'different-remote'}});
   assert.equal(downloads.getState().jobs['failed-association'].status,'completed'); assert.equal(downloads.getState().jobs['failed-association'].sourceLinkStatus,'failed'); assert.match(downloads.getState().jobs['failed-association'].error,/Livro importado/); failLink=false;
   assert.equal(sourceAcquisitionState(item,undefined,{...job,status:'queued'}),'downloading'); assert.equal(sourceAcquisitionState(item,'local-book'),'imported'); assert.equal(sourceAcquisitionState({...item,availability:'unavailable'}),'unavailable'); assert.equal(sourceAcquisitionState(item),'remote_only');
-  await sources.getState().update(source.id,{url:'folder_987654321',folderId:'folder_987654321'}); assert.equal(await sourceCatalogs.repository.get(source.id),null); assert.deepEqual(await sourceCatalogs.links(source.id),[]);
+  const previousIndex = await sourceCatalogs.repository.get(source.id);
+  await sources.getState().update(source.id,{url:'folder_987654321',folderId:'folder_987654321'});
+  assert.deepEqual(await sourceCatalogs.repository.get(source.id),previousIndex,'editing preserves the old valid index until a complete replacement');
+  assert.deepEqual(await sourceCatalogs.links(source.id),[],'old associations are hidden for a changed identity');
   await sourceCatalogs.recordImport(source.id,item.remoteBookId,'old-download',sourceIdentity(source)); assert.deepEqual(await sourceCatalogs.links(source.id),[],'late download cannot map to edited source');
   await sources.getState().remove(source.id); await downloads.getState().enqueue(job); assert.deepEqual(await sourceCatalogs.links(source.id),[]); assert.deepEqual(JSON.parse(stored),[]);
-  console.log('PASS actual download store: failed/cancelled no link, completed trusted book ID persists; four acquisition states; identity edit clears associations, late completion/removal cannot resurrect source');
+  console.log('PASS actual download store: failed/cancelled no link, completed trusted book ID persists; four acquisition states; identity edit preserves index and hides old associations, late completion/removal cannot resurrect source');
 })().catch(error=>{console.error(error);process.exitCode=1;});

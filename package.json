@@ -20,7 +20,7 @@
     "test:import": "node scripts/test-book-import.cjs && node scripts/test-download-import.cjs",
     "test:ocr": "node scripts/test-pdf-ocr.cjs",
     "test:drive": "node scripts/test-google-drive.cjs && node scripts/test-drive-tree.cjs && node scripts/test-drive-download.cjs",
-    "test:source-catalog": "node scripts/test-source-catalog.cjs && node scripts/test-source-library-actions.cjs",
+    "test:source-catalog": "node scripts/test-source-catalog.cjs && node scripts/test-source-library-actions.cjs && node scripts/test-source-ownership.cjs && node scripts/test-source-preparation.cjs",
     "test:source-library:browser": "node scripts/test-source-library-browser.cjs",
     "audit:supabase:public": "node scripts/audit-supabase-public.cjs",
     "audit:auth:redirects": "node scripts/audit-google-redirects.cjs",

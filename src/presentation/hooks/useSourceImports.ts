@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { sourceCatalogs } from "@/src/data/sources/sourceCatalogDependencies";
 import { appDependencies } from "@/src/presentation/services/dependencies";
 import { useDownloadStore } from "@/src/presentation/stores/downloadStore";
+import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 
 export function useSourceImports(sourceId: string) {
   const [imported, setImported] = useState<Record<string, string>>({}), [error, setError] = useState<string | null>(null);
@@ -11,8 +12,10 @@ export function useSourceImports(sourceId: string) {
   const completed = Object.values(jobs).filter(job => job.source?.sourceId === sourceId && job.status === "completed").map(job => `${job.operationId}:${job.sourceLinkStatus}`).join("|");
   const reload = useCallback(async () => {
     const run = ++revision.current;
+    const scope = libraryAccountScope.capture();
     try {
       const [links, books] = await Promise.all([sourceCatalogs.links(sourceId), appDependencies.bookRepository.listActive()]);
+      scope.check();
       const active = new Set(books.map(book => book.id));
       if (activeSource.current !== sourceId || revision.current !== run) return;
       setImported(Object.fromEntries(links.filter(link => active.has(link.bookId)).map(link => [link.remoteBookId, link.bookId])));
@@ -21,5 +24,6 @@ export function useSourceImports(sourceId: string) {
   }, [sourceId]);
   useEffect(() => { void reload(); return () => { revision.current++; }; }, [reload, completed]);
   useEffect(() => { setImported({}); }, [sourceId]);
+  useEffect(() => libraryAccountScope.subscribe(() => { revision.current++; setImported({}); setError(null); }), []);
   return { imported, error, reload };
 }
