@@ -1,9 +1,10 @@
-import { useEffect,useRef,useState } from 'react';
+import { useEffect,useRef } from 'react';
 import type { CatalogPlan } from '@/src/domain/saas/accountPlan';
 import { catalogPrice,featureLabels,formatBytes } from '@/src/domain/saas/planPresentation';
 import { planLabel } from '@/src/presentation/i18n/ptBR';
 import { initialCatalogReference } from './catalogReference.generated';
 import { landingCss } from './landingStyles';
+import { ScrollBookStory } from './ScrollBookStory';
 
 export interface LandingProps { signedIn?:boolean; catalog?:CatalogPlan[]; contactEmail?:string|null; }
 const faqs=[
@@ -16,27 +17,6 @@ const faqs=[
 ];
 function BookMark(){return <svg viewBox="0 0 32 32" width="31" height="31" aria-hidden="true"><path fill="currentColor" d="M4 5h9c3 0 4 2 4 2s1-2 4-2h7v22h-8c-2 0-3 1-3 1s-2-1-4-1H4V5Zm3 3v16h6c1 0 2 .2 2 .2V9s-1-1-3-1H7Zm12 1v15.2s1-.2 2-.2h4V8h-4c-1 0-2 1-2 1Z"/></svg>;}
 function Arrow(){return <span aria-hidden="true">↗</span>;}
-function AppPreview(){
- const [tab,setTab]=useState<'library'|'reader'|'study'>('library');
- const [theme,setTheme]=useState('paper');
- return <div className="al-preview" aria-label="Demonstração ilustrativa do Aldus">
-  <div className="al-preview-top"><span className="al-preview-brand">Aldus</span><span className="al-demo-label">PRÉVIA ILUSTRATIVA</span><span className="al-avatar" aria-hidden="true">A</span></div>
-  <div className="al-preview-tabs" role="tablist" aria-label="Explorar a prévia">
-   {([['library','Biblioteca'],['reader','Reader'],['study','Estudo']] as const).map(([id,label],index)=><button key={id} id={`preview-tab-${id}`} role="tab" tabIndex={tab===id?0:-1} aria-selected={tab===id} aria-controls="preview-panel" onClick={()=>setTab(id)} onKeyDown={event=>{
-    const order=['library','reader','study'] as const;
-    const next=event.key==='ArrowRight'?(index+1)%3:event.key==='ArrowLeft'?(index+2)%3:event.key==='Home'?0:event.key==='End'?2:-1;
-    if(next>=0){event.preventDefault();setTab(order[next]);requestAnimationFrame(()=>document.getElementById(`preview-tab-${order[next]}`)?.focus());}
-   }}>{label}</button>)}
-  </div>
-  <div id="preview-panel" role="tabpanel" aria-labelledby={`preview-tab-${tab}`}>
-   {tab==='library'?<div className="al-demo-library"><div className="al-demo-heading"><div><small>SEU ESPAÇO DE LEITURA</small><h3>Sua Biblioteca</h3></div><span className="al-demo-plus" aria-hidden="true">+</span></div>
-    <div className="al-covers">{[['Dom Casmurro','Machado de Assis','warm'],['A hora de ler','Título ilustrativo','sage'],['Entre páginas','Título ilustrativo','ink']].map(([title,author,color])=><div className="al-demo-book" key={title}><div className={`al-cover al-cover-${color}`}><span>ALDUS · LEITURAS</span><strong>{title}</strong><i aria-hidden="true"/><small>{author}</small></div><b>{title}</b><small>Disponível no dispositivo</small></div>)}</div>
-    <div className="al-demo-progress"><span>Um lugar para cada história.</span><span aria-hidden="true">▥</span></div>
-   </div>:tab==='reader'?<div className={`al-demo-reader al-demo-theme-${theme}`}><div className="al-reader-toolbar"><span>Reader · demonstração</span><span aria-hidden="true">Aa</span></div><h3>O tempo de uma página.</h3><p>Há um espaço entre a pressa do dia e a próxima linha. Um espaço para imaginar, descobrir e voltar a uma ideia com outro olhar.</p><p>Aqui, a leitura encontra o seu ritmo.</p><div className="al-theme-buttons" aria-label="Experimentar temas da prévia">{[['paper','Papel'],['sepia','Sépia'],['dark','Escuro']].map(([id,label])=><button key={id} aria-pressed={theme===id} onClick={()=>setTheme(id)}>{label}</button>)}</div></div>:<div className="al-demo-study"><small>APRENDER TAMBÉM É REVISITAR</small><h3>Uma ideia que fica.</h3><div className="al-flashcard"><span>flashcard ilustrativo</span><h4>O que esta leitura despertou em você?</h4><p>Transforme uma passagem importante em uma pergunta para revisar depois.</p></div><p>Organize seus estudos em um deck e revise no seu ritmo.</p></div>}
-  </div>
-  <div className="al-preview-bottom">Dados de demonstração · sem biblioteca de usuários</div>
- </div>;
-}
 export function LandingDocument({signedIn=false,catalog,contactEmail=null}:LandingProps){
  const root=useRef<HTMLDivElement>(null),menu=useRef<HTMLDetailsElement>(null);
  const plans=catalog??initialCatalogReference;
@@ -63,17 +43,16 @@ export function LandingDocument({signedIn=false,catalog,contactEmail=null}:Landi
   <header className="al-header"><div className="al-header-inner">
    <a href="/" className="al-brand" aria-label="Aldus Reader, início"><BookMark/><span>Aldus<span className="al-brand-reader"> Reader</span></span></a>
    <nav className="al-desktop-nav" aria-label="Navegação principal">{nav}</nav>
-   <div className="al-header-actions"><a className="al-login" href="/auth/login">Entrar</a><a className="al-button al-button-small" href={cta}>{signedIn?'Biblioteca':'Criar conta'} <Arrow/></a></div>
-   <details className="al-mobile-menu" ref={menu}><summary aria-label="Menu de navegação"><span aria-hidden="true">☰</span></summary><nav aria-label="Navegação para celular">{nav}<a href="/auth/login">Entrar</a><a href={cta}>{ctaText} <Arrow/></a></nav></details>
+   <div className="al-header-actions">{!signedIn&&<a className="al-login" href="/auth/login">Entrar</a>}<a className="al-button al-button-small" href={cta}>{signedIn?'Biblioteca':'Criar conta'} <Arrow/></a></div>
+   <details className="al-mobile-menu" ref={menu}><summary aria-label="Menu de navegação"><span aria-hidden="true">☰</span></summary><nav aria-label="Navegação para celular">{nav}{!signedIn&&<a href="/auth/login">Entrar</a>}<a href={cta}>{ctaText} <Arrow/></a></nav></details>
   </div></header>
   <main id="conteudo" tabIndex={-1}>
-   <section className="al-hero al-container">
-    <div className="al-hero-copy al-enter"><div className="al-eyebrow"><span/> SUA LEITURA. SEU TEMPO.</div><h1>Muito mais que<br/>uma <em>biblioteca.</em></h1><p className="al-lead">Leia, organize e estude. Um lugar para os seus livros — e para tudo o que eles despertam em você.</p>
+   <ScrollBookStory plans={plans}>
+    <div className="al-hero-copy al-enter"><div className="al-eyebrow"><span/> SUA LEITURA. SEU TEMPO.</div><h1>Muito mais que <br/>uma <em>biblioteca.</em></h1><p className="al-lead">Leia, organize e estude. Um lugar para os seus livros — e para tudo o que eles despertam em você.</p>
      <div className="al-hero-actions"><a href={cta} className="al-button">{ctaText} <Arrow/></a><a className="al-text-link" href="#experiencia">Conhecer o Aldus <span aria-hidden="true">↓</span></a></div>
      <p className="al-hero-note">Comece pela leitura local, gratuitamente.<br/>EPUB e PDF, com o seu jeito de ler.</p>
     </div>
-    <div className="al-hero-art al-enter"><div className="al-art-halo" aria-hidden="true"/><AppPreview/><div className="al-float-note" aria-hidden="true"><span>✦</span> Um livro.<br/><b>Novas possibilidades.</b></div></div>
-   </section>
+   </ScrollBookStory>
    <div className="al-ribbon"><div className="al-container"><span>EPUB + PDF</span><span>Leitura local</span><span>Organização pessoal</span><span>deck + flashcard</span><span>No seu ritmo</span></div></div>
    <section id="experiencia" className="al-container al-section" data-reveal><div className="al-section-heading"><div><p className="al-eyebrow">DA PRIMEIRA PÁGINA À PRÓXIMA IDEIA</p><h2>Seu universo de leitura.<br/><em>Bem perto de você.</em></h2></div><p>Uma experiência que acompanha o livro inteiro: o que você lê, o que marca e o que quer guardar.</p></div>
     <div className="al-experience-grid"><article className="al-feature-reader"><div className="al-mini-page" aria-hidden="true"><small>ALDUS READER</small><div>Encontre seu<br/><em>próprio ritmo.</em></div><p>Uma página aberta.<br/>Espaço para novas ideias.</p><div className="al-page-lines"/></div><div><span className="al-kicker">01 · LEITURA</span><h3>O Reader se adapta a você.</h3><p>Escolha fonte, tema e espaçamento. Leia EPUB ou preserve o layout do PDF Original. A Leitura Livre adapta PDFs compatíveis.</p></div></article>
