@@ -80,6 +80,11 @@ function loader(mocks, environment = {}, logs) {
     linkedUrl='aldus://auth/callback#error=access_denied';params={error:'access_denied'};
     await act(async()=>{tree=create(React.createElement(Screen));});
     assert.equal(calls,1);assert.match(JSON.stringify(tree.toJSON()),/cancelada/);await act(async()=>tree.unmount());
+    linkedUrl=null;params={code:'PRIVATE_CANARY_route_without_origin'};
+    await act(async()=>{tree=create(React.createElement(Screen));});
+    assert.equal(calls,1,'Native route parameters alone cannot exchange an authorization code');
+    assert.match(JSON.stringify(tree.toJSON()),/inválido ou expirado/);assert.ok(!JSON.stringify(tree.toJSON()).includes('PRIVATE_CANARY'));
+    await act(async()=>tree.unmount());
     console.log('PASS Native rejects HTTP/localhost callback before exchange; cancellation remains a sanitized separate outcome');
     await redirectContract();
     console.log('PASS React Native window without location: callback/recovery/login Google and real callback component never read browser origin');
