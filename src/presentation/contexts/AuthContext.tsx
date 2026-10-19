@@ -6,6 +6,7 @@ import { AccountProfile, canUseFeature, FeatureKey, FeatureOverrides } from "@/s
 import { supabase } from "@/src/data/remote/supabase";
 import { authFailureDetails } from "@/src/data/remote/authErrors";
 import { authDiagnostic, correlatedAuthDiagnostic } from "@/src/utils/authDiagnostics";
+import { nativeAuthCallbacks } from '@/src/data/remote/nativeAuthCallback';
 
 type AuthState = {
   loading: boolean;
@@ -93,6 +94,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let authEventRevision=0;
     const initialTicket=authEventRevision;
     const { data: listener } = client.auth.onAuthStateChange((event, next) => {
+      if (event === 'SIGNED_OUT') nativeAuthCallbacks.reset();
       const ticket=++authEventRevision;
       revision.current++;
       libraryAccountScope.set(next?.user.id ?? null);

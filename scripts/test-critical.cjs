@@ -4,7 +4,7 @@ const tests = [
   'metro-test-isolation', 'pt-br', 'marketing', 'admin-security', 'admin-client', 'admin-presentation',
   'saas-quotas', 'saas-quota-client', 'saas-quota-driver',
   'saas-schema', 'saas-client', 'saas-compatibility', 'saas-experience', 'saas-ui',
-  'auth', 'auth-flows', 'auth-callback', 'username-login', 'integrated-security', 'battle-account',
+  'auth', 'auth-flows', 'auth-callback', 'auth-native-callback', 'username-login', 'integrated-security', 'battle-account',
   'flashcards', 'flashcard-scoring', 'flashcard-storage', 'flashcard-sessions', 'flashcard-ui', 'flashcard-battles',
   'library-account', 'library-sync', 'library-remote', 'library-cancellation', 'library-files', 'library-reading-sync', 'library-coordinator', 'library-restart', 'library-rls', 'library-ui', 'library-organization',
   'google-drive', 'drive-tree', 'drive-download', 'source-catalog', 'source-library-actions', 'source-indexing', 'source-ownership', 'source-preparation', 'source-performance', 'source-ui', 'auth-native-pkce',

@@ -7,6 +7,7 @@ import { authDiagnostic, finishAuthDiagnostic } from "@/src/utils/authDiagnostic
 import { buildAuthCallback, validateGoogleAuthorizationUrl } from "./authRedirect";
 import { authOAuthContext, authOAuthGeneration, beginGoogleAuthOperation, finishAuthOAuthOperation, isCurrentGoogleAuthOperation } from "@/src/utils/authOAuthDiagnostics";
 import { hardenPkceParameters } from "./authPkce";
+import { nativeAuthCallbacks } from './nativeAuthCallback';
 
 export function authCallbackUrl(next?: "reset-password") {
   const webOrigin = Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : undefined;
@@ -47,6 +48,7 @@ export async function registerAccount(name: string, username: string, email: str
   if (!validUsername(username)) throw new Error("Use 3 a 24 caracteres: letras, números ou _; comece por uma letra.");
   if (!/^\S+@\S+\.\S+$/.test(email.trim())) throw new Error("Informe um email válido.");
   if (password.length < 8) throw new Error("A senha precisa ter pelo menos 8 caracteres.");
+  if (Platform.OS !== 'web') nativeAuthCallbacks.reset();
   try {
     const { data, error } = await client.auth.signUp({
       email: email.trim().toLowerCase(), password,
@@ -71,6 +73,7 @@ export async function loginWithGoogle() {
   if (callbackExchange?.pending) throw new Error("A autenticação anterior está sendo concluída. Aguarde e tente novamente.");
   const client = requireSupabase();
   const redirectTo = authCallbackUrl();
+  if (Platform.OS !== 'web') nativeAuthCallbacks.reset();
   const ticket = beginGoogleAuthOperation(redirectTo);
   const context = authOAuthContext();
   let result;
@@ -114,6 +117,7 @@ export async function loginWithGoogle() {
 
 export async function sendRecoveryEmail(email: string) {
   if (!/^\S+@\S+\.\S+$/.test(email.trim())) throw new Error("Informe um email válido.");
+  if (Platform.OS !== 'web') nativeAuthCallbacks.reset();
   const { error } = await requireSupabase().auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: authCallbackUrl("reset-password") });
   if (error) {
     const details = authFailureDetails(error);

@@ -32,12 +32,14 @@ function loader(mocks, environment = {}, logs) {
   // React Native exposes window without browser location. Native must never read location.
   global.window={};
   try {
-  let resolve, calls=0, params={code:'fixture-code'}, urls=[], nextError=null, linkedUrl=null;
+  let resolve, calls=0, params={code:'fixture-code'}, urls=[], nextError=null, linkedUrl='aldus://auth/callback?code=fixture-code';
+  let nativeSnapshot={ready:true,url:linkedUrl};
   const gate=new Promise(r=>resolve=r);
   const client={auth:{exchangeCodeForSession:()=>{calls++;return gate;},resetPasswordForEmail:async(email,options)=>{urls.push(options.redirectTo);return {error:nextError};}}};
   const load=loader({react:React,'react/jsx-runtime':testRequire('react/jsx-runtime'),
     'react-native':{Platform:{OS:'android'},Text:'Text',ActivityIndicator:'Spinner'},
     'expo-linking':{useURL:()=>linkedUrl},'expo-router':{useLocalSearchParams:()=>params,router:{replace:url=>urls.push(url)}},
+    '@/src/data/remote/nativeAuthCallback':{nativeAuthCallbacks:{reset(){},subscribe:()=>()=>{},snapshot:()=>{if(nativeSnapshot.url!==linkedUrl)nativeSnapshot={ready:true,url:linkedUrl};return nativeSnapshot;}}},
     '@/src/presentation/contexts/AppThemeContext':{useAppTheme:()=>({palette:{}})},
     '@/src/presentation/components/AuthForm':{AuthForm:'Form',AuthLink:'Link'},
     '@/src/data/remote/supabase':{requireSupabase:()=>client}});
@@ -46,6 +48,7 @@ function loader(mocks, environment = {}, logs) {
   let tree;
   await act(async()=>{tree=create(React.createElement(Screen));});
   params={...params,next:'reset-password'};
+  linkedUrl='aldus://auth/callback?code=fixture-code&next=reset-password';
   await act(async()=>{tree.update(React.createElement(Screen));});
   await act(async()=>{resolve({data:{session:{access_token:'fixture-only',refresh_token:'fixture-only',user:{id:'11111111-1111-4111-8111-111111111111'}}},error:null});await gate;});
   assert.equal(calls,1);
@@ -53,6 +56,7 @@ function loader(mocks, environment = {}, logs) {
   else {assert.deepEqual(urls,['/auth/reset-password']);console.log('PASS callback effect update: same exchange, recovery navigation completes');}
   await act(async()=>{tree.unmount();});
   params={error:'server_error',error_description:'PRIVATE_CANARY_authorization_code'};
+  linkedUrl='aldus://auth/callback?error=server_error&error_description=PRIVATE_CANARY_authorization_code';
   await act(async()=>{tree=create(React.createElement(Screen));});
   const output=JSON.stringify(tree.toJSON());
   if(baseline) {assert.ok(output.includes('PRIVATE_CANARY'));console.log('REPRODUCED baseline: raw OAuth description exposed');}

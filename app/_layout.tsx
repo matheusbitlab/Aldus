@@ -1,7 +1,7 @@
 import { Stack, useSegments } from "expo-router";
 import Head from "expo-router/head";
 import { useEffect } from "react";
-import { ActivityIndicator, AppState, DimensionValue, Platform, StatusBar, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, AppState, DimensionValue, Linking, Platform, StatusBar, StyleSheet, useWindowDimensions, View } from "react-native";
 import { addNetworkStateListener } from 'expo-network';
 import { appDependencies } from '@/src/presentation/services/dependencies';
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,9 +11,13 @@ import { ReaderSettingsProvider } from "@/src/presentation/contexts/ReaderSettin
 import { AppThemeProvider, useAppTheme } from "@/src/presentation/contexts/AppThemeContext";
 import { AuthProvider, useAuth } from "@/src/presentation/contexts/AuthContext";
 import { authDiagnostic, correlatedAuthDiagnostic } from "@/src/utils/authDiagnostics";
+import { nativeAuthCallbacks } from '@/src/data/remote/nativeAuthCallback';
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(Ionicons.font);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return nativeAuthCallbacks.start(Linking);
+  }, []);
 
   if (!fontsLoaded && !fontError) {
     return <View style={styles.fontLoading}><ActivityIndicator color="#D97757" /></View>;
