@@ -1309,3 +1309,51 @@ pagamentos ou publicar automaticamente em tarefas de interface.
   Importação física sob demanda e reprodução de todos os congelamentos continuam pendentes.
 - Necessário futuro bundle Android para distribuir as correções; development build atual
   serve apenas à homologação. Sem migrations/configurações remotas, deploy ou cobrança.
+
+### Resultado físico de Auth/Drive — 19/10/2026 (complemento)
+
+- Cadastro de teste expressamente autorizado: identidade criada, e-mail confirmado,
+  login por senha realizado, nome de usuário concluído pelo fluxo autenticado e perfil
+  active/user com Free automático. Credenciais inseridas exclusivamente pelo proprietário
+  no Redmi; e-mail e senha de teste não foram acrescentados ao Git.
+- O link de confirmação foi aberto no computador: confirmou o e-mail no servidor, mas
+  não poderia abrir o Android em outro aparelho. Entrada manual posterior no Redmi validada.
+- No primeiro login houve falha ao consultar o perfil, apesar da senha e sessão aceitas.
+  Tentar novamente recuperou o perfil com HTTP 200, sem modificar RLS. Causa desse evento
+  intermitente permanece INCONCLUSIVA; não atribuir a credenciais inválidas nem encerrar
+  esse acompanhamento por ter funcionado no retry.
+- Isolamento real A/B: a conta de teste mostrou 34 assets bundled, zero livros privados
+  da conta original e zero fontes atribuídas a ela. Uma fonte legada permaneceu sem adoção
+  automática. A conta original foi restaurada por e-mail/senha e confirmada por getUser
+  no servidor; voltou aos 38 livros, uma fonte ativa e um cadastro legado preservado.
+- Login Google real: autorização abriu no Chrome do Redmi, o proprietário escolheu sua
+  conta e confirmou. Logs remotos da janela 17:44–17:47 UTC registraram invalid_client
+  na troca do código do provedor no /callback. NÃO houve sessão Google válida. Bloqueio
+  EXTERNO na configuração OAuth Google/Supabase, distinto da autorização Native do Drive.
+  Conferir o par Client ID/secret do provedor e seu callback exige acesso protegido e
+  autorização específica; nada foi alterado no Google Cloud ou na configuração Auth.
+- Detectada também corrida local: useURL recebia o endereço inicial do development client
+  depois do evento de callback, substituindo a mensagem do provedor por origem inválida.
+  Agora o Root captura o callback Native validado antes da tela; evento novo prevalece sobre
+  initial URL atrasada. Cache contém só um URI efêmero, sem persistir/logar códigos; novas
+  operações/logout o invalidam. Parâmetros de rota Native sozinhos não autorizam exchange.
+  Esquema/host/caminho/credenciais continuam estritos. Ensaio físico com erro sintético
+  confirmou mensagem do provedor e estado terminal correto; NÃO é PASS de login Google real.
+- Nova reconexão Drive após trocar contas concluiu os mesmos 713 livros/62 pastas. Importação
+  explícita de um EPUB real concluiu, ofereceu Abrir livro, abriu no Reader com controles e
+  retornou à fonte pelo Voltar. Biblioteca passou legitimamente de 38 para 39, mantendo os
+  anteriores; nova reabertura com o código final preservou os 39. Nenhuma fonte foi removida.
+- Memória no development build ficou elevada (amostras PSS 712.814–913.368 KB; heap JS
+  ~64 MB em uma amostra). Não comparar diretamente ao APK release inicial e não inferir
+  vazamento/causa única desses números. Manter investigação de memória/congelamentos
+  intermitentes; Android não registrou ANR nos ensaios. PDF físico não foi revalidado aqui.
+- Gates finais: typecheck/export Web, 75/75 suítes críticas, Auth/callback/PKCE e ensaio
+  Chromium do export atual PASS. Regressores incluem callback antes de mount, initial URL
+  atrasada, reset de operação e parâmetros Native sem origem confiável. Provas físicas,
+  fixtures e bloqueios do provedor permanecem distintos.
+- Sem release/deploy/migrations/RLS/configuração OAuth/OWNER/pagamentos. Conta de teste
+  real e operações normais autorizadas do aplicativo são as exceções explicitamente
+  consentidas; não afirmar ausência total de escrita remota. A conta original está ativa.
+  Development build depende do Metro local; distribuição independente requer futuro build
+  Android autorizado. Rede e ajuste temporário de manter a tela ligada foram restaurados.
+  Alterações documentais preexistentes e .gitignore permanecem preservadas fora destes commits.

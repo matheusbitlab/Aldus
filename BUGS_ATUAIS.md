@@ -480,3 +480,24 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - Typecheck/export e matriz final 74/74 PASS; Sources UI/Chromium com fixtures controladas
   PASS, sem substituir prova física. Resultados adicionais de conta devem ser registrados
   ao concluir. Nenhum release/deploy/migration remota nesta correção.
+
+### Fechamento dos ensaios Android — 19/10/2026
+
+- Cadastro por e-mail VALIDADO com a identidade autorizada: criação, confirmação, login,
+  conclusão do username e Free automático. Primeiro carregamento de perfil falhou e retry
+  recuperou com HTTP 200; manter essa falha intermitente ABERTA, causa ainda inconclusiva.
+- Google PARCIAL/BLOQUEADO: S256/RNG local corrigidos e fluxo abriu/recebeu consentimento
+  real, mas Supabase registrou invalid_client na troca com Google. Sem sessão Google.
+  Configuração do provedor remoto exige autorização específica, sem relaxar RLS/PKCE.
+- Corrida de callback corrigida: Root registra URI Native validado; initial URL atrasada
+  do development client não substitui evento real. Parâmetros de rota sem URI confiável
+  não fazem exchange. Testes e erro sintético no Redmi PASS; não confundir com login Google.
+- Drive: indexação completa e repetida com 713 livros/62 pastas, cancelamento, recuperação
+  de erro e leitura offline/persistência demonstrados. EPUB importado sob demanda, aberto
+  no Reader e retorno à fonte; contagem 38→39 por esse acréscimo, sem apagar os anteriores.
+  Conta original restaurada e sessão validada no servidor; cadastro legado não foi adotado.
+- Estabilidade não declarada universal: alto uso de memória observado no build de
+  desenvolvimento e ausência de baseline físico equivalente; causa de todos os travamentos
+  ainda não demonstrada. Sem ANR nos ensaios. PDF físico permanece fora da prova desta rodada.
+- Gates finais 75/75 + typecheck/export + Auth/Chromium PASS. Futuro bundle Android
+  necessário para distribuir; sem release, deploy ou alteração de configuração remota.
