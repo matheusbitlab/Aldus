@@ -13,6 +13,6 @@ export default function SourceLibraryRoute() {
   useEffect(() => { void load().catch(() => setError("Não foi possível ler as fontes.")).finally(() => setReady(true)); }, [load]);
   const source = sources.find(item => item.id === sourceId);
   if (!ready) return <ActivityIndicator color={palette.accent} />;
-  if (!source || !sourceCapabilities(source).supportsCatalog) return <View style={{ flex: 1, padding: 24, gap: 16, backgroundColor: palette.background }}><Text style={{ color: palette.text }}>{error ?? (!source ? "Fonte removida ou não encontrada. Os livros importados permanecem na sua biblioteca." : "Esta fonte oferece somente pesquisa, não uma biblioteca completa.")}</Text><Pressable accessibilityRole="button" onPress={() => router.replace("/sources" as never)}><Text style={{ color: palette.accent }}>Voltar às fontes</Text></Pressable></View>;
+  if (!source || !sourceCapabilities(source).supportsCatalog) return <View style={{ flex: 1, padding: 24, gap: 16, backgroundColor: palette.background }}><Text style={{ color: palette.text }}>{error ?? (!source ? "Biblioteca removida ou não encontrada nesta conta. Os livros importados permanecem na sua biblioteca." : "Este catálogo oferece somente pesquisa, não uma biblioteca completa.")}</Text><Pressable accessibilityRole="button" onPress={() => router.replace("/sources" as never)}><Text style={{ color: palette.accent }}>Voltar às minhas bibliotecas</Text></Pressable></View>;
   return <SourceLibraryScreen source={source} />;
 }

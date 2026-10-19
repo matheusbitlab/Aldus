@@ -18,10 +18,12 @@ async function cdp(url) {
   const screenshots = path.resolve('.expo/source-library-validation'); fs.mkdirSync(screenshots, { recursive: true });
   const epubAsset = fs.readdirSync(path.join(exported, 'assets/assets/Livros'), { withFileTypes: true }).find(entry => entry.name.endsWith('.epub'));
   let books = Array.from({ length: 20 }, (_, i) => ({ id: `remote-${i}`, title: i === 0 ? 'Dom Casmurro' : i === 1 ? 'Memórias Póstumas de Brás Cubas' : `Livro ${String(i).padStart(4, '0')}`, author: 'Machado de Assis', url: '/fixture.epub', format: 'epub', modifiedAt: '2026-10-11T10:00:00Z' }));
-  let fail = false, requests = 0, delay = 0;
+  let fail = false, requests = 0, delay = 0, hold = false;
+  const heldResponses = [];
+  const releaseResponses = () => { hold = false; for (const respond of heldResponses.splice(0)) respond(); };
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, 'http://fixture.local').pathname;
-    if (pathname === '/fixture.json') { requests++; res.setHeader('Content-Type', 'application/json'); const respond = () => { if (fail) { res.writeHead(429); res.end('{}'); } else res.end(JSON.stringify({ books })); }; delay ? setTimeout(respond,delay) : respond(); return; }
+    if (pathname === '/fixture.json') { requests++; res.setHeader('Content-Type', 'application/json'); const respond = () => { if (fail) { res.writeHead(429); res.end('{}'); } else res.end(JSON.stringify({ books })); }; hold ? heldResponses.push(respond) : delay ? setTimeout(respond,delay) : respond(); return; }
     let target = pathname === '/fixture.epub' ? path.join(exported, 'assets/assets/Livros', epubAsset.name) : path.resolve(exported, '.' + decodeURIComponent(pathname));
     if (!target.startsWith(exported + path.sep)) { res.writeHead(403); res.end(); return; }
     if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) target = path.join(exported, 'index.html');
@@ -38,7 +40,7 @@ async function cdp(url) {
     const profile = { id: user.id, username: 'fixture', display_name: 'Teste controlado', avatar_url: null, role: 'user', account_status: 'active' };
     const jwt = [Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url'), Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 86400 })).toString('base64url'), 'fixture-signature'].join('.');
     const session = { access_token: jwt, refresh_token: 'fixture-not-real', token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400, user };
-    const source = { id: 'browser-source', name: 'Minha biblioteca de teste', kind: 'json', url: origin + '/fixture.json', enabled: true, status: 'active', createdAt: 1 };
+    const source = { id: 'browser-source', ownerId: user.id, name: 'Minha biblioteca de teste', kind: 'json', url: origin + '/fixture.json', enabled: true, status: 'active', createdAt: 1 };
     const drive = { ...source, id: 'drive-offline', name: 'Drive sem autorização', kind: 'google-drive', url: 'folder_123456789', folderId: 'folder_123456789' };
     const treeFolder = (id, name, parentFolderId, relativePath, target) => ({ id, sourceId: drive.id, remoteFolderId: target ?? id, parentFolderId, name, relativePath, isShortcut: !!target, shortcutTargetId: target });
     const treeBook = (id, title, parentFolderId, relativeFolderPath) => ({ sourceId: drive.id, remoteBookId: id, title, parentFolderId, relativeFolderPath, url: 'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media', format: title.endsWith('.pdf') ? 'pdf' : 'epub', estimatedSize: 123, sourceSite: drive.name, availability: 'available', drive: { fileId: id } });
@@ -82,9 +84,9 @@ async function cdp(url) {
     const screenshot = async name => { const r = await client.command('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(screenshots, name + '.png'), Buffer.from(r.data, 'base64')); };
     await navigate('/sources'); await until('Minha biblioteca de teste'); await screenshot('sources');
     await client.evaluate(`document.querySelector('[aria-label="Abrir biblioteca: Minha biblioteca de teste"]').click()`); await until('Use Atualizar');
-    delay=500; await click('Atualizar'); await until('Carregando catálogo'); await screenshot('loading'); await until('20 livros'); delay=0; await screenshot('grid');
+    hold=true; await click('Atualizar'); await until('Buscando livros'); await screenshot('loading'); releaseResponses(); await until('20 livros'); await screenshot('grid');
     assert.equal(requests, 1, 'one collection request, metadata only');
-    const input = async value => { await client.evaluate(`(() => { const e = document.querySelector('input[aria-label="Pesquisar nesta fonte"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e, ${JSON.stringify(value)}); e.dispatchEvent(new Event('input',{bubbles:true})); })()`); await wait(300); };
+    const input = async value => { await client.evaluate(`(() => { const e = document.querySelector('input[aria-label="Pesquisar nesta biblioteca"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e, ${JSON.stringify(value)}); e.dispatchEvent(new Event('input',{bubbles:true})); })()`); await wait(300); };
     await input('Dom Casmuro'); await until('Dom Casmurro'); assert.equal(requests, 1, 'typing does not call the source'); await screenshot('search');
     await click('Lista'); await screenshot('list');
     await client.evaluate(`document.querySelector('[aria-label="Abrir Dom Casmurro, de Machado de Assis"]').click()`); await until('Importar para a Biblioteca'); await screenshot('import-action');
@@ -123,26 +125,26 @@ async function cdp(url) {
     await client.evaluate(`document.querySelector('[aria-label="Abrir Dom Casmurro.epub, de Autor não informado"]').click()`); await until('Importar para a Biblioteca'); await until('Arquivo remoto.'); await click('Fechar');
     await input(''); await until('Sociedade do Espetáculo.pdf'); await client.evaluate(`document.querySelector('[aria-label="Ir para raiz da fonte"]').click()`); await until('Livro Root.epub');
     await openFolder('Atalho para Pasta B'); await until('Dom Casmurro.epub'); await openFolder('Voltar à raiz'); await until('Livro Root.epub');
-    await input('Pasta B'); await until('Resultados em toda a fonte'); await openFolder('Pasta B'); await until('Dom Casmurro.epub'); await screenshot('drive-tree-folder-search');
+    await input('Pasta B'); await until('Resultados em toda a biblioteca'); await openFolder('Pasta B'); await until('Dom Casmurro.epub'); await screenshot('drive-tree-folder-search');
     await navigate('/sources/drive-offline'); await until('Livro Root.epub'); await openFolder('Pasta A'); await openFolder('Pasta B'); await until('Dom Casmurro.epub'); await screenshot('drive-tree-offline-reopen');
     assert.equal(await client.evaluate(`window.fixtureRequests.filter(path=>path.startsWith('/drive/v3/files')).length`),0,'Navigation/search/open actions do not query Drive or download files');
-    await client.evaluate(`document.querySelector('[aria-label="Ir para raiz da fonte"]').click()`); await click('← Fontes'); await until('Minha biblioteca de teste');
+    await client.evaluate(`document.querySelector('[aria-label="Ir para raiz da fonte"]').click()`); await click('← Minhas bibliotecas'); await until('Minha biblioteca de teste');
     console.log('PASS exported hierarchical Drive snapshot: ROOT/A/B/back/breadcrumbs, source-wide fuzzy from C + path/actions, folder search, shortcut/cycle, offline IndexedDB reopen; no Drive API or media requests');
-    await navigate('/sources/error-source'); await until('Fonte indisponível'); fail=true; await click('Atualizar'); await until('Não foi possível carregar esta fonte.'); await screenshot('error-no-snapshot'); fail=false;
+    await navigate('/sources/error-source'); await until('Fonte indisponível'); fail=true; await click('Atualizar'); await until('Não foi possível carregar esta biblioteca.'); await screenshot('error-no-snapshot'); fail=false;
     await navigate('/sources/browser-source'); await until('20 livros'); books = []; await click('Atualizar'); await until('Nenhum EPUB ou PDF'); await screenshot('empty');
     books = Array.from({ length: 1000 }, (_, i) => ({ id: `remote-${i}`, title: `Livro ${String(i).padStart(4,'0')}`, url: '/fixture.epub', format: 'epub' }));
-    delay=500; const start = performance.now(); await click('Atualizar'); await until('Atualizando catálogo'); await screenshot('refreshing'); await until('1000 livros'); delay=0; const indexedMs = performance.now() - start; await wait(1000);
+    hold=true; const start = performance.now(); await click('Atualizar'); await until('Buscando livros'); await screenshot('refreshing'); releaseResponses(); await until('1.000 livros'); const indexedMs = performance.now() - start; await wait(1000);
     const mounted = await client.evaluate(`document.querySelectorAll('[aria-label^="Abrir Livro "]').length`); assert.ok(mounted < 250, `virtualized list, mounted ${mounted}/1000`);
     await input('Livro 0999'); await until('Livro 0999'); await click('Título Z–A'); await screenshot('thousand-search');
-    await client.evaluate(`localStorage.setItem('@kindle/appTheme','dark')`); await navigate('/sources/browser-source'); await until('1000 livros'); await screenshot('dark-grid');
-    await click('Gerenciar fonte'); await until('FONTES CADASTRADAS'); await click('Remover'); await until('Remover esta fonte não excluirá');
-    await client.evaluate(`document.querySelectorAll('[role="button"]').forEach(e=>{if(e.textContent.trim()==='Confirmar remoção da fonte')e.scrollIntoView({block:'center'});})`); await screenshot('remove-confirmation');
-    await click('Confirmar remoção da fonte'); await until('Fonte removida ou não encontrada');
+    await client.evaluate(`localStorage.setItem('@kindle/appTheme','dark')`); await navigate('/sources/browser-source'); await until('1.000 livros'); await screenshot('dark-grid');
+    await client.evaluate(`document.querySelector('[aria-label="Opções da biblioteca Minha biblioteca de teste"]').click()`); await click('Remover biblioteca'); await until('Remover esta biblioteca?'); await until('Livros já importados, notas e progresso serão preservados.');
+    await screenshot('remove-confirmation');
+    await click('Confirmar remoção da biblioteca'); await until('Biblioteca removida ou não encontrada nesta conta.');
     await client.evaluate(`window.fixturePersistence = {}; (function(exports){${persistentCode}})(window.fixturePersistence)`);
     const removed = await client.evaluate(`(async () => { const p=window.fixturePersistence; return { catalog:await p.webGetPersistent('source_catalogs','browser-source'), links:(await p.webSourceLinksPersistent('browser-source')).length, imported:(await p.webGetAllPersistent('books')).filter(b=>b.id===${JSON.stringify(importedBookId)} && !b.isDeleted).length }; })()`);
     assert.equal(removed.catalog, null); assert.equal(removed.links, 0); assert.equal(removed.imported, 1);
     const filePreserved = await client.evaluate(`(async () => !!(await window.fixturePersistence.webGetPersistent('documents', ${JSON.stringify(importedBookId)}))?.data)()`); assert.ok(filePreserved,'imported EPUB Blob remains after removing source');
-    console.log(`PASS exported Web: Sources/route/grid/list/search/import/reopen/stale/refresh-error/offline/auth/empty/remove; real IndexedDB rollback+links+personal book/file preserved; 1000 indexed ~${indexedMs.toFixed(0)}ms (includes 500ms injected latency), ${mounted} mounted cards. Screenshots .expo/source-library-validation. Supabase/remote fixture only; Drive real/Android NOT TESTED.`);
+    console.log(`PASS exported Web: Sources/route/grid/list/search/import/reopen/stale/refresh-error/offline/auth/empty/remove; real IndexedDB rollback+links+personal book/file preserved; 1000 indexed ~${indexedMs.toFixed(0)}ms (includes controlled response gate), ${mounted} mounted cards. Screenshots .expo/source-library-validation. Supabase/remote fixture only; Drive real/Android NOT TESTED.`);
   } finally {
     client?.close(); const exited = new Promise(r => child.once('exit',r)); child.kill(); await Promise.race([exited,wait(2000)]); await new Promise(r => server.close(r));
     // Only this run's mkdtemp profile, never an installed browser/user profile.

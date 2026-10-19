@@ -84,12 +84,12 @@ export default function Settings() {
           </View>
         </Section>
 
-        <Section title="FONTES E CATÁLOGOS" color={palette.secondaryText}>
+        <Section title="MINHAS BIBLIOTECAS" color={palette.secondaryText}>
           <View style={[styles.group, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <SettingsRow
               icon="albums-outline"
-              title="Minhas fontes"
-              description="Abrir bibliotecas, adicionar e gerenciar fontes"
+              title="Minhas bibliotecas"
+              description="Suas pastas do Google Drive e bibliotecas por link"
               color={palette.text}
               secondaryColor={palette.secondaryText}
               onPress={() => router.push("/sources" as never)}
