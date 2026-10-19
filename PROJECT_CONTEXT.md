@@ -1251,3 +1251,61 @@ pagamentos ou publicar automaticamente em tarefas de interface.
   book-library/reader/study/plans/final e book-nojs-reduced-motion. Nenhum novo deploy,
   alteração Supabase, bootstrap, cobrança, APK ou teste físico Android nesta etapa.
   Entrada Native e Reader intactos; não exige recompilação nativa para esse recurso Web.
+
+### Android: cadastro, PKCE e catálogos grandes — 19/10/2026
+
+- main atualizada por fast-forward seguro de 10d6d24 para 112450d; alterações anteriores
+  de fontes e documentação preservadas. O redesign de Minhas bibliotecas já existia no
+  worktree; esta correção priorizou estabilidade, busca e fluxos preparados existentes.
+- Redmi Android 16: APK instalado originalmente 1.0.0/code 1, atualizado em 17/10,
+  Supabase público cmivracxuihtmsbmtuec. SHA-256 do APK inspecionado:
+  60066f5377b24d0beb72c8fed8441d893a4464ee1ac1db1aeb3b66f3ad5758dd.
+  O bundle difere do release 761c28d; não foi atribuída uma revisão exata sem prova.
+  Development build existente instalado com adb install -r após conferir a mesma assinatura,
+  sem desinstalar/limpar dados; o código atual foi carregado via Metro. Nenhum release gerado.
+- Cadastro: quatro /signup HTTP 500 do incidente de 17/10 classificados por leitura
+  remota como conflito único profiles/username. O trigger auth_create_profile insere o
+  username fornecido nos metadados e abortava a criação da identidade quando ocupado.
+  Cliente agora envia preferred_username como sugestão, deixa o perfil inicial sem username
+  e usa o fluxo autenticado existente para reivindicá-lo após confirmação de e-mail.
+  Conflito e falha de rede em completar perfil possuem erro recuperável e encerram busy.
+- SDK Supabase instalado reproduz code_challenge_method=plain sem SubtleCrypto; era a
+  condição rejeitada pelo validador S256. Native usa SecureRandom do Expo Core existente
+  para getRandomValues e SHA-256 de @noble/hashes para endurecer os desafios de OAuth e
+  signup/recovery/OTP, preservando o verifier armazenado pelo SDK. Sem fallback Math.random,
+  sem SubtleCrypto fictício, sem relaxar origem/callback/PKCE, sem dependência nativa nova.
+  Hermes físico confirmou ausência de subtle, RNG disponível e vetor RFC 7636 S256 correto.
+- Auditoria remota somente leitura: redirect Native e recovery corretos; Web localhost
+  não preservado e caminho Native não aprovado aceito pelo servidor. Configuração Auth
+  externa não alterada. As quatro migrations SaaS/Admin já constam no ledger remoto sob
+  versões de 16/10 documentadas anteriormente; não foram reaplicadas nesta execução.
+- Catálogos: snapshot imutável reaproveitado após validar conta/identidade; índices e
+  ordenações construídos somente quando usados; Intl.Collator reutilizado. Busca coopera
+  em lotes de 100, pode ser cancelada e descarta respostas antigas. JSON é serializado
+  antes da transação SQLite exclusiva, mantendo rollback e verificações de cancelamento.
+- Físico: 38 livros pessoais preservados antes e após reiniciar. Catálogo existente:
+  713 livros / 62 pastas visíveis (63 nós incluindo raiz). Abertura, busca, pastas, rolagem,
+  Voltar, cancelamento real e nova tentativa exercitados; sem ANR registrado pelo Android.
+  Indexação Google real terminou em 117.056 ms, com 713 livros e 62 pastas consultadas;
+  serialização 11,8 ms e escrita SQLite 60,9 ms. Catálogo reaberto após encerrar o processo
+  e também com Wi-Fi/dados móveis desligados, sem nova indexação. Rede restaurada.
+  Tentativa anterior após segundo plano terminou em erro network após 34 pastas;
+  carregamento terminou, índice anterior preservado e retry explícito posterior concluiu.
+- Leitura SQLite inicial 49,2 ms, parse 7,7 ms, árvore inicial 15,6 ms e callback de frame
+  após mount 748,1 ms no build de desenvolvimento. Busca cooperativa dos 713 registros:
+  229 ms e 25 callbacks de timer; isso não mede FPS nem latência de toque. Não existe
+  medição física anterior equivalente para afirmar percentuais de ganho ou encerrar todos
+  os congelamentos intermitentes. Fixtures isoladas de 1.000/5.000/10.000 e cancelamento
+  têm evidência controlada distinta do aparelho.
+- Gates: typecheck, export Web e matriz crítica final 74/74 PASS; Sources UI controlada
+  PASS; Chromium exportado PASS para navegação, busca, importação, IndexedDB/rollback,
+  offline, remoção preservando arquivo e 1.000 livros com 24 cards montados. Testes foram
+  adaptados às labels/ownership atuais e resposta HTTP retida explicitamente durante loading,
+  sem depender de atraso artificial curto. Nova Sources UI incorporada à matriz crítica.
+- Cadastro real autorizado: UI Verifique seu email; servidor confirmou uma identidade nova,
+  um perfil ativo/user, plano Free automático e username ainda não reivindicado. Confirmação de e-mail, login posterior
+  e login Google continuam em andamento; não declarar PASS completo por fixtures ou vetor
+  PKCE. Senha e confirmação entram exclusivamente no Redmi; sem credenciais no Git.
+  Importação física sob demanda e reprodução de todos os congelamentos continuam pendentes.
+- Necessário futuro bundle Android para distribuir as correções; development build atual
+  serve apenas à homologação. Sem migrations/configurações remotas, deploy ou cobrança.

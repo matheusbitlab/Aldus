@@ -457,3 +457,26 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - Android físico permanece pendente; futuro build/instalação necessário para distribuir
   o novo bundle. Nenhum APK/deploy/migration remota/backup real nesta etapa. A janela de
   senha anterior foi encerrada sem leitura de credenciais. Bugs físicos anteriores intactos.
+
+### Cadastro, Google e travamentos Android — atualização de 19/10/2026
+
+- Cadastro HTTP 500: confirmado conflito profiles_username_unique_ci no trigger de criação
+  do perfil durante o incidente. Correção local adia a reivindicação do username ao fluxo
+  autenticado, sem modificar trigger/RLS remoto. Cadastro real autorizado criou identidade e
+  perfil ativo/user; UI Verifique seu email. Ainda pendentes confirmação e login posterior.
+- Login Google: SDK sem SubtleCrypto gerava PKCE plain, rejeitado pelo validador S256.
+  Corrigidos RNG Native e desafio S256 preservando verifier e validações. Vetor correto no
+  Hermes físico; autorização/callback/sessão completos ainda pendentes. Auditoria também
+  encontrou allowlist remota ampla para caminho Native e localhost Web não preservado;
+  nenhuma configuração externa alterada nesta missão.
+- BUG-03: reconexão/indexação Google real concluiu no Redmi, 713 livros e 62 pastas, em
+  117.056 ms. Cancelamento real encerrou loading preservando índice; erro network após
+  segundo plano também terminou sem perda e retry explícito concluiu. SQLite persistiu;
+  reabrir processo e abrir offline preservaram catálogo. 38 livros pessoais mantidos.
+- Reduzidos trabalho duplicado ao abrir e busca síncrona grande; busca cooperativa cancela
+  e rejeita resultados tardios. Não foi demonstrada causa única para todos os congelamentos
+  relatados; não há baseline físico cronometrado comparável. Manter acompanhamento até
+  completar importação física e fluxos de conta. Sem ANR no período inspecionado.
+- Typecheck/export e matriz final 74/74 PASS; Sources UI/Chromium com fixtures controladas
+  PASS, sem substituir prova física. Resultados adicionais de conta devem ser registrados
+  ao concluir. Nenhum release/deploy/migration remota nesta correção.
