@@ -2,11 +2,12 @@ import { SourceCatalogRepository } from "@/src/domain/repositories/SourceCatalog
 import { ScrapedLink } from "@/src/domain/types/search";
 import { UserSource } from "@/src/domain/types/sources";
 import { SourceCatalog, SourceCatalogItem, SourceCatalogListing, SourceCatalogView, SourceFolder, SourceImportLink, SourceOperationContext, SourceOperationProgress, sourceCapabilities, sourceIdentity } from "@/src/domain/types/sourceCatalog";
-import { createCatalogSearchIndex, normalizeCatalogText } from "@/src/domain/search/catalogRanking";
+import { createCatalogSearchIndex, createCatalogSearchIndexAsync, normalizeCatalogText } from "@/src/domain/search/catalogRanking";
 import { DriveError } from "@/src/data/drive/DriveErrors";
 import { throwIfAborted, withAbort } from "@/src/core/utils/cancellation";
 import { libraryAccountScope } from "@/src/data/library/LibraryAccountScope";
 import { sourceOperationContext, sourceOperationErrorCode, sourceProgress } from "@/src/utils/sourceDiagnostics";
+import { measureSource } from "@/src/utils/sourcePerformance";
 
 export interface SourceCatalogAdapter {
   list(source: UserSource, signal: AbortSignal, context?: SourceOperationContext): Promise<ScrapedLink[]>;
@@ -117,6 +118,16 @@ export class SourceCatalogService {
       if (session !== this.session || generation !== this.generation(source.id)) return;
       if (!current || sourceIdentity(current) !== sourceIdentity(source)) throw new Error("Esta biblioteca não está disponível para a conta atual.");
       this.checkOwner(current);
+      const previous = this.view(source.id);
+      if (previous.catalog?.sourceIdentity === sourceIdentity(source)) {
+        // A mounted summary and its library share one immutable snapshot. Reopening
+        // must not parse, tokenize and sort the same persisted collection again.
+        const catalog = previous.catalog.sourceName === source.name ? previous.catalog : { ...previous.catalog, sourceName: source.name };
+        const status = this.adapter.authorizationRequired(source) ? 'auth_required' : typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline'
+          : previous.status === 'auth_required' || previous.status === 'offline' ? 'stale' : previous.status;
+        if (catalog !== previous.catalog || status !== previous.status) this.publish(source.id, { ...previous, catalog, status });
+        return;
+      }
       const stored = await withAbort(this.repository.get(source.id), signal);
       if (session !== this.session || generation !== this.generation(source.id)) return;
       const catalog = stored?.sourceIdentity === sourceIdentity(source) ? { ...stored, sourceName: source.name } : null;
@@ -297,15 +308,33 @@ export function catalogItems(source: UserSource, links: ScrapedLink[]): SourceCa
   return [...items.values()];
 }
 export type SourceCatalogSort = "az" | "za" | "recent";
-const queryIndexes = new WeakMap<SourceCatalogItem[], { index: ReturnType<typeof createCatalogSearchIndex<SourceCatalogItem>>; sorted: Record<SourceCatalogSort, SourceCatalogItem[]> }>();
-const compareItems = (sort: SourceCatalogSort) => (a: SourceCatalogItem, b: SourceCatalogItem) => sort === "recent" ? (Date.parse(b.modifiedAt ?? "") || 0) - (Date.parse(a.modifiedAt ?? "") || 0) || a.title.localeCompare(b.title, "pt") : a.title.localeCompare(b.title, "pt") * (sort === "za" ? -1 : 1);
+const queryIndexes = new WeakMap<SourceCatalogItem[], { index?: ReturnType<typeof createCatalogSearchIndex<SourceCatalogItem>>; sorted: Partial<Record<SourceCatalogSort, SourceCatalogItem[]>> }>();
+// Reuse one ICU collator. Constructing it inside every localeCompare is costly on Native.
+const titleCollator = new Intl.Collator('pt');
+const compareItems = (sort: SourceCatalogSort) => (a: SourceCatalogItem, b: SourceCatalogItem) => sort === "recent" ? (Date.parse(b.modifiedAt ?? "") || 0) - (Date.parse(a.modifiedAt ?? "") || 0) || titleCollator.compare(a.title, b.title) : titleCollator.compare(a.title, b.title) * (sort === "za" ? -1 : 1);
 export function querySourceCatalog(items: SourceCatalogItem[], query: string, sort: SourceCatalogSort): SourceCatalogItem[] {
   let cached = queryIndexes.get(items);
   if (!cached) {
-    cached = { index: createCatalogSearchIndex(items), sorted: { az: [...items].sort(compareItems("az")), za: [...items].sort(compareItems("za")), recent: [...items].sort(compareItems("recent")) } };
+    cached = { sorted: {} };
     queryIndexes.set(items, cached);
   }
-  return query.trim() ? cached.index.search(query, compareItems(sort)) : cached.sorted[sort];
+  if (query.trim()) {
+    cached.index ??= measureSource('search_index', items.length, () => createCatalogSearchIndex(items));
+    return measureSource('search', items.length, () => cached.index!.search(query, compareItems(sort)));
+  }
+  return cached.sorted[sort] ??= measureSource('sort', items.length, () => [...items].sort(compareItems(sort)));
+}
+/** Same ranking rules/cache; large Native searches yield between batches and reject obsolete input. */
+export async function querySourceCatalogAsync(items: SourceCatalogItem[], query: string, sort: SourceCatalogSort, signal?: AbortSignal): Promise<SourceCatalogItem[]> {
+  throwIfAborted(signal);
+  if (!query.trim()) return querySourceCatalog(items, query, sort);
+  let cached = queryIndexes.get(items);
+  if (!cached) { cached = { sorted: {} }; queryIndexes.set(items, cached); }
+  if (!cached.index) {
+    const prepared = await createCatalogSearchIndexAsync(items, signal);
+    throwIfAborted(signal); cached.index ??= prepared;
+  }
+  return cached.index.searchAsync(query, compareItems(sort), signal);
 }
 
 function catalogFolders(source: UserSource, listing: SourceCatalogListing): { schemaVersion?: 2; rootFolderId?: string; folders: SourceFolder[] } {

@@ -1,4 +1,5 @@
 import { ScrapedLink } from "@/src/domain/types/search";
+import { cancellableWait, throwIfAborted } from "@/src/core/utils/cancellation";
 
 const stopWords = new Set("a o as os um uma uns umas de do da dos das e em no na nos nas por para the an of and by to in".split(" "));
 const authorSpellings: Record<string, string> = { dostoievski: "dostoyevsky", dostoievsky: "dostoyevsky", dostoevsky: "dostoyevsky", dostoevski: "dostoyevsky", dostojevski: "dostoyevsky", dostoievskij: "dostoyevsky" };
@@ -39,15 +40,38 @@ function scorePreparedBook(book: ReturnType<typeof prepareCatalogBook>, terms: s
 }
 export function scoreCatalogBook(book: ScrapedLink, query: string): number { return scorePreparedBook(prepareCatalogBook(book), catalogTokens(query)); }
 /** Same scoring rules, with book tokens prepared once per immutable snapshot. */
-export function createCatalogSearchIndex<T extends ScrapedLink>(books: T[]) {
-  const rows = books.map((book, index) => ({ book, index, prepared: prepareCatalogBook(book) }));
+type CatalogRow<T extends ScrapedLink> = { book: T; index: number; prepared: ReturnType<typeof prepareCatalogBook> };
+function preparedCatalogIndex<T extends ScrapedLink>(rows: CatalogRow<T>[]) {
+  const finish = (matches: (CatalogRow<T> & {score: number})[], tieBreak?: (a: T, b: T) => number) =>
+    matches.sort((a, b) => b.score - a.score || (tieBreak?.(a.book, b.book) ?? 0) || a.index - b.index).map(row => row.book);
   return {
     search(query: string, tieBreak?: (a: T, b: T) => number): T[] {
       const terms = catalogTokens(query);
-      return rows.map(row => ({ ...row, score: scorePreparedBook(row.prepared, terms) }))
-        .filter(row => row.score > 0).sort((a, b) => b.score - a.score || (tieBreak?.(a.book, b.book) ?? 0) || a.index - b.index).map(row => row.book);
+      return finish(rows.map(row => ({ ...row, score: scorePreparedBook(row.prepared, terms) })).filter(row => row.score > 0), tieBreak);
+    },
+    async searchAsync(query: string, tieBreak?: (a: T, b: T) => number, signal?: AbortSignal): Promise<T[]> {
+      const terms = catalogTokens(query), matches: (CatalogRow<T> & {score: number})[] = [];
+      for (let index = 0; index < rows.length; index++) {
+        throwIfAborted(signal);
+        const row = rows[index], score = scorePreparedBook(row.prepared, terms);
+        if (score > 0) matches.push({ ...row, score });
+        if (index % 100 === 99) await cancellableWait(0, signal);
+      }
+      throwIfAborted(signal); return finish(matches, tieBreak);
     },
   };
+}
+export function createCatalogSearchIndex<T extends ScrapedLink>(books: T[]) {
+  return preparedCatalogIndex(books.map((book, index) => ({ book, index, prepared: prepareCatalogBook(book) })));
+}
+export async function createCatalogSearchIndexAsync<T extends ScrapedLink>(books: T[], signal?: AbortSignal) {
+  const rows: CatalogRow<T>[] = [];
+  for (let index = 0; index < books.length; index++) {
+    throwIfAborted(signal);
+    rows.push({ book: books[index], index, prepared: prepareCatalogBook(books[index]) });
+    if (index % 100 === 99) await cancellableWait(0, signal);
+  }
+  throwIfAborted(signal); return preparedCatalogIndex(rows);
 }
 export function rankCatalogBooks<T extends ScrapedLink>(books: T[], query: string): T[] {
   return createCatalogSearchIndex(books).search(query);

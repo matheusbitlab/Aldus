@@ -1,7 +1,9 @@
 import { createCatalogSearchIndex } from "@/src/domain/search/catalogRanking";
 import { SourceCatalog, SourceCatalogItem, SourceFolder } from "@/src/domain/types/sourceCatalog";
+import { measureSource } from "@/src/utils/sourcePerformance";
 
 const cache = new WeakMap<SourceCatalog, ReturnType<typeof buildTreeIndex>>();
+const folderCollator = new Intl.Collator('pt');
 function buildTreeIndex(catalog: SourceCatalog) {
   const byId = new Map((catalog.folders ?? []).map(folder => [folder.id, folder]));
   const foldersByParent = new Map<string, SourceFolder[]>(), booksByParent = new Map<string, SourceCatalogItem[]>();
@@ -10,7 +12,7 @@ function buildTreeIndex(catalog: SourceCatalog) {
     const siblings = foldersByParent.get(folder.parentFolderId) ?? [];
     siblings.push(folder); foldersByParent.set(folder.parentFolderId, siblings);
   }
-  for (const siblings of foldersByParent.values()) siblings.sort((a, b) => a.name.localeCompare(b.name, "pt"));
+  for (const siblings of foldersByParent.values()) siblings.sort((a, b) => folderCollator.compare(a.name, b.name));
   for (const book of catalog.items) {
     const parent = book.parentFolderId ?? catalog.rootFolderId;
     if (!parent) continue;
@@ -23,7 +25,7 @@ function buildTreeIndex(catalog: SourceCatalog) {
 }
 export function sourceTreeIndex(catalog: SourceCatalog) {
   let index = cache.get(catalog);
-  if (!index) { index = buildTreeIndex(catalog); cache.set(catalog, index); }
+  if (!index) { index = measureSource('tree', catalog.items.length, () => buildTreeIndex(catalog)); cache.set(catalog, index); }
   return index;
 }
 /** Revalidates IDs after refresh; removed/moved ancestors return to the last known parent. */
