@@ -6,6 +6,7 @@ import { AuthOperationError, authFailureDetails } from "./authErrors";
 import { authDiagnostic, finishAuthDiagnostic } from "@/src/utils/authDiagnostics";
 import { buildAuthCallback, validateGoogleAuthorizationUrl } from "./authRedirect";
 import { authOAuthContext, authOAuthGeneration, beginGoogleAuthOperation, finishAuthOAuthOperation, isCurrentGoogleAuthOperation } from "@/src/utils/authOAuthDiagnostics";
+import { hardenPkceParameters } from "./authPkce";
 
 export function authCallbackUrl(next?: "reset-password") {
   const webOrigin = Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : undefined;
@@ -49,7 +50,10 @@ export async function registerAccount(name: string, username: string, email: str
   try {
     const { data, error } = await client.auth.signUp({
       email: email.trim().toLowerCase(), password,
-      options: { emailRedirectTo: authCallbackUrl(), data: { username: normalizeUsername(username), display_name: name.trim() } },
+      // The existing Auth trigger inserts profiles.username under a unique index.
+      // Claim it only after email verification, through the authenticated profile flow:
+      // a taken suggestion must not abort creation of the Auth identity with HTTP 500.
+      options: { emailRedirectTo: authCallbackUrl(), data: { preferred_username: normalizeUsername(username), display_name: name.trim() } },
     });
     if (error) throw new AuthOperationError("signup", error);
     authDiagnostic("SUPABASE_SIGNUP_RESULT", { operationId, result: "success", uuid: data.user?.id, session: !!data.session, emailConfirmationPending: !data.session });
@@ -84,14 +88,22 @@ export async function loginWithGoogle() {
     authDiagnostic("OAUTH_BROWSER_OPENED", { ...context, authorizationResult: "error", ...authFailureDetails(error) });
     throw new Error("Não foi possível iniciar o login Google.");
   }
-  try { validateGoogleAuthorizationUrl(data.url, process.env.EXPO_PUBLIC_SUPABASE_URL, redirectTo); }
+  let authorizationUrl = data.url;
+  try {
+    if (Platform.OS !== 'web') {
+      const nativeUrl = new URL(authorizationUrl);
+      hardenPkceParameters(nativeUrl.searchParams);
+      authorizationUrl = nativeUrl.href;
+    }
+    validateGoogleAuthorizationUrl(authorizationUrl, process.env.EXPO_PUBLIC_SUPABASE_URL, redirectTo);
+  }
   catch (failure) {
     authDiagnostic("OAUTH_BROWSER_OPENED", { ...context, authorizationResult: "rejected" });
     throw failure;
   }
   try {
-    if (Platform.OS === "web") window.location.assign(data.url);
-    else await Linking.openURL(data.url);
+    if (Platform.OS === "web") window.location.assign(authorizationUrl);
+    else await Linking.openURL(authorizationUrl);
     authDiagnostic("OAUTH_BROWSER_OPENED", { ...context, authorizationResult: "opened", callbackReceived: false, exchangeStarted: false });
   } catch {
     if (!isCurrentGoogleAuthOperation(ticket)) return;

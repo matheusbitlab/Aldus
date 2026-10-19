@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Redirect, router } from "expo-router";
 import { AuthButton, AuthError, AuthForm, AuthInput } from "@/src/presentation/components/AuthForm";
 import { normalizeUsername, validUsername } from "@/src/domain/auth/authRules";
@@ -9,14 +9,22 @@ export default function CompleteProfile() {
   const { session, profile, refreshProfile } = useAuth();
   const [username, setUsername] = useState(""); const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const suggestion = session?.user.user_metadata?.preferred_username;
+    setUsername(typeof suggestion === "string" && validUsername(suggestion) ? normalizeUsername(suggestion) : "");
+    setError(null);
+  }, [session?.user.id]);
   if (!session) return <Redirect href={"/auth/login" as never} />;
   if (profile?.username) return <Redirect href="/" />;
   const submit = async () => {
     if (!validUsername(username)) { setError("Use 3 a 24 caracteres: letras, números ou _; comece por uma letra."); return; }
     setBusy(true); setError(null);
-    const result = await requireSupabase().from("profiles").update({ username: normalizeUsername(username) }).eq("id", session.user.id).select("id").single();
-    if (result.error) { setError(result.error.code === "23505" ? "Este nome de usuário já está em uso." : "Não foi possível salvar o usuário."); setBusy(false); return; }
-    await refreshProfile(); setBusy(false); router.replace("/");
+    try {
+      const result = await requireSupabase().from("profiles").update({ username: normalizeUsername(username) }).eq("id", session.user.id).select("id").single();
+      if (result.error) { setError(result.error.code === "23505" ? "Este nome de usuário já está em uso. Escolha outro para concluir seu perfil." : "Não foi possível salvar o usuário. Tente novamente."); return; }
+      await refreshProfile(); router.replace("/");
+    } catch { setError("Não foi possível salvar seu perfil. Confira a conexão e tente novamente."); }
+    finally { setBusy(false); }
   };
   return <AuthForm title="Escolha seu nome de usuário" subtitle="Ele será usado para entrar e identificar seu perfil.">
     <AuthInput label="Nome de usuário" value={username} onChangeText={setUsername} autoComplete="username-new" />

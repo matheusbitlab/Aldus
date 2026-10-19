@@ -1,5 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { Platform } from "react-native";
+import { installNativeAuthRandom } from "./nativeAuthRandom";
+import { nativeAuthFetch } from "./authPkce";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_KEY;
@@ -10,9 +13,11 @@ const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_KEY;
  * when a build does not provide remote configuration.
  */
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
+if (Platform.OS !== 'web' && isSupabaseConfigured) installNativeAuthRandom();
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl!, supabaseKey!, {
+      ...(Platform.OS !== 'web' ? { global: { fetch: nativeAuthFetch(supabaseUrl!, (...args) => fetch(...args)) } } : {}),
       auth: {
         storage: AsyncStorage,
         autoRefreshToken: true,
