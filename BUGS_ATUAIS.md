@@ -501,3 +501,28 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   ainda não demonstrada. Sem ANR nos ensaios. PDF físico permanece fora da prova desta rodada.
 - Gates finais 75/75 + typecheck/export + Auth/Chromium PASS. Futuro bundle Android
   necessário para distribuir; sem release, deploy ou alteração de configuração remota.
+
+### 20/10/2026 — Capas, Ajustes e Admin
+
+- IMPLEMENTADO/VALIDADO em contratos e interfaces controladas: capa EPUB declarada agora
+  aproveitada; BookCover editorial em biblioteca/Drive/busca/seleção; fallback para imagem
+  quebrada/pequena e fonte sem capa; sem download automático dos livros do Drive.
+  Capas de importações antigas não são extraídas retroativamente. SVG/arte >1 MiB e PDF
+  Native sem miniatura existente usam o placeholder, sem novo subsistema de renderização.
+- IMPLEMENTADO/VALIDADO: Ajustes compactos, índice legal público e controles anteriores
+  preservados; Admin com dez seções agrupadas e configurações editadas sob demanda.
+  Histórico, revisões, MFA, confirmações, auditoria e permissões continuam nas camadas existentes.
+- Leitura Livre: otimização experimental DESCARTADA. Weber 584 páginas no desktop apresentou
+  ~22 ms de economia no agrupamento, sem comprovação de melhoria dos 212 s informados no
+  Redmi. Nenhum algoritmo do Reader/extrator/cache de produção alterado. Dois avisos JBIG2
+  no ensaio desktop limitam prova de imagens; tempos reais de WebView/ponte/OCR/cache Native
+  continuam sem comparação pareada nesta rodada. Não declarar conversão acelerada.
+- Redmi: 40 livros confirmados, navegação/temas/Legal/fonte 1,3x após reabertura e catálogo
+  Teste preservado em cache com 713 livros. Atualização do Drive aguarda reconexão, não
+  repetida aqui. Automação da árvore acessível após alterar escala exigiu reabrir o dev client;
+  não houve prova de ANR. Preferências originais e APK independente 35d092b restaurados.
+- Qualidade: 79/79 críticas, typecheck/export, regressões específicas e Chromium do export
+  com PostgreSQL/PGlite isolado PASS. Não equivalem a validação remota ou TalkBack físico.
+  Alterações novas exigem futuro bundle Android autorizado; APK/preview 35d092b são anteriores.
+  Bloqueio Google invalid_client e investigação intermitente de perfil/memória anteriores
+  permanecem abertos; esta revisão não alterou configuração OAuth nem declarou sua correção.

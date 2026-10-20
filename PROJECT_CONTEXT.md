@@ -1357,3 +1357,71 @@ pagamentos ou publicar automaticamente em tarefas de interface.
   Development build depende do Metro local; distribuição independente requer futuro build
   Android autorizado. Rede e ajuste temporário de manter a tela ligada foram restaurados.
   Alterações documentais preexistentes e .gitignore permanecem preservadas fora destes commits.
+
+### 20/10/2026 — Capas editoriais, Ajustes e organização do Admin
+
+- Trabalho na main, partindo de 35d092bf512cc7f96d2c2ad864c956ade62462e7. As alterações
+  preexistentes de .gitignore e destes dois documentos foram preservadas sem reset/clean/stash
+  e não foram incluídas nos commits desta revisão.
+- Capas: BookCover compartilhado por biblioteca, fontes/Drive, busca/detalhes e seleção
+  de livros. Original disponível, miniatura alternativa quando fornecida e fallback editorial
+  determinístico; carregamento/erro, proporção preservada, imagem pequena rejeitada e
+  downsampling Android. Sem imagens geradas por IA, arquivos de placeholder ou busca externa.
+  As 35 imagens estáticas existentes mantêm dimensões válidas e não foram substituídas.
+- EPUB: declarações EPUB 3 cover-image, meta cover do EPUB 2 e guia HTML/raster, inclusive
+  caminhos relativos fora da pasta do OPF. Extração apenas da capa declarada, limitada a
+  1 MiB, com assinatura raster verificada; reaproveita recursos já lidos. Usa coverImagePath
+  persistido existente. Arte inválida/ausente/grande não impede importação nem leitura.
+  Não há reimportação automática de livros antigos. Capas vetoriais SVG não ganham um
+  novo renderizador Native: nesses casos ou sem capa disponível usa-se o fallback editorial.
+- PDF: Web mantém renderização só da primeira página, canvas limitado a 300 x 480 e
+  destruição do documento/worker também em falhas. Android reutiliza miniatura local válida;
+  o módulo atual só expõe OCR, não thumbnail, portanto sem miniatura usa o placeholder.
+  Não foi acionado Reflow/OCR para gerar capas, nem adicionada dependência Native.
+- Ajustes: identidade compacta, grupos Conta e plano, Leitura e aparência, Biblioteca e
+  serviços, Comunidade e Privacidade e informações. Sincronização, tema, conforto e serviços
+  usam subdivisões internas; preferências e operações anteriores continuam disponíveis.
+  Índice Legal e informações público, além dos sete documentos públicos existentes.
+  A entrada Admin depende da mesma autorização verificada no servidor.
+- Admin: dez seções agrupadas em quatro áreas; lateral recolhível no desktop e menu
+  fechado inicialmente no celular. Configurações em lista resumida, editor só após seleção,
+  histórico e identificadores avançados recolhíveis. Contratos/chaves/RPCs/MFA/confirmações,
+  revisões, auditoria e proteção do último OWNER preservados. Sem mutações administrativas reais.
+- Leitura Livre: nenhuma otimização de produção adotada. Experimento local com o Weber
+  empacotado (5.265.071 bytes, 584 páginas, 58.594 itens) comparou agrupamento linear a busca
+  binária: medianas 213,96 ms e 191,49 ms em oito execuções alternadas; linhas e documento
+  textual idênticos. Economia de ~22 ms insuficiente para justificar mudança sem prova Native.
+  No mesmo ensaio Node/PDF.js 6.3.289: leitura 3,34 ms, base64 2,69 ms, abertura 167,91 ms,
+  texto 7.374 ms, listas de operações 5.921 ms, montagem/validação 1.282 ms, serialização
+  15,55 ms e gravação de arquivo temporário 16,17 ms. JSON de ponte foi apenas simulado.
+  Houve dois avisos JBIG2 no desktop; pixels/OCR/ponte real/SQLite/memória móvel não foram
+  validados nesse ensaio. Os ~212 s previamente informados no Redmi não são comparáveis.
+  Extrator WebView/PDF.js 3.11.174, Reader, imagens, OCR, validação e cache de produção intactos.
+- Qualidade: typecheck/export Web; matriz 79/79; novas regressões de capas/miniaturas,
+  Ajustes e Admin, mais reexecução das suítes afetadas após revisão. Chromium do export:
+  Admin com HTTP/Auth/TOTP sintéticos e PostgreSQL/PGlite isolado, dez seções e operações
+  auditadas, edição/rollback de configuração, teclado, telas móveis e fonte ampliada;
+  fontes com mil itens, 24 cartões montados, grade/lista, busca, importação e IndexedDB.
+  Esses ensaios não são validação de Supabase gerenciado. Capturas locais em .expo/admin-validation
+  e .expo/source-library-validation; medições/logs em artifacts/design-20261020 (ignorados).
+  Bundle Web principal: 5.623.899 bytes contra 5.617.078 em 35d092b (+6.821); gzip
+  1.472.471 contra 1.470.417 (+2.054). Zero dependências Native e imagens bitmap novas.
+  Isso não mede RSS do Android nem tamanho de um APK com as novas telas.
+- Redmi Android 16: development build já existente, compatível por assinatura, com JS novo;
+  40 livros preservados (o proprietário confirmou a importação adicional desde os 39).
+  Ajustes/Legal/temas/rolagem e fonte 1,3x após reabertura, fonte Teste, pastas e grade/lista
+  exercitados. Catálogo em cache com 713 livros/62 pastas + raiz; pede reconexão para atualizar,
+  sem novo consentimento, indexação ou importação nesta revisão. Três fontes atuais preservadas.
+  Após mudar font_scale a automação precisou reabrir o development build para recuperar a
+  árvore acessível; a captura já mostrava a biblioteca. Não classificar isso como ANR provado.
+  Preferências restauradas (tema sistema, escala 1,0 e manter tela ligada 0).
+- Entrega anterior concluída separadamente: APK independente 35d092b, 345.627.034 bytes,
+  SHA-256 F0B152615D2A6F45C7DBA64414FBA25A14B6A125ABCFA5077E691EA0B1748117,
+  artifacts/apk/Aldus-35d092b.apk e cópia USB Download/Aldus-35d092b.apk. Mesmo package/certificado,
+  install -r, primeiro install preservado; restaurado no aparelho ao terminar e aberto sem Metro.
+  Preview anterior somente homologação: https://kindle-reader-gzaek9u7j-matheus-projects-70f48ed9.vercel.app
+  (commit 35d092b, conteúdo remoto verificado). APK/preview anteriores NÃO incluem esta revisão.
+  Nova distribuição Android precisará de novo bundle/build autorizado; sem nova dependência Native.
+- Sem novo APK de distribuição nesta revisão, deploy de produção, mudanças Supabase,
+  migrations, OAuth, OWNER ou pagamentos. Push da main não aciona o projeto Vercel inspecionado:
+  não há integração Git conectada; o preview anterior foi envio explícito estático.
