@@ -1,9 +1,10 @@
-export const LEGAL_DOCUMENT_VERSION = "0.6";
-export const LEGAL_EFFECTIVE_DATE = "12 de outubro de 2026";
+export const LEGAL_DOCUMENT_VERSION = "0.7";
+export const LEGAL_EFFECTIVE_DATE = "20 de outubro de 2026";
 export const LEGAL_REVIEW_STATUS = "Implementação jurídica inicial — revisão profissional pendente";
 
 const configuredController = process.env.EXPO_PUBLIC_LEGAL_CONTROLLER_NAME?.trim() ?? "";
-const configuredContact = process.env.EXPO_PUBLIC_LEGAL_CONTACT_EMAIL?.trim() ?? "";
+// Public beta support/contact approved by the owner; never used for authorization.
+const configuredContact = process.env.EXPO_PUBLIC_LEGAL_CONTACT_EMAIL?.trim() || "matheusborbaifc@gmail.com";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const legalIdentity = {

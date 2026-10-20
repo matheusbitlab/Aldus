@@ -16,4 +16,8 @@ assert.match(parsed.searchParams.get('body'),/Falha ao abrir & voltar/);assert.m
 assert.equal(feedbackMailto({...data,contact:null}),null);assert.equal(feedbackMailto({...data,description:'  '}),null);
 assert.equal(feedbackMailto({...data,contact:'x@example.invalid?bcc=elsewhere'}),null);
 assert(!uri.includes('access_token'));assert(!uri.includes('attachment='));
+const metadataLoader=require('./community-test-loader.cjs')({'expo-constants':{},'../../app.json':require('../app.json')});
+assert.deepEqual(metadataLoader('src/legal/appMetadata.ts').getAppMetadata(),{version:require('../app.json').expo.version,build:String(require('../app.json').expo.android.versionCode)});
+const nativeLoader=require('./community-test-loader.cjs')({'expo-constants':{expoConfig:{version:'native-version'},nativeBuildVersion:'9'},'../../app.json':require('../app.json')});
+assert.deepEqual(nativeLoader('src/legal/appMetadata.ts').getAppMetadata(),{version:'native-version',build:'9'});
 console.log('PASS beta: private signing fail-closed, explicit device-only compatibility, missing/partial/development keystore refusal; manual mail draft, encoding, missing contact/description, injection refusal. No remote writes or mail sent.');
