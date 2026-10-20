@@ -6,13 +6,13 @@ const {EpubParserService}=load('src/data/epub/EpubParserService.ts'),{BookCover}
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN9sAAAAASUVORK5CYII=','base64');
 async function epub(kind,image=png){
  const z=new JSZip();z.file('mimetype','application/epub+zip');z.file('META-INF/container.xml','<container><rootfiles><rootfile full-path="OPS/book.opf"/></rootfiles></container>');
- z.file('OPS/book.opf',`<package><metadata><title>Teste</title>${kind==='legacy'?'<meta name="cover" content="art"/>':''}</metadata><manifest><item id="text" href="text.xhtml"/><item id="art" href="images/cover.png" media-type="image/png" ${kind==='modern'?'properties="nav cover-image"':''}/></manifest><spine><itemref idref="text"/></spine>${kind==='guide'?'<guide><reference type="cover" href="cover.xhtml"/></guide>':''}</package>`);
- z.file('OPS/text.xhtml','<h1>Texto</h1><p>Conteúdo preservado.</p>');z.file('OPS/images/cover.png',image);z.file('OPS/cover.xhtml','<img src="images/cover.png"/>');
+ z.file('OPS/book.opf',`<package><metadata><title>Teste</title>${kind==='legacy'?'<meta name="cover" content="art"/>':''}</metadata><manifest><item id="text" href="text.xhtml"/><item id="art" href="images/cover.png" media-type="image/png" ${kind==='modern'?'properties="nav cover-image"':''}/></manifest><spine><itemref idref="text"/></spine>${kind.startsWith('guide')?'<guide><reference type="cover" href="cover.xhtml"/></guide>':''}</package>`);
+ z.file('OPS/text.xhtml','<h1>Texto</h1><p>Conteúdo preservado.</p>');z.file('OPS/images/cover.png',image);z.file('cover.png',image);z.file('OPS/cover.xhtml',kind==='guide-parent'?'<img src="../cover.png"/>':'<img src="images/cover.png"/>');
  return z.generateAsync({type:'uint8array'});
 }
 (async()=>{
  const parser=new EpubParserService();let reference;
- for(const kind of ['modern','legacy','guide']){const p=await parser.parse(await epub(kind));assert.equal(p.coverImagePath,'data:image/png;base64,'+png.toString('base64'));reference??=p.chapters;assert.deepEqual(p.chapters,reference);}
+ for(const kind of ['modern','legacy','guide','guide-parent']){const p=await parser.parse(await epub(kind));assert.equal(p.coverImagePath,'data:image/png;base64,'+png.toString('base64'));reference??=p.chapters;assert.deepEqual(p.chapters,reference);}
  for(const [kind,data] of [['none',png],['modern',Buffer.from('broken')],['modern',Buffer.alloc(1048577)]])assert.equal((await parser.parse(await epub(kind,data))).coverImagePath,null);
  const controller=new AbortController();controller.abort();await assert.rejects(parser.parse(await epub('modern'),controller.signal),e=>e.name==='AbortError');
  const design=editorialCover('stable','Livro.pdf','');assert.equal(design.title,'Livro');assert.equal(design.author,'Autor não informado');assert.deepEqual(design,editorialCover('stable','Livro.pdf',''));

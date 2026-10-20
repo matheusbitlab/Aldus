@@ -174,6 +174,7 @@ async function extractCover(
   const legacy = asArray(opf.metadata?.meta).find(item => String(item['@_name']).toLowerCase() === 'cover');
   const declared = modern ?? manifest.find(item => item['@_id'] === legacy?.['@_content']);
   let href = declared?.['@_href'];
+  let guideImagePath: string | undefined;
   if (!href) {
     const guide = asArray(opf.guide?.reference).find(item => String(item['@_type']).split(/\s+/).includes('cover'));
     if (!guide?.['@_href'] || isExternalResource(String(guide['@_href']))) return null;
@@ -184,11 +185,11 @@ async function extractCover(
       const html = await resources.read(file, 'string');
       const image = html.match(/<(?:img|image)\b[^>]*>/i)?.[0];
       href = image && (readAttribute(image, 'src') || readAttribute(image, 'href') || readAttribute(image, 'xlink:href'));
-      if (href && !isExternalResource(String(href))) href = `/${resolveResourcePath(guidePath, String(href), directory).slice(directory.length)}`;
+      if (href && !isExternalResource(String(href))) guideImagePath = resolveResourcePath(guidePath, String(href), directory);
     } else href = guide['@_href'];
   }
   if (!href || isExternalResource(String(href))) return null;
-  const path = resolveResourcePath(opfPath, String(href), directory), file = zip.file(path);
+  const path = guideImagePath ?? resolveResourcePath(opfPath, String(href), directory), file = zip.file(path);
   // A bounded original is persisted once in existing cover metadata. No extra
   // full-book image extraction, network request or thumbnail dependency.
   if (!file || archiveEntrySize(file) > 1024 * 1024) return null;
