@@ -28,6 +28,12 @@ const sections:{id:AdminSection;label:string;icon:React.ComponentProps<typeof Io
  {id:'audit',label:'Auditoria',icon:'list-outline',description:'Rastreabilidade das operações administrativas.'},
  {id:'health',label:'Saúde do Sistema',icon:'pulse-outline',description:'Estado observado e limites da telemetria disponível.'},
 ];
+const navigationGroups: { label: string; ids: AdminSection[] }[] = [
+ {label:'Visão geral',ids:['overview','metrics']},
+ {label:'Contas e comercial',ids:['users','subscriptions','plans']},
+ {label:'Operação',ids:['storage','health']},
+ {label:'Administração',ids:['settings','members','audit']},
+];
 export default function AdminScreen(){
  const access=useAdminAccess(),{palette}=useAppTheme(),insets=useSafeAreaInsets();
  const refresh=useCallback(()=>{void access.refresh();},[access.refresh]);
@@ -67,7 +73,10 @@ function AdminContent({session,refreshAccess}:{session:AdminSession;refreshAcces
  }
  function ask(next:PendingChange){setSaved(false);setChange(next);}
  function select(id:AdminSection){setData(null);setSection(id);setFilters({});setFrom('');setUntil('');setSaved(false);setMenuOpen(false);setAuditSearch('');setSelectedUser(null);}
- const nav=<View accessibilityLabel="Seções administrativas" style={{gap:5}}>{sections.filter(s=>canAdmin(session,SECTION_PERMISSION[s.id])).map(s=><Button key={s.id} title={desktop&&collapsed?'':s.label} accessibilityLabel={s.label} selected={section===s.id} navigation icon={s.icon} onPress={()=>select(s.id)}/>)}</View>;
+ const nav=<View accessibilityLabel="Seções administrativas" style={{gap:20}}>{navigationGroups.map(group=>{
+  const available=group.ids.map(id=>sections.find(s=>s.id===id)!).filter(s=>canAdmin(session,SECTION_PERMISSION[s.id]));
+  return available.length?<View key={group.label} style={{gap:4}}>{!(desktop&&collapsed)?<Text style={{color:palette.secondaryText,fontSize:12,fontWeight:'600',paddingHorizontal:14,marginBottom:3}}>{group.label}</Text>:null}{available.map(s=><Button key={s.id} title={desktop&&collapsed?'':s.label} accessibilityLabel={s.label} selected={section===s.id} navigation icon={s.icon} onPress={()=>select(s.id)}/>)}</View>:null;
+ })}</View>;
  const auditRows=section==='audit'&&data?(data as AdminResults['audit']).rows:[];
  const auditFiltered=auditRows.filter(a=>[a.actor,a.resource,termLabel(a.action),termLabel(a.outcome),a.reason].join(' ').toLocaleLowerCase('pt-BR').includes(auditSearch.toLocaleLowerCase('pt-BR')));
  return <View style={{flex:1,flexDirection:'row'}}>

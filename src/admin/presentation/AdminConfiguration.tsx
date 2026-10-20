@@ -5,17 +5,26 @@ import { ADMIN_PERMISSIONS,AdminMember,AdminPermission,AdminResults,AdminSetting
 import { Button,Card,dateLabel,Field,Label,Muted,PendingChange,rowStyle } from './components';
 
 export function AdminConfiguration({data,enabled,ask}:{data:AdminResults['settings'];enabled:boolean;ask:(v:PendingChange)=>void}){
+ const [selected,setSelected]=useState<string|null>(null);
  const groups=[['Aplicativo','app.'],['Operação','operation.'],['Recursos','features.']] as const;
- return <><Card title="Configurações globais"><Muted>Somente chaves permitidas pelo servidor. Alterações de autenticação, políticas de segurança, armazenamento, segredos ou banco não estão disponíveis. O aviso do aplicativo aparece em Ajustes após atualização; os demais valores estão preparados para integrações futuras e exigem publicação.</Muted></Card>
- {groups.map(([title,prefix])=>{const rows=data.rows.filter(s=>s.key.startsWith(prefix));return rows.length?<View key={prefix}><Label>{title}</Label>{rows.map(s=><Setting key={`${s.key}:${s.revision}`} setting={s} history={data.history.filter(h=>h.key===s.key)} enabled={enabled} ask={ask}/>)}</View>:null;})}
- {data.rows.filter(s=>!groups.some(([,prefix])=>s.key.startsWith(prefix))).map(s=><Setting key={`${s.key}:${s.revision}`} setting={s} history={data.history.filter(h=>h.key===s.key)} enabled={enabled} ask={ask}/>)}
+ const setting=data.rows.find(s=>s.key===selected);
+ const summary=(s:AdminSetting)=><Button key={s.key} title={`${termLabel(s.key)} · ${typeof s.value==='boolean'?(s.value?'Ativada':'Desativada'):(s.value.trim().slice(0,84)+(s.value.length>84?'…':'')||'Não definido')}`} selected={selected===s.key} navigation onPress={()=>setSelected(s.key)}/>;
+ return <><Muted>Selecione uma configuração para editar. Toda alteração exige confirmação e fica na auditoria.</Muted>
+ {groups.map(([title,prefix])=>{const rows=data.rows.filter(s=>s.key.startsWith(prefix));return rows.length?<Card key={prefix} title={title}>{rows.map(summary)}</Card>:null;})}
+ {data.rows.filter(s=>!groups.some(([,prefix])=>s.key.startsWith(prefix))).map(summary)}
+ {setting?<Setting key={`${setting.key}:${setting.revision}`} setting={setting} history={data.history.filter(h=>h.key===setting.key)} enabled={enabled} ask={ask} onClose={()=>setSelected(null)}/>:null}
  </>;
 }
-function Setting({setting,history,enabled,ask}:{setting:AdminSetting;history:AdminResults['settings']['history'];enabled:boolean;ask:(v:PendingChange)=>void}){
- const [value,setValue]=useState(setting.value);return <Card title={termLabel(setting.key)}><Muted>Identificador: {setting.key}</Muted><Muted>{setting.requires_deploy?'Depende de publicação e integração; não altera o app atual automaticamente.':'Aplicado ao aviso das Configurações durante o uso.'} · revisão {setting.revision}</Muted>
- {typeof value==='boolean'?<Button title={`${setting.key}: ${value?'habilitado':'desabilitado'}`} onPress={()=>setValue(v=>!v)}/>:<Field label={`Valor ${setting.key}`} value={value} onChange={setValue} multiline/>}
- <Button title={`Salvar ${setting.key}`} disabled={!enabled} onPress={()=>ask({title:'Alterar configuração',description:'Apenas a chave selecionada será alterada. Direitos básicos gratuitos e estruturas de segurança não são configuráveis aqui.',target:setting.key,revision:setting.revision,command:{action:'setting',payload:{value}}})}/>
- {history.map(h=><View key={h.id} style={rowStyle}><Muted>Revisão {h.revision} · {dateLabel(h.created_at)}</Muted>{h.revision!==setting.revision&&<Button title={`Restaurar ${setting.key} revisão ${h.revision}`} disabled={!enabled} onPress={()=>ask({title:'Restaurar configuração',description:'Cria uma nova revisão com o valor histórico, preservando a trilha de auditoria.',target:setting.key,revision:setting.revision,command:{action:'setting_rollback',payload:{revision:h.revision}}})}/>}</View>)}</Card>;
+function Setting({setting,history,enabled,ask,onClose}:{setting:AdminSetting;history:AdminResults['settings']['history'];enabled:boolean;ask:(v:PendingChange)=>void;onClose:()=>void}){
+ const [value,setValue]=useState(setting.value),[historyOpen,setHistoryOpen]=useState(false),[detailsOpen,setDetailsOpen]=useState(false);
+ return <Card title={`Editar: ${termLabel(setting.key)}`}><Muted>{setting.requires_deploy?'Depende de publicação e integração; não altera o app atual automaticamente.':'Aplicado ao aviso dos Ajustes durante o uso.'}</Muted>
+ {typeof value==='boolean'?<Button title={value?'Ativada':'Desativada'} onPress={()=>setValue(v=>!v)}/>:<Field label="Conteúdo da configuração" value={value} onChange={setValue} multiline/>}
+ <View style={rowStyle}><Button title="Revisar alteração" disabled={!enabled||value===setting.value} onPress={()=>ask({title:'Alterar configuração',description:'Apenas a chave selecionada será alterada. Direitos básicos gratuitos e estruturas de segurança não são configuráveis aqui.',target:setting.key,revision:setting.revision,command:{action:'setting',payload:{value}}})}/><Button title="Fechar edição" onPress={onClose}/></View>
+ <Button title="Histórico de revisões" expanded={historyOpen} onPress={()=>setHistoryOpen(v=>!v)}/>
+ {historyOpen?(history.length?history.map(h=><View key={h.id} style={rowStyle}><Muted>Revisão {h.revision} · {dateLabel(h.created_at)}</Muted>{h.revision!==setting.revision&&<Button title={`Restaurar revisão ${h.revision}`} disabled={!enabled} onPress={()=>ask({title:'Restaurar configuração',description:'Cria uma nova revisão com o valor histórico, preservando a trilha de auditoria.',target:setting.key,revision:setting.revision,command:{action:'setting_rollback',payload:{revision:h.revision}}})}/>}</View>):<Muted>Nenhuma revisão anterior disponível.</Muted>):null}
+ <Button title="Detalhes avançados" expanded={detailsOpen} onPress={()=>setDetailsOpen(v=>!v)}/>
+ {detailsOpen?<><Muted>Identificador: {setting.key} · revisão {setting.revision}</Muted><Muted>Autenticação, permissões, políticas de segurança, segredos e banco não são configuráveis aqui.</Muted></>:null}
+ </Card>;
 }
 export function AdminMembers({rows,enabled,ask,actor}:{rows:AdminMember[];enabled:boolean;ask:(v:PendingChange)=>void;actor:string}){
  const [target,setTarget]=useState(''),[role,setRole]=useState<'OWNER'|'ADMIN'>('ADMIN'),[permissions,setPermissions]=useState<AdminPermission[]>(['users.read','metrics.read']);

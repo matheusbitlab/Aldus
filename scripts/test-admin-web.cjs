@@ -101,9 +101,14 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
   await enqueue(async()=>{await f.as('owner');assert.equal((await f.read('members')).data.rows.find(m=>m.user_id===f.ids.second).active,false);});
   await click('Planos e Preços');await until('Nome comercial Pro');await input('Preço mensal em centavos Pro (vazio = indefinido)','3490');await input('Preço anual em centavos Pro (vazio = indefinido)','34900');await click('Salvar plano Pro');await confirm('pro');
   await enqueue(async()=>{await f.as('owner');assert.equal((await f.read('plans')).data.rows.find(p=>p.id==='pro').price_brl_centavos,3490);});
-  await click('Configurações');await until('Valor app.notice');await input('Valor app.notice','Aviso controlado do painel');await click('Salvar app.notice');await confirm('app.notice');
-  await navigate('/settings');await until('Aviso controlado do painel');await until('Abrir Aldus Admin');await click('Abrir Aldus Admin');await until('Usuários cadastrados');
-  await click('Configurações');await until('Valor app.notice');await click('Restaurar app.notice revisão 0');await confirm('app.notice');
+  await click('Configurações');await until('Aviso do aplicativo · Não definido');await shot('settings-summary');await click('Aviso do aplicativo · Não definido');await until('Conteúdo da configuração');await shot('settings-editor');await input('Conteúdo da configuração','Aviso controlado do painel');await click('Revisar alteração');await confirm('app.notice');
+  await navigate('/settings');await until('Aviso controlado do painel');await until('Aldus Admin');await shot('reader-settings-desktop');
+  await client.command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await shot('reader-settings-mobile');
+  await click('Legal e informações');await until('Sobre o Aldus Reader');await shot('reader-legal-mobile');assert.ok((await text()).includes('Licenças de terceiros'));
+  await navigate('/settings');await until('Aldus Admin');await click('Tema do aplicativo');await until('A aparência do livro é independente.');await click('Claro');await shot('reader-theme-light');await click('Escuro');await shot('reader-theme-dark');
+  await navigate('/settings');await until('Aldus Admin');await click('Aldus Admin');await until('Usuários cadastrados');
+  await client.command('Emulation.setDeviceMetricsOverride',{width:1440,height:960,deviceScaleFactor:1,mobile:false});
+  await click('Configurações');await until('Aviso do aplicativo · Aviso controlado do painel');await click('Aviso do aplicativo · Aviso controlado do painel');await click('Histórico de revisões');await click('Restaurar revisão 0');await confirm('app.notice');
   await enqueue(async()=>{await f.as('owner');assert.equal((await f.read('settings')).data.rows.find(v=>v.key==='app.notice').value,'');});
   await click('Visão Geral');await until('Usuários cadastrados');
   await client.command('Emulation.setDeviceMetricsOverride',{width:430,height:932,deviceScaleFactor:1,mobile:true});await shot('owner-mobile');
