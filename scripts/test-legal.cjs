@@ -5,7 +5,7 @@ const { spawnSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-const routeFiles = ["privacy", "terms", "copyright", "licenses", "data", "about", "version"];
+const routeFiles = ["index", "privacy", "terms", "copyright", "licenses", "data", "about", "version"];
 for (const route of routeFiles) assert.ok(fs.existsSync(path.join(root, "app", "legal", `${route}.tsx`)), `rota legal ausente: ${route}`);
 
 const layout = read("app/_layout.tsx");
@@ -15,8 +15,8 @@ for (const route of routeFiles) {
   assert.ok(routeAt > -1 && routeAt < protectedAt, `rota legal/${route} deve ser pública`);
 }
 
-const settings = read("app/(tabs)/settings.tsx");
-for (const label of ["LEGAL E INFORMAÇÕES", "Sobre o Aldus Reader", "Política de Privacidade", "Termos de Uso", "Direitos Autorais e Conteúdo", "Licenças de terceiros", "Privacidade e Dados", "Versão do aplicativo"]) {
+const settings = read("src/presentation/screens/SettingsScreen.tsx") + read("app/legal/index.tsx") + read("app/legal/version.tsx");
+  for (const label of ["Legal e informações", "Sobre o Aldus Reader", "Política de Privacidade", "Termos de Uso", "Direitos Autorais e Conteúdo", "Licenças de terceiros", "Privacidade e Dados"]) {
   assert.match(settings, new RegExp(label), `item ausente em Ajustes: ${label}`);
 }
 
