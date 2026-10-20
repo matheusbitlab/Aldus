@@ -48,19 +48,26 @@ const flushTimers=async()=>act(async()=>{const due=[...timers.values()];timers.c
  writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'close'}));});
  await act(async()=>renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid));await report(1,101,true);await report(51,101,true);await act(async()=>renderer.unmount());await flushTimers();assert.equal(writes.at(-1)?.pageNumber,51,'Last acknowledged position must survive immediate close');
  // Cache completion is part of preparation, not an unobserved background write.
- let releaseSave,saveStarted=false,publication;
- dependencies.pdfReflowCache.save=async()=>{saveStarted=true;await new Promise(resolve=>releaseSave=resolve)};
+ let releaseSave,saveStarted=false,publication,notifySaveStarted;
+ const observeSaveStart=()=>new Promise(resolve=>{notifySaveStarted=resolve});
+ let saveStartedSignal=observeSaveStart();
+ dependencies.pdfReflowCache.save=async()=>{saveStarted=true;await new Promise(resolve=>{releaseSave=resolve;notifySaveStarted()})};
+ // The cooperative pipeline crosses real host timers. A fixed number of
+ // setImmediate turns can finish before those timers run on a fast CI host.
+ const waitForSaveStart=()=>act(async()=>{
+   await Promise.race([saveStartedSignal,publication.then(()=>{throw new Error('Publication ended before requesting the cache write')})]);
+ });
  await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'cache-cancel'}));});
  await act(async()=>{publication=renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid)});
- for(let n=0;n<100&&!saveStarted;n++)await act(async()=>new Promise(setImmediate));assert.equal(saveStarted,true);
+ await waitForSaveStart();assert.equal(saveStarted,true);
  assert.equal(renderer.root.findAllByType('DocumentReaderAdapter').length,0,'Do not publish Reflow before cache commit');
  assert.equal(renderer.root.findAllByType('PdfReflowProcessor').length,1,'Final cache write must remain cancellable/Back-handled');
  await act(async()=>{[...back][0]()});assert.equal(getDoc().props.pdfReadingMode,'original');
  await act(async()=>{releaseSave();await publication});assert.equal(getDoc().props.pdfReadingMode,'original','Late cache write cannot restore cancelled Reflow');await act(async()=>renderer.unmount());
- saveStarted=false;
+ saveStarted=false;saveStartedSignal=observeSaveStart();
  await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'cache-commit'}));});
  await act(async()=>{publication=renderer.root.findByType('PdfReflowProcessor').props.onComplete(valid)});
- for(let n=0;n<100&&!saveStarted;n++)await act(async()=>new Promise(setImmediate));assert.equal(saveStarted,true);
+ await waitForSaveStart();assert.equal(saveStarted,true);
  await act(async()=>{releaseSave();await publication});assert.equal(getDoc().props.pdfReadingMode,'reflow');assert.ok(getDoc().props.pdfReflowChapters[0].html.includes('readable'));
  await act(async()=>renderer.unmount());
  dependencies.pdfReflowCache.save=async()=>{};
