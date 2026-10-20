@@ -73,7 +73,7 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
   }`});
   const text=()=>client.evaluate('document.body?.innerText??""');
   const until=async snippet=>{const start=Date.now();while(Date.now()-start<45000){if((await text()).includes(snippet))return;await wait(100);}await shot('operation-error');throw Error('Missing '+snippet+': '+(await text()).slice(-1800));};
-  const click=async label=>{const start=Date.now();while(Date.now()-start<12000){const clicked=await client.evaluate(`(()=>{const el=[...document.querySelectorAll('[role="button"]')].find(e=>e.getAttribute('aria-label')===${JSON.stringify(label)});if(!el||el.getAttribute('aria-disabled')==='true')return false;el.click();return true})()`);if(clicked)return;await wait(100);}throw Error('Enabled button missing '+label+': '+(await text()).slice(0,2000));};
+  const click=async label=>{const start=Date.now();while(Date.now()-start<12000){const clicked=await client.evaluate(`(()=>{const el=[...document.querySelectorAll('[role="button"],[role="radio"]')].find(e=>e.getAttribute('aria-label')===${JSON.stringify(label)});if(!el||el.getAttribute('aria-disabled')==='true')return false;el.click();return true})()`);if(clicked)return;await wait(100);}throw Error('Enabled control missing '+label+': '+(await text()).slice(0,2000));};
   const input=(label,value)=>client.evaluate(`(()=>{const el=document.querySelector('[aria-label='+CSS.escape(${JSON.stringify(label)})+']');if(!el)throw Error('Input missing');Object.getOwnPropertyDescriptor(el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const navigate=async(route,identity)=>{if(identity)await client.evaluate(`localStorage.setItem('fixture-admin-identity',${JSON.stringify(identity)})`);await client.command('Page.navigate',{url:origin+route});};
   const shot=async name=>{const png=await client.command('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(shots,name+'.png'),Buffer.from(png.data,'base64'));};
@@ -106,6 +106,11 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
   await client.command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await shot('reader-settings-mobile');
   await click('Legal e informações');await until('Sobre o Aldus Reader');await shot('reader-legal-mobile');assert.ok((await text()).includes('Licenças de terceiros'));
   await navigate('/settings');await until('Aldus Admin');await click('Tema do aplicativo');await until('A aparência do livro é independente.');await click('Claro');await shot('reader-theme-light');await click('Escuro');await shot('reader-theme-dark');
+  await navigate('/settings');await until('Aldus Admin');
+  await client.command('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});await client.command('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  assert.ok(await client.evaluate(`['button','radio','link'].includes(document.activeElement?.getAttribute('role'))`));
+  await client.evaluate(`document.querySelectorAll('[dir=auto]').forEach(e=>{const s=getComputedStyle(e);e.style.fontSize=(parseFloat(s.fontSize)*1.4)+'px';e.style.lineHeight='1.5'})`);
+  assert.ok(await client.evaluate('document.documentElement.scrollWidth<=innerWidth+2'));await shot('reader-settings-large-text');
   await navigate('/settings');await until('Aldus Admin');await click('Aldus Admin');await until('Usuários cadastrados');
   await client.command('Emulation.setDeviceMetricsOverride',{width:1440,height:960,deviceScaleFactor:1,mobile:false});
   await click('Configurações');await until('Aviso do aplicativo · Aviso controlado do painel');await click('Aviso do aplicativo · Aviso controlado do painel');await click('Histórico de revisões');await click('Restaurar revisão 0');await confirm('app.notice');
