@@ -1,7 +1,7 @@
 // Deterministic suites only. Browser/physical/remote QA are separate, never silently claimed.
 const { spawnSync } = require('node:child_process');
 const tests = [
-  'metro-test-isolation', 'pt-br', 'marketing', 'admin-security', 'admin-client', 'admin-presentation', 'admin-layout',
+  'beta-preparation', 'metro-test-isolation', 'pt-br', 'marketing', 'admin-security', 'admin-client', 'admin-presentation', 'admin-layout',
   'saas-quotas', 'saas-quota-client', 'saas-quota-driver',
   'saas-schema', 'saas-client', 'saas-compatibility', 'saas-experience', 'saas-ui',
   'auth', 'auth-flows', 'auth-callback', 'auth-native-callback', 'username-login', 'integrated-security', 'battle-account',

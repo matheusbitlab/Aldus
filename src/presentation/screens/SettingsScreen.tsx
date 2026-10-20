@@ -30,6 +30,7 @@ export default function SettingsScreen() {
     </SettingsGroup>
     <SettingsGroup title="Comunidade"><SettingsLink title="Comunidade literária" icon="people-outline" onPress={() => go('/community')} /></SettingsGroup>
     <SettingsGroup title="Privacidade e informações">
+      <SettingsLink title="Ajuda e feedback" icon="chatbubble-ellipses-outline" onPress={() => go('/support')} />
       <SettingsLink title="Privacidade e Dados" icon="shield-checkmark-outline" onPress={() => go('/legal/data')} />
       <SettingsLink title="Legal e informações" description="Sobre o Aldus, termos, privacidade e licenças." icon="information-circle-outline" onPress={() => go('/legal')} />
     </SettingsGroup>

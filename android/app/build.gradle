@@ -3,6 +3,11 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+if (gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+        && !System.getenv('ALDUS_SIGNING_STORE_FILE')
+        && System.getenv('ALDUS_ALLOW_DEVELOPMENT_SIGNING') != 'device-rehearsal') {
+    throw new GradleException('Private signing is required for release; development signing is restricted to an explicit device-rehearsal.')
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -92,12 +97,20 @@ android {
         applicationId 'com.aldus.reader'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 2
+        versionName "1.0.0-beta.1"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
     signingConfigs {
+        beta {
+            if (System.getenv('ALDUS_SIGNING_STORE_FILE')) {
+                storeFile file(System.getenv('ALDUS_SIGNING_STORE_FILE'))
+                storePassword System.getenv('ALDUS_SIGNING_STORE_PASSWORD')
+                keyAlias System.getenv('ALDUS_SIGNING_KEY_ALIAS')
+                keyPassword System.getenv('ALDUS_SIGNING_KEY_PASSWORD')
+            }
+        }
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
@@ -110,9 +123,9 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // The wrapper requires private signing inputs. Legacy signing is an explicit
+            // device-compatibility rehearsal only; it must never be distributed as beta.
+            signingConfig System.getenv('ALDUS_SIGNING_STORE_FILE') ? signingConfigs.beta : signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

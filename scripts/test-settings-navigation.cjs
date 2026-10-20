@@ -25,6 +25,7 @@ const load=require('./community-test-loader.cjs')({react:React,'react/jsx-runtim
   await render(Settings);assert.match(text(),/Legal e informações/);assert.doesNotMatch(text(),/Política de Privacidade|Licenças de terceiros|Aldus Admin/);
   for(const [label,route]of [['Minha conta','/account'],['Meu Plano','/plan'],['Sincronização','/preferences?section=sync'],['Tema do aplicativo','/preferences?section=appearance'],['Conforto durante a leitura','/preferences?section=comfort'],['Minhas bibliotecas','/sources'],['Serviços de leitura','/preferences?section=services'],['Comunidade literária','/community'],['Privacidade e Dados','/legal/data'],['Legal e informações','/legal']]){await click(label);assert.equal(routes.at(-1),route);}
   await click('Preferências do leitor');assert.match(text(),/Preferências abertas/);
+  await click('Ajuda e feedback');assert.equal(routes.at(-1),'/support');
   adminSession={role:'OWNER'};await render(Settings);await click('Aldus Admin');assert.equal(routes.at(-1),'/admin');adminSession=null;
   const Legal=load('app/legal/index.tsx').default;await render(Legal);
   for(const [name,path]of [['Sobre o Aldus Reader','about'],['Política de Privacidade','privacy'],['Termos de Uso','terms'],['Direitos Autorais e Conteúdo','copyright'],['Licenças de terceiros','licenses']]){await click(name);assert.equal(routes.at(-1),'/legal/'+path);}

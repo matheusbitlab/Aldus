@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { androidBuildCommand } from "./android-build-command.cjs";
 import { validate } from "./validate-web-env.cjs";
+import { validateReleaseSigning } from "./release-signing.cjs";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const androidDir = path.join(projectRoot, "android");
@@ -15,6 +16,9 @@ const apkPath = path.join(androidDir, "app/build/outputs/apk/release/app-release
 if (existsSync(path.join(projectRoot, '.env.local'))) process.loadEnvFile(path.join(projectRoot, '.env.local'));
 try { validate(process.env); }
 catch { console.error('Unsafe public app configuration; values redacted. Build not started.'); process.exit(1); }
+
+try { console.log(`Release signing mode: ${validateReleaseSigning(process.env, existsSync)}`); }
+catch (error) { console.error(error.message + ' Build not started; credentials redacted.'); process.exit(1); }
 
 if (!existsSync(wrapper)) {
   console.error("Android project not found. Run npx expo prebuild --platform android first.");
