@@ -1510,3 +1510,92 @@ pagamentos ou publicar automaticamente em tarefas de interface.
   primeiro perfil intermitente segue inconclusivo; cadastro/confirm/recovery nos artefatos,
   ciclo completo Android↔Web, instalação do novo certificado e recuperação de chaves fora
   da máquina pendentes. Não convidar usuários nem declarar GO com esses portões abertos.
+
+
+### 20/10/2026 — Beta: ciclo real Web/Android e recuperação concluídos no Redmi
+
+- Este registro atualiza o checkpoint anterior, sem apagar seu histórico. Situação final
+  desta rodada: NO-GO para abertura da Beta; nenhum convite ou deploy de produção realizado.
+  main em f521187 antes deste registro. Código funcional dos artefatos: 22eb657521ca76cc2b655f7b2fa0136c4c122bc6.
+- CORRIGIDO em 22eb657: BookCover tratava somente nativeEvent.source; no preview real,
+  onLoad do React Native Web forneceu target/naturalWidth/naturalHeight e provocou exceção.
+  Agora aceita os dois contratos e rejeita dimensões inválidas/miniaturas sem travar fallback.
+  Regressões Web/Native, typecheck/export e 80/80 críticas PASS. Nenhuma lógica do Reader alterada.
+- CI Linux de 22eb657 encontrou uma espera frágil no TESTE de cache do Reader: cem voltas
+  de setImmediate não garantiam a fronteira de gravação de uma pipeline cooperativa.
+  f521187 passou a aguardar a chamada real do save simulado, também detectando término
+  sem gravação. Não é mudança no Reader de produção. Teste focado local PASS; CI remoto
+  39477626025 SUCCESS com 80/80, typecheck e export. Tentativa Windows anterior não
+  reproduziu deterministicamente a falha Linux; não alegar reprodução local inexistente.
+- APK privado final: artifacts/apk/Aldus-22eb657.apk, 274.844.045 bytes (~262,1 MiB),
+  SHA-256 46ed94d86116f5d55edd51ea345ebc1e8137a5200403cf3a3bf7a6a796270ea1.
+  com.aldus.reader, 1.0.0-beta.1/code 2, release não depurável, ARM64/ARMv7, Hermes,
+  módulos Drive/OCR presentes. Certificado privado SHA-256
+  4adef0a46afa7f9d685a3ae7dba564379a5c9eb406a9452b05decdea11cb9875.
+  Não instalado fisicamente: assinatura incompatível com o app pessoal existente.
+  Não há URL HTTPS de APK publicada; obtenção privada pelo arquivo local. Não distribuir
+  o derivado Aldus-22eb657-redmi.apk, usado exclusivamente como ensaio de compatibilidade.
+- Redmi atualizado por install -r com o derivado de certificado antigo, sem uninstall/clear;
+  primeiro install 11/10 preservado. Payload e bundle idênticos aos do APK privado,
+  assinatura separada. Cold start sem Metro e offline PASS; isso não prova instalação
+  da chave nova nem seu consentimento Google Drive. Bundle Hermes SHA-256
+  fd3d503e1ec42cdbfa2fff38d141aed23ae3eae63aaa90a171fb4779c1ee10fe.
+- Preview atual confirmado, isolado e protegido por Vercel:
+  https://kindle-reader-ro081u87x-matheus-projects-70f48ed9.vercel.app
+  Código funcional 22eb657; HTML, rotas, metadata e bundle remoto conferidos. Nenhuma
+  promoção ou mudança global de proteção. CI/documentação posteriores não mudaram o runtime.
+- Chromium do preview real: oito cenários de Reader/Sync PASS, sem fixtures HTTP e sem
+  exceções não tratadas: recebeu metadata EPUB/PDF, progresso e nota do Android; baixou
+  os dois arquivos privados; abriu os Readers; persistiu nota offline em IndexedDB;
+  criou grifo pela âncora do engine; alterou progresso EPUB/PDF e organização; servidor
+  confirmou os dados e fila zero. Autenticação A→B→A já PASS no preview 579cf75 anterior,
+  com código Auth inalterado. Não atribuir esses quatro casos ao novo preview como reteste.
+- Conflito REAL em dois perfis Chromium/sessões GoTrue independentes: edições offline
+  concorrentes da nota PDF sintética, CAS conflitante visível, duas versões preservadas,
+  escolha explícita da versão remota e restauração da nota QA pelo formulário. PASS,
+  zero exceções, nenhuma identidade ou biblioteca pessoal usada como fixture.
+- Retorno físico ao Redmi/22eb657: EPUB 17% e página 3/13, nota e grifo da Web recebidos;
+  PDF Original fonte 3/4 e nota da Web recebidos; coleção e tag recebidas. Paginação EPUB
+  varia com viewport, portanto não comparar número bruto de páginas entre Web/Android.
+  Marcador/nota criados no Android offline persistiram após encerrar/reabrir o processo;
+  após reconexão, servidor confirmou a nota e ownership. B: 35 metadados de livros,
+  compostos por 33 assets públicos empacotados e dois QA, não 35 uploads privados.
+  Criação de grifo no Android ainda NÃO EXECUTADA; foi criado na Web e recebido no Redmi.
+- Recuperação REAL da conta original: primeiro link abriu erro e o Auth registrou
+  One-time token not found; causa do consumo/rejeição original não comprovada. Um único
+  novo pedido às 19:06 UTC abriu Redefinir senha. Proprietário digitou/salvou senha só no
+  aparelho; Auth registrou exchange 200 e user_modified/PUT 200, nova sessão confirmada.
+  Biblioteca original com 40 livros, inclusive após cold reopen, sessão mantida e sem
+  erro de callback. Recuperação Android PASS. Não declarar novo cadastro/confirmação
+  de e-mail nem recuperação Web validados nos artefatos atuais. Nenhuma senha/URI/token
+  entrou em relatório, chat, argumento de processo ou Git.
+- Estado agregado remoto após piloto: seis contas, oito objetos privados/5.960.039 bytes,
+  zero tamanhos desconhecidos/objetos sem livro vivo. Os dois arquivos QA de B somam
+  7.190 bytes e zero reservas pendentes. As seis cópias pessoais anteriores preservadas.
+  QA A/Amêndoas, seu cadastro e outbox continuam preservados, sem adoção ou limpeza.
+- Backup verificado continua sendo o snapshot ANTERIOR ao piloto: 65 tabelas e seis
+  objetos/5.952.849 bytes; não inclui contas/arquivos QA criados depois. Na conferência
+  final, arquivos temporários do restore e de perfis Chromium não haviam herdado EFS;
+  ACL privada esteve ativa e dump/credenciais já estavam cifrados. Corrigida a cifragem
+  no diretório exato da operação e fechados apenas navegadores QA próprios. Conferência:
+  zero arquivos não vazios sem EFS; marcadores vazios não contêm dados. Hash do dump
+  permanece ebb042d5f430364462fdb20c3e91df5ee20eed4cc6cdbfc618bd877066a365a6.
+  Chaves EFS/DPAPI e assinatura ainda exigem custódia protegida fora desta máquina.
+- Memória release após Reader/Sync/Auth: amostra PSS 235.756 KiB, sem CRASH/ANR no histórico
+  retido. Não equivale a teste prolongado, ausência de vazamento ou comparação pareada
+  com development build. Leitura Livre de PDF grande mantém a limitação já documentada.
+- Matriz conservadora dos 34 portões do pedido: 27 PASS, um FAIL, seis BLOQUEADOS (79,4%).
+  Segurança 5/5 PASS; recuperação 2/3 (custódia/recuperação em outra máquina bloqueada);
+  Auth 4/7 (cadastro atual e recuperação Web bloqueados; redirecionamentos FAIL por Google);
+  Sync 7/8 (criação de grifo Native e ida à Web não comprovadas); app 4/5 (Reader/Reflow
+  prolongado no artefato final sem prova suficiente); distribuição 5/6 (instalação física
+  da nova assinatura bloqueada). PASS vale para o escopo/ambiente descrito, não é garantia
+  universal nem percentual de testes unitários. Recovery Android isolado é PASS dentro
+  do portão Auth que exige as duas plataformas. Sem ampliação silenciosa de cobertura.
+- Bloqueios operacionais mantidos: Google invalid_client; username-login ausente; primeiro
+  perfil novo intermitente inconclusivo; Drive para o SHA-1 da nova assinatura não homologado;
+  controlador/retenção e custódia de chaves pendentes. Pro não contratável. Admissão de
+  cinco testadores, posterior expansão a dez, requer aprovação de controle Auth/convites.
+  Não ocultar Google ou alterar configuração OAuth sem autorização específica. Nenhuma
+  migration/RLS/OWNER/cobrança/produção modificada nesta rodada. Próximas ações externas
+  precisam de aprovação específica; preservar todo dado pessoal e a fila QA A.

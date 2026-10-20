@@ -555,3 +555,35 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - Retenção/identificação formal do controlador, custódia das chaves, instalação limpa da
   assinatura beta e admissão restrita precisam ser concluídas/aprovadas antes de convites.
   Sem deploy de produção, migrations, OWNER, cobrança ou convites nesta missão.
+
+
+### 20/10/2026 — Beta: fechamento de Sync real e recuperação Android
+
+- CORRIGIDO/VALIDADO: BookCover lançava exceção no onLoad real do React Native Web por
+  assumir nativeEvent.source. 22eb657 aceita Native e target/naturalWidth/naturalHeight,
+  mantendo fallback para imagens inválidas. Oito casos reais do novo preview e conflito
+  em duas sessões reais PASS, zero exceções. Typecheck/export e 80/80 críticas PASS.
+- CORRIGIDO no teste: CI Linux de 22eb657 falhou por espera de cache baseada em cem
+  setImmediate; f521187 aguarda a fronteira efetiva de save. Reader de produção intacto.
+  CI remoto 39477626025 SUCCESS. Não atribuir a falha do harness à conversão do Reader.
+- VALIDADO nos artefatos funcionais 22eb657: Android→Web→Android para EPUB/PDF, progresso,
+  notas, organização; grifo Web recebido no Redmi; nota Native offline sobrevive ao
+  cold reopen e chega ao servidor após reconectar. Criação de grifo Native→Web pendente.
+  Ensaios físicos usam derivado do mesmo payload com certificado antigo, não a chave nova.
+- Recovery Android deixou de estar bloqueado: novo link abriu Redefinir senha, proprietário
+  salvou nova senha, Auth aceitou e sessão original persistiu após reabrir. 40 livros
+  confirmados. Primeiro link rejeitado com One-time token not found permanece registrado,
+  sem causa original inventada. Cadastro/confirm atual e recovery Web ainda não validados.
+- Novo APK privado/preview 22eb657 prontos, mas NO-GO: 27/34 portões PASS (79,4%), um FAIL
+  e seis bloqueados. O APK de assinatura nova não foi instalado no Redmi; não apagar o app
+  pessoal para testá-lo. Google invalid_client, username-login ausente, perfil novo
+  intermitente e Drive com nova assinatura continuam pendentes. Sem convite/produção.
+- Proteção de backup: temporários do restore/perfis QA sem herança EFS foram identificados
+  e cifrados; dump e credenciais já protegidos, ACL privada mantida. Zero arquivos não
+  vazios sem EFS na revisão final. Restore de 65 tabelas/seis objetos comprovado apenas
+  neste Windows; custódia das chaves em outra máquina ainda depende do proprietário.
+- Memória é só amostra release (PSS 235.756 KiB, sem CRASH/ANR retido), sem baseline
+  dev/release ou prova de ausência de vazamentos. Leitura Livre grande não foi acelerada.
+- Preservar QA A/Amêndoas e outbox; não tratar A como descartável. Seis arquivos privados
+  anteriores e 40 livros originais mantidos. Nenhuma migration, OAuth, OWNER, cobrança
+  ou produção modificada. Detalhes de hashes/caminhos/portões em PROJECT_CONTEXT.md.
