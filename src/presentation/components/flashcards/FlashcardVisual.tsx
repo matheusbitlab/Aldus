@@ -3,12 +3,18 @@ import {
   Image,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   Text,
   View,
+  ViewStyle,
 } from "react-native";
 import { FlashcardDrawing } from "@/src/domain/types/flashcards";
 import { AppThemePalette } from "@/src/theme/tokens";
+
+// React Native Web supports this CSS property; Android's ViewStyle does not.
+const drawingTouchStyle: ViewStyle & { touchAction?: 'none' } =
+  Platform.OS === 'web' ? { touchAction: 'none' } : {};
 
 export function DrawingView({
   drawing,
@@ -187,11 +193,10 @@ export function DrawingEditor({
       <View
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         {...responder.panHandlers}
-        style={{
+        style={[{
           width: "100%",
           height: (drawing.height * width) / drawing.width,
-          touchAction: "none",
-        }}
+        }, drawingTouchStyle]}
       >
         <DrawingView drawing={drawing} width={width} />
       </View>
