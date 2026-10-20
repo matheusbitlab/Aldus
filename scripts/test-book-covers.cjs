@@ -17,6 +17,7 @@ async function epub(kind,image=png){
  const controller=new AbortController();controller.abort();await assert.rejects(parser.parse(await epub('modern'),controller.signal),e=>e.name==='AbortError');
  const design=editorialCover('stable','Livro.pdf','');assert.equal(design.title,'Livro');assert.equal(design.author,'Autor não informado');assert.deepEqual(design,editorialCover('stable','Livro.pdf',''));
  assert.equal(editorialCover('stable','Título .pdf no meio').title,'Título .pdf no meio');
+ assert.equal(editorialCover('pdf','PDF','Arquivo local').author,'Autor não informado');
  let view;const render=async p=>act(async()=>{const e=React.createElement(BookCover,{identity:'A',title:'Título longo '.repeat(20),author:'Autora',format:'epub',...p});if(view)view.update(e);else view=create(e);});
  try{
   await render({source:{uri:'file:///cover.jpg'},thumbnail:{uri:'file:///thumbnail.jpg'}});

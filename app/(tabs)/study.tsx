@@ -35,6 +35,8 @@ import {
 } from "@/src/domain/types/flashcards";
 import { FlashcardCreateModal } from "@/src/presentation/components/flashcards/FlashcardCreateModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BookCover } from '@/src/presentation/components/BookCover';
+import { getBookCover } from '@/src/utils/coverHelper';
 
 export default function Study() {
   const { allowed } = useFeatureAccess("flashcards");
@@ -455,6 +457,9 @@ function StudyContent() {
                   {books.map((book) => (
                     <Pressable
                       key={book.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Selecionar ${book.title}`}
+                      accessibilityState={{ selected: selectedBookId === book.id }}
                       onPress={() => setSelectedBookId(book.id)}
                       style={[
                         styles.chip,
@@ -466,6 +471,7 @@ function StudyContent() {
                         },
                       ]}
                     >
+                      <View style={{ width: 36, height: 54, overflow: 'hidden', borderRadius: 3 }}><BookCover identity={book.id} title={book.title} author={book.author} format={book.mimeType === 'application/pdf' ? 'pdf' : 'epub'} source={getBookCover({ id: book.id, title: book.title, author: book.author, format: book.mimeType === 'application/pdf' ? 'pdf' : 'epub', coverUri: book.coverImagePath ?? undefined, fileUri: book.filePath, progress: book.progress })} compact /></View>
                       <Text
                         numberOfLines={1}
                         style={{ color: palette.text, maxWidth: 170 }}
@@ -644,6 +650,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 10,

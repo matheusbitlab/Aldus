@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { BookCover } from '@/src/presentation/components/BookCover';
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -241,13 +242,7 @@ export default function Search() {
             onPress={() => { setAcquisitionMessage(null); setSelectedBook(item); }}
             style={[styles.resultRow, { backgroundColor: palette.surface, borderColor: palette.separator }]}
           >
-            {item.coverUrl ? (
-              <Image source={{ uri: item.coverUrl }} style={styles.cover} resizeMode="cover" />
-            ) : (
-              <View style={[styles.coverFallback, { backgroundColor: palette.surfaceSecondary }]}>
-                <Ionicons name="book-outline" size={23} color={palette.secondaryText} />
-              </View>
-            )}
+            <View style={styles.cover}><BookCover identity={item.remoteBookId ?? item.url} title={item.title} author={item.author} format={item.format} source={item.coverUrl ? { uri: item.coverUrl } : null} compact /></View>
             <View style={styles.resultBody}>
               <Text numberOfLines={2} style={[styles.resultTitle, { color: palette.text }]}>{item.title}</Text>
               <Text numberOfLines={1} style={[styles.author, { color: palette.secondaryText }]}>{item.author ?? "Autor não informado"}</Text>
@@ -309,7 +304,7 @@ function BookDetailsModal({
         <Pressable style={[styles.detailSheet, { backgroundColor: palette.panel }]} onPress={(event) => event.stopPropagation()}>
           <View style={[styles.handle, { backgroundColor: palette.separator }]} />
           <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
-            {book?.coverUrl ? <Image source={{ uri: book.coverUrl }} style={styles.detailCover} resizeMode="contain" /> : null}
+            {book ? <View style={styles.detailCover}><BookCover identity={book.remoteBookId ?? book.url} title={book.title} author={book.author} format={book.format} source={book.coverUrl ? { uri: book.coverUrl } : null} /></View> : null}
             <Text style={[styles.detailTitle, { color: palette.text }]}>{book?.title}</Text>
             <Text style={[styles.detailAuthor, { color: palette.secondaryText }]}>{book?.author ?? "Autor não informado"}</Text>
             <View style={styles.detailMeta}>
@@ -426,7 +421,7 @@ const styles = StyleSheet.create({
   detailSheet: { maxHeight: "92%", width: "100%", maxWidth: 620, alignSelf: "center", borderTopLeftRadius: 12, borderTopRightRadius: 12, overflow: "hidden" },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 10 },
   detailContent: { padding: 20, paddingBottom: 26, gap: 8 },
-  detailCover: { width: "100%", height: 150, alignSelf: "center" },
+  detailCover: { width: 130, height: 195, alignSelf: "center", overflow: 'hidden', borderRadius: 5 },
   detailTitle: { fontSize: 22, lineHeight: 28, fontWeight: "700", marginTop: 4 },
   detailAuthor: { fontSize: 14 },
   detailMeta: { gap: 3, marginTop: 4 },

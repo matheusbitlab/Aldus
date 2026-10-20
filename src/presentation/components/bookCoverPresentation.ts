@@ -13,6 +13,6 @@ export function editorialCover(identity: string, title: string, author?: string)
   return {
     ...palettes[(hash >>> 0) % palettes.length],
     title: title.replace(/\.(?:epub|pdf)\s*$/i, '').trim() || 'Sem título',
-    author: author?.trim() || 'Autor não informado',
+    author: !author?.trim() || /^(?:Autor desconhecido|Arquivo local)$/i.test(author.trim()) ? 'Autor não informado' : author.trim(),
   };
 }

@@ -43,11 +43,11 @@ function CoverSurface({ identity, title, author, format, source, thumbnail, comp
       {!compact ? <Text style={[styles.author, { color: design.ink }]} numberOfLines={2}>{design.author}</Text> : null}
       <Text style={[styles.format, { color: design.ink }]}>{format.toUpperCase()}</Text>
     </View>
-    {selected ? <Image key={index} source={selected} resizeMode="contain" accessibilityIgnoresInvertColors
+    {selected ? <Image key={index} source={selected} resizeMode="contain" resizeMethod="resize" fadeDuration={0} accessibilityIgnoresInvertColors
       style={[StyleSheet.absoluteFill, styles.image, { opacity: loaded ? 1 : 0, backgroundColor: design.paper }]}
       onLoad={event => {
         const { width, height } = event.nativeEvent.source;
-        if (!Number.isFinite(width) || !Number.isFinite(height) || width < 32 || height < 32) reject();
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width < 96 || height < 96) reject();
         else setLoaded(true);
       }} onError={reject} /> : null}
     {selected && !loaded ? <ActivityIndicator testID="book-cover-loading" size="small" color={design.ink} style={styles.loading} /> : null}
