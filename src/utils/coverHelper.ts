@@ -15,11 +15,13 @@ const defaultCover = resolveCoverAsset(DEFAULT_COVER_PLACEHOLDER);
 
 export const getDefaultBookCover = (): ImageSourcePropType => defaultCover;
 
-export const getBookCover = (book: Book): ImageSourcePropType => {
+export const getBookCover = (book: Book): ImageSourcePropType | null => {
   const coverUri = book.coverUri?.trim();
-  if (!coverUri) return defaultCover;
-  if (/^(?:data:|https?:|file:)/i.test(coverUri)) return { uri: coverUri };
-  return resolveCoverAsset(coverUri);
+  if (!coverUri || coverUri === DEFAULT_COVER_PLACEHOLDER || /(?:^|\/)default\.jpg$/i.test(coverUri)) return null;
+  if (/^(?:data:image\/(?:png|jpeg|gif|webp);base64,|https?:\/\/|file:\/\/|blob:)/i.test(coverUri)) return { uri: coverUri };
+  const fileName = coverUri.split(/[\\/]/).pop()?.toLowerCase();
+  const key = coverAssets.keys().find(assetKey => assetKey.slice(2).toLowerCase() === fileName);
+  return key ? coverAssets(key) : null;
 };
 
 /**

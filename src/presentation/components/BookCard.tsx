@@ -1,7 +1,8 @@
-import React, { useState } from "react";
-import { View, Text, Image, StyleSheet, Pressable } from "react-native";
+import React from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Book } from "@/src/constants/mockBooks";
-import { getBookCover, getDefaultBookCover } from "@/src/utils/coverHelper";
+import { getBookCover } from "@/src/utils/coverHelper";
+import { BookCover } from './BookCover';
 import { THEMES } from "@/src/constants/theme";
 
 interface BookCardProps {
@@ -24,7 +25,6 @@ export const BookCard: React.FC<BookCardProps> = ({
   const theme = THEMES[themeMode];
   const coverSource = getBookCover(book);
   const progress = Math.max(0, Math.min(1, book.progress));
-  const [coverLoaded, setCoverLoaded] = useState(false);
 
   return (
     <Pressable
@@ -34,20 +34,7 @@ export const BookCard: React.FC<BookCardProps> = ({
       onPress={() => onPress(book)}
     >
       <View style={[styles.cover, layout === "list" && styles.listCover, { backgroundColor: theme.accent }]}>
-        <Image
-          source={getDefaultBookCover()}
-          style={styles.coverImage}
-          resizeMode="cover"
-          accessibilityIgnoresInvertColors
-        />
-        <Image
-          source={coverSource}
-          style={[styles.coverImage, !coverLoaded && styles.coverPending]}
-          resizeMode="cover"
-          onLoad={() => setCoverLoaded(true)}
-          onError={() => setCoverLoaded(false)}
-          accessibilityIgnoresInvertColors
-        />
+        <BookCover identity={book.id} title={book.title} author={book.author} format={book.format} source={coverSource} compact={layout === 'list'} />
       </View>
       <View style={[styles.infoContainer, layout === "list" && { flex: 1 }]}>
         <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
@@ -87,16 +74,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 2 / 3,
     justifyContent: 'center',
-    padding: 14,
     overflow: 'hidden',
-  },
-  coverImage: {
-    ...StyleSheet.absoluteFill,
-    width: '100%',
-    height: '100%',
-  },
-  coverPending: {
-    opacity: 0,
   },
   infoContainer: {
     padding: 8,

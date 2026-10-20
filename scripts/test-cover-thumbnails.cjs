@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+let dimensions=[600,900],destroyed=0,rendered=0,pageRequests=[],fail=false,canvas;
+global.document={createElement:name=>{assert.equal(name,'canvas');canvas={width:0,height:0,getContext:()=>({}),toDataURL:()=> 'data:image/jpeg;base64,fixture'};return canvas;}};
+const exportsForGenerator={};
+const code=ts.transpileModule(fs.readFileSync('src/presentation/services/PdfThumbnailGenerator.web.ts','utf8').replaceAll('import.meta.url','"file:///fixture"'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+new Function('require','exports',code)(name=>{assert.equal(name,'pdfjs-dist');return {GlobalWorkerOptions:{},getDocument:()=>({destroy:async()=>{destroyed++;},promise:fail?Promise.reject(Error('invalid')):Promise.resolve({numPages:3,getPage:async page=>{pageRequests.push(page);return {getViewport:({scale})=>({width:dimensions[0]*scale,height:dimensions[1]*scale}),render:()=>({promise:Promise.resolve().then(()=>{rendered++;})})};}})})};},exportsForGenerator);
+(async()=>{const generator=exportsForGenerator.pdfThumbnailGenerator;
+ assert.equal(await generator.generate('file:///book.pdf','id'),'data:image/jpeg;base64,fixture');assert.equal(canvas.width,300);assert.equal(canvas.height,450);assert.deepEqual(pageRequests,[1]);
+ dimensions=[100,10000];await generator.generate('file:///book.pdf','id');assert(canvas.width<=300&&canvas.height<=480);
+ dimensions=[0,0];assert.equal(await generator.generate('file:///bad.pdf','id'),null);assert.equal(rendered,2);
+ fail=true;assert.equal(await generator.generate('file:///broken.pdf','id'),null);assert.equal(destroyed,4);
+ delete global.document;console.log('PASS PDF covers: first page only, bounded canvas incl pathological pages, invalid input fallback, worker/document cleanup on success and failure. No Native rendering claimed.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

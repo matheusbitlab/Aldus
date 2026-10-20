@@ -12,14 +12,12 @@ if (typeof window !== "undefined") {
 
 export class WebPdfThumbnailGenerator {
   async generate(uri: string, _bookId: string, pickedFile?: Blob): Promise<string | null> {
+    let loadingTask: ReturnType<typeof getDocument> | undefined;
     try {
-      let loadingTask;
       if (pickedFile) {
         const buffer = await pickedFile.arrayBuffer();
         loadingTask = getDocument({
           data: new Uint8Array(buffer),
-          cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
-          cMapPacked: true,
         });
       } else if (uri.startsWith("data:application/pdf;base64,")) {
         const base64 = uri.split(",")[1];
@@ -27,14 +25,10 @@ export class WebPdfThumbnailGenerator {
         const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
         loadingTask = getDocument({
           data: bytes,
-          cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
-          cMapPacked: true,
         });
       } else {
         loadingTask = getDocument({
           url: uri,
-          cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
-          cMapPacked: true,
         });
       }
 
@@ -46,7 +40,8 @@ export class WebPdfThumbnailGenerator {
 
       // Target thumbnail width around 300px for sharp cards in 2/3 ratio
       const targetWidth = 300;
-      const scale = targetWidth / unscaledViewport.width;
+      if (!Number.isFinite(unscaledViewport.width) || !Number.isFinite(unscaledViewport.height) || unscaledViewport.width <= 0 || unscaledViewport.height <= 0) return null;
+      const scale = Math.min(targetWidth / unscaledViewport.width, 480 / unscaledViewport.height);
       const viewport = page.getViewport({ scale });
 
       const canvas = document.createElement("canvas");
@@ -66,6 +61,8 @@ export class WebPdfThumbnailGenerator {
       return dataUrl;
     } catch {
       return null;
+    } finally {
+      await loadingTask?.destroy().catch(() => undefined);
     }
   }
 }

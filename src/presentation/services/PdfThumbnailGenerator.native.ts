@@ -16,7 +16,7 @@ export class NativePdfThumbnailGenerator {
       await this.ensureDirectory();
       const targetPath = `${this.coversDir}${bookId}.jpg`;
       const info = await FileSystem.getInfoAsync(targetPath).catch(() => null);
-      if (info?.exists) {
+      if (info?.exists && !info.isDirectory && info.size > 0) {
         return targetPath;
       }
       return null;

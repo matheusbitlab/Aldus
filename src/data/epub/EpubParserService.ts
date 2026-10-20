@@ -70,7 +70,10 @@ export class EpubParserService implements EpubParser {
       // last original location, preserving cascade order and media conditions.
       for (const chapter of resolvedChapters) chapter.html = resources.restoreFonts(chapter.html);
       throwIfAborted(signal);
-      return { title, author, opfPath, coverImagePath: null, chapters: resolvedChapters };
+      let coverImagePath: string | null = null;
+      try { coverImagePath = await extractCover(opf, opfPath, opfDirectory, zip, manifestItems, resources); }
+      catch { throwIfAborted(signal); /* Optional artwork must never prevent reading. */ }
+      return { title, author, opfPath, coverImagePath, chapters: resolvedChapters };
     } catch (error) {
       throwIfAborted(signal);
       if (error instanceof EpubParsingError) throw error;
@@ -160,6 +163,51 @@ interface ChapterDraft {
   characterCount: number;
   html: string;
   path: string;
+}
+
+/** Read only the declared cover, never scan/decompress all archive images. */
+async function extractCover(
+  opf: { metadata?: { meta?: Record<string, unknown> | Array<Record<string, unknown>> }; guide?: { reference?: Record<string, unknown> | Array<Record<string, unknown>> } }, opfPath: string, directory: string, zip: JSZip,
+  manifest: Array<Record<string, unknown>>, resources: ResourceContext,
+): Promise<string | null> {
+  const modern = manifest.find(item => String(item['@_properties'] ?? '').split(/\s+/).includes('cover-image'));
+  const legacy = asArray(opf.metadata?.meta).find(item => String(item['@_name']).toLowerCase() === 'cover');
+  const declared = modern ?? manifest.find(item => item['@_id'] === legacy?.['@_content']);
+  let href = declared?.['@_href'];
+  if (!href) {
+    const guide = asArray(opf.guide?.reference).find(item => String(item['@_type']).split(/\s+/).includes('cover'));
+    if (!guide?.['@_href'] || isExternalResource(String(guide['@_href']))) return null;
+    const guidePath = resolveResourcePath(opfPath, String(guide['@_href']), directory);
+    if (/\.(?:xhtml|html|htm)$/i.test(guidePath)) {
+      const file = zip.file(guidePath);
+      if (!file || archiveEntrySize(file) > 128 * 1024) return null;
+      const html = await resources.read(file, 'string');
+      const image = html.match(/<(?:img|image)\b[^>]*>/i)?.[0];
+      href = image && (readAttribute(image, 'src') || readAttribute(image, 'href') || readAttribute(image, 'xlink:href'));
+      if (href && !isExternalResource(String(href))) href = `/${resolveResourcePath(guidePath, String(href), directory).slice(directory.length)}`;
+    } else href = guide['@_href'];
+  }
+  if (!href || isExternalResource(String(href))) return null;
+  const path = resolveResourcePath(opfPath, String(href), directory), file = zip.file(path);
+  // A bounded original is persisted once in existing cover metadata. No extra
+  // full-book image extraction, network request or thumbnail dependency.
+  if (!file || archiveEntrySize(file) > 1024 * 1024) return null;
+  const type = String(declared?.['@_media-type'] ?? mimeTypeForPath(path)).toLowerCase();
+  if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(type)) return null;
+  const cached = resources.dataUris.get(path);
+  const dataUri = cached ? await cached : `data:${type};base64,${await resources.read(file, 'base64')}`;
+  if (!dataUri || dataUri.length > 1_400_000) return null;
+  const head = atob(dataUri.slice(dataUri.indexOf(',') + 1).slice(0, 64));
+  const valid = type === 'image/png' ? head.startsWith('\x89PNG\r\n\x1a\n') && head.length >= 24
+    : type === 'image/jpeg' ? head.startsWith('\xff\xd8\xff') && head.length >= 16
+    : type === 'image/gif' ? /^GIF8[79]a/.test(head) && head.length >= 10
+    : head.startsWith('RIFF') && head.slice(8, 12) === 'WEBP';
+  return valid ? dataUri : null;
+}
+
+function archiveEntrySize(file: JSZip.JSZipObject): number {
+  // JSZip's already parsed ZIP directory gives the uncompressed size before read.
+  return (file as JSZip.JSZipObject & { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? Infinity;
 }
 
 function asArray<T>(value: T | T[] | undefined): T[] { return value === undefined ? [] : Array.isArray(value) ? value : [value]; }
