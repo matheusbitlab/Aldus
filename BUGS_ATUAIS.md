@@ -526,3 +526,32 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   Alterações novas exigem futuro bundle Android autorizado; APK/preview 35d092b são anteriores.
   Bloqueio Google invalid_client e investigação intermitente de perfil/memória anteriores
   permanecem abertos; esta revisão não alterou configuração OAuth nem declarou sua correção.
+
+
+### 20/10/2026 — Beta: evidência e bloqueios atuais
+
+- CORRIGIDO: CI Linux falhava em touchAction no componente de desenho; tipagem específica
+  Web preserva Native. CI do código 579cf75 PASS, matriz 80/80. Identidade da versão Web
+  agora usa configuração pública de fallback quando Constants.expoConfig não existir.
+- IMPLEMENTADO: assinatura privada obrigatória e exceção explícita de ensaio; feedback
+  manual, contato aprovado e metadados 1.0.0-beta.1/build 2. Novo APK e preview protegidos
+  do mesmo código existem; isso não equivale a GO nem a instalação da nova chave no Redmi.
+- Backup deixou de estar bloqueado: dump real + seis arquivos físicos cifrados, restore
+  isolado de 65 tabelas e hashes conferidos. Serviços gerenciados/configurações externas
+  e recuperação EFS/DPAPI fora desta máquina não foram reconstituídos.
+- Piloto real teve 12 cenários PASS e uma asserção inicial de limpeza FAIL. Causa inicial
+  não determinada; estado final confirmado por consulta do objeto ausente, GET 404,
+  remoção repetida e tombstone idempotente. Conservar essa ressalva na entrega.
+- QA A NÃO é mais puramente descartável: Amêndoas foi escolhido/importado pelo proprietário
+  durante o seletor. Preservar livro local, conta e fila; não apagar nem transferir para
+  a conta pessoal sem ação explícita. Ensaio dos dois arquivos sintéticos usa QA B.
+- Redmi confirmou importação EPUB/PDF QA, Reader, avanço e marcador/nota; Storage B contém
+  os dois arquivos (7.190 bytes), zero reservas. Ciclo completo com preview ainda em curso.
+  Automação foi protegida contra leitura de XML antigo e toques fora do Aldus/seletor;
+  perda de foco para outro aplicativo não é evidência de travamento do Aldus.
+- Google invalid_client, username-login ausente, incidente intermitente de perfil e
+  validação real de confirmação/recovery continuam abertos. Não alterar OAuth nem esconder
+  Google sem autorização específica. Nova assinatura beta exige ensaio Drive separado.
+- Retenção/identificação formal do controlador, custódia das chaves, instalação limpa da
+  assinatura beta e admissão restrita precisam ser concluídas/aprovadas antes de convites.
+  Sem deploy de produção, migrations, OWNER, cobrança ou convites nesta missão.

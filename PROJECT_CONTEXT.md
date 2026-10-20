@@ -1425,3 +1425,88 @@ pagamentos ou publicar automaticamente em tarefas de interface.
 - Sem novo APK de distribuição nesta revisão, deploy de produção, mudanças Supabase,
   migrations, OAuth, OWNER ou pagamentos. Push da main não aciona o projeto Vercel inspecionado:
   não há integração Git conectada; o preview anterior foi envio explícito estático.
+
+
+### 20/10/2026 — Beta fechado: checkpoint de infraestrutura e artefatos
+
+- Missão A–J EM ANDAMENTO na main, partindo de e3618b6. Não há GO nem autorização
+  de convites/produção. As alterações preexistentes de .gitignore e dos dois documentos
+  continuam separadas; não foram incorporadas a esta revisão.
+- Código distribuído: 579cf752489538a5666e059062585b8e601cd4f3. Commits anteriores
+  desta missão: 15b56b6 (tipagem Web de touchAction/CI) e 7990f67 (preparo beta).
+  Versão 1.0.0-beta.1, Android code 2. Feedback manual em Ajustes: versão/plataforma,
+  categoria, descrição e reprodução; prepara rascunho, sem envio/coleta automáticos.
+  Contato público autorizado: matheusborbaifc@gmail.com. Identificação formal do controlador,
+  retenção operacional e revisão jurídica ainda pendentes; nenhuma certificação legal.
+- Build local exige assinatura privada; exceção explícita apenas para ensaio compatível.
+  APK artifacts/apk/Aldus-579cf75.apk: 274.843.921 bytes; SHA-256
+  43b06eab6de6c0466b6da49bb578ff827abb6a0f07d1c0de50b06008972a8c6a.
+  com.aldus.reader, não depurável, Hermes embarcado, ARM64/ARMv7, módulos Drive/OCR presentes.
+  Remover x86/x86_64 economizou 70.783.113 bytes frente ao 35d092b, sem retirar recursos.
+  Certificado beta privado SHA-256 4adef0a46afa7f9d685a3ae7dba564379a5c9eb406a9452b05decdea11cb9875.
+  Chave cifrada fora do Git; custódia recuperável em outra máquina depende do proprietário.
+- Redmi recebeu somente Aldus-579cf75-redmi.apk, derivado com o certificado anterior.
+  Payload não relacionado à assinatura e bundle idênticos ao beta; install -r confirmado,
+  primeiro install 11/10 preservado, sem limpar/desinstalar, sem Metro. O beta de nova
+  assinatura NÃO substitui esse aplicativo; instalação nova com esse certificado e OAuth
+  Drive para seu SHA-1 continuam sem prova física. Não distribuir o derivado de ensaio.
+- Preview isolado/protegido, sem promoção:
+  https://kindle-reader-b83yrgk17-matheus-projects-70f48ed9.vercel.app
+  Código 579cf75, conteúdo/rotas/bundle remoto verificados. Chromium real: login por senha,
+  perfil, reload, Free/quotas, negação Admin, logout e A→B→A PASS com identidades QA reais;
+  nenhuma fixture HTTP. Cadastro por Admin NÃO prova entrega de e-mail ou recuperação.
+  CI remoto 39436524460 PASS. Push na main não publica o Vercel: integração Git ausente.
+- Auditoria somente leitura: sete versões remotas históricas preservadas; 31 funções e
+  27 policies equivalentes às quatro migrations incrementais originais. Bucket privado,
+  schemas privados sem USAGE de clientes, sem escrita direta de plano/Admin/biblioteca.
+  Não reaplicar nem reparar ledger. Nenhuma migration, OAuth, OWNER ou cobrança alterados.
+- Backup REAL atualizado e cifrado (EFS, ACL usuário/SYSTEM, credenciais DPAPI), fora do Git:
+  %USERPROFILE%\.aldus-private\beta-20261020\backup-2026-10-20T17-23-35-346Z.
+  Dump 595.970 bytes, SHA-256 ebb042d5f430364462fdb20c3e91df5ee20eed4cc6cdbfc618bd877066a365a6.
+  Snapshot consistente; restore PostgreSQL isolado em loopback, depois parado; 65 tabelas,
+  contagens/fingerprints, funções/policies/triggers e FKs conferidos. Seis objetos físicos,
+  5.952.849 bytes, copiados e hashes conferidos. Metadata não foi confundida com arquivos.
+  Vault sem segredos omitido apenas no restore Windows; arquivo completo preservado.
+  Não recria GoTrue/Storage gerenciados, SMTP/OAuth/segredos/configuração externa nem comprova
+  recuperação fora deste Windows sem preservar suas chaves EFS/DPAPI separadamente.
+- Piloto especificamente autorizado: três contas QA sintéticas A/B/D, D desativada;
+  credenciais apenas cifradas fora do Git, JWTs GoTrue reais usados para RLS. Doze cenários
+  remotos PASS: Free, autopromoção negada, CAS/retry, A/B/anônimo, upload sem reserva negado,
+  reserva concorrente/idempotente, tamanho real, publicação, download/hash, upsert/remoção
+  cruzada negados, cancelamento/retorno tardio e D com JWT anterior negada. A primeira
+  asserção de confirmação imediata da limpeza falhou; causa inicial não retida. Ausência
+  do objeto no banco, GET 404, delete repetido e tombstone CAS foram confirmados depois.
+  Não converter esse incidente em PASS sem ressalva nem inventar sua causa.
+- ATENÇÃO: o proprietário importou Amêndoas manualmente na QA A ao abrir o seletor.
+  Foi preservado localmente com sua fila; rede pausada antes de envio, sem uso como fixture.
+  Logout offline funcionou e os ensaios controlados passaram para QA B. NÃO excluir,
+  desativar ou tratar QA A como descartável enquanto esse livro não tiver destino definido
+  explicitamente. Não transferir ownership nem limpar outbox automaticamente.
+- QA B no Redmi: importação real dos dois arquivos originais QA (EPUB 2.954 bytes e
+  PDF 4.236 bytes), EPUB aberto, avanço, marcador e nota salvos; PDF Original página 2/4.
+  Storage real confirmou dois objetos/7.190 bytes, zero reservas pendentes. Livro público
+  empacotado tem metadata própria sincronizável; não interpretar toda contagem de livros
+  como quantidade de arquivos enviados. Manifest contém 34 assets públicos.
+  Ida à Web e retorno de dados ao Android ainda precisam fechar o cenário completo.
+- Qualidade controlada: typecheck/export Web, 80/80 críticas, 19 cenários PostgreSQL real
+  local com cinco esperas entre sessões independentes; Chromium Admin/SaaS/marketing/Library
+  PASS com contratos/HTTP/Auth/Storage sintéticos claramente separados do serviço real.
+  Leitura Livre/Reader não foram refatorados. Amostra release de memória não é prova de
+  ausência de vazamentos nem comparação pareada com development build.
+- Operação proposta, não ativada: iniciar com cinco convidados e avaliar expansão a dez;
+  admissão controlada por Auth/convites revogáveis, preservando contas existentes e sem
+  privilégios administrativos. Cadastro público ainda habilitado; mudar isso e convidar
+  requer aprovações específicas. Free comercial 100 livros/500 MiB e Pro 2.000/10 GiB intactos;
+  Pro não contratável. Supabase Free não garante simultaneamente essas franquias: 1 GB
+  Storage, 500 MB banco, máximo de arquivo Free 50 MB, egress limitado e sem PITR/backup
+  automático contratado; saldo mensal de tráfego não disponibilizado pelo conector.
+- Incidentes: contato manual com versão/plataforma/passos, sem enviar livros/tokens/logs
+  pessoais. Preservar arquivos/outbox; se suspeita de isolamento, pausar Sync, não apagar.
+  Recuperação de dados somente em instância isolada antes de qualquer ação aprovada em
+  produção. Atualização Android por fix-forward com code maior e mesma assinatura; nunca
+  uninstall/clear/downgrade. Web conserva previews anteriores; rollback/promoção requerem
+  aprovação, não são automáticos. Não há política automática de purga ou exclusão de contas.
+- Bloqueios: Google invalid_client remoto permanece; função username-login não implantada;
+  primeiro perfil intermitente segue inconclusivo; cadastro/confirm/recovery nos artefatos,
+  ciclo completo Android↔Web, instalação do novo certificado e recuperação de chaves fora
+  da máquina pendentes. Não convidar usuários nem declarar GO com esses portões abertos.
