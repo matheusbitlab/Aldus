@@ -46,8 +46,13 @@ function CoverSurface({ identity, title, author, format, source, thumbnail, comp
     {selected ? <Image key={index} source={selected} resizeMode="contain" resizeMethod="resize" fadeDuration={0} accessibilityIgnoresInvertColors
       style={[StyleSheet.absoluteFill, styles.image, { opacity: loaded ? 1 : 0, backgroundColor: design.paper }]}
       onLoad={event => {
-        const { width, height } = event.nativeEvent.source;
-        if (!Number.isFinite(width) || !Number.isFinite(height) || width < 96 || height < 96) reject();
+        // React Native Web forwards the DOM image event instead of a native source.
+        const native = event.nativeEvent as typeof event.nativeEvent & {
+          target?: { naturalWidth?: number; naturalHeight?: number };
+        };
+        const width = native?.source?.width ?? native?.target?.naturalWidth;
+        const height = native?.source?.height ?? native?.target?.naturalHeight;
+        if (typeof width !== 'number' || typeof height !== 'number' || !Number.isFinite(width) || !Number.isFinite(height) || width < 96 || height < 96) reject();
         else setLoaded(true);
       }} onError={reject} /> : null}
     {selected && !loaded ? <ActivityIndicator testID="book-cover-loading" size="small" color={design.ink} style={styles.loading} /> : null}

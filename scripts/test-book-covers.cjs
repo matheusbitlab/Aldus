@@ -27,6 +27,10 @@ async function epub(kind,image=png){
   await render({identity:'B',source:{uri:'file:///valid.jpg'}});
   await act(async()=>image().props.onLoad({nativeEvent:{source:{width:300,height:450}}}));assert.equal(view.root.findAllByProps({testID:'book-cover-loading'}).length,0);
   await render({identity:'B',source:{uri:'file:///replacement.jpg'}});assert.equal(view.root.findAllByProps({testID:'book-cover-loading'}).length,1);
+  await act(async()=>image().props.onLoad({nativeEvent:{target:{naturalWidth:300,naturalHeight:450}}}));assert.equal(view.root.findAllByProps({testID:'book-cover-loading'}).length,0);
+  await render({identity:'web-tiny',source:{uri:'file:///web-tiny.jpg'},thumbnail:{uri:'file:///web-valid.jpg'}});
+  await act(async()=>image().props.onLoad({nativeEvent:{target:{naturalWidth:1,naturalHeight:1}}}));assert.equal(image().props.source.uri,'file:///web-valid.jpg');
+  await act(async()=>image().props.onLoad({nativeEvent:{}}));assert.equal(view.root.findAllByType('Image').length,0);assert.equal(view.root.findAllByProps({testID:'book-cover-loading'}).length,0);
   await render({identity:'drive-file',source:null,format:'pdf',compact:true});assert.equal(view.root.findAllByType('Image').length,0);
  }finally{if(view)await act(async()=>view.unmount());}
  console.log('PASS covers: EPUB 3/2/guide, absent/broken/bounded/cancelled; chapters unchanged; deterministic editorial; failure/thumbnail/tiny/reset/list/Drive. No remote book downloads.');
