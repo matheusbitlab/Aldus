@@ -23,7 +23,7 @@ export function SettingsGroup({ title, children }: PropsWithChildren<{ title: st
 }
 export function SettingsLink({ title, description, icon, onPress }: { title: string; description?: string; icon: React.ComponentProps<typeof Ionicons>['name']; onPress: () => void }) {
   const { palette } = useAppTheme();
-  return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityHint={description} onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.65 : 1 }]}>
+  return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityHint={description} onPress={onPress} android_ripple={{ color: palette.surfaceSecondary }} style={styles.row}>
     <Ionicons name={icon} size={21} color={palette.accent} />
     <View style={{ flex: 1, gap: 3 }}><Text style={{ color: palette.text, fontSize: 15, fontWeight: '500' }}>{title}</Text>{description ? <Text style={{ color: palette.secondaryText, fontSize: 12, lineHeight: 17 }}>{description}</Text> : null}</View>
     <Ionicons name="chevron-forward" size={17} color={palette.secondaryText} />

@@ -23,6 +23,14 @@ const load=require('./community-test-loader.cjs')({react:React,'react/jsx-runtim
  try{
   const Settings=load('src/presentation/screens/SettingsScreen.tsx').default;
   await render(Settings);assert.match(text(),/Legal e informações/);assert.doesNotMatch(text(),/Política de Privacidade|Licenças de terceiros|Aldus Admin/);
+  // Geometry must reach the Native host as data, including through CSS interop.
+  // A functional Pressable style was physically observed as a vertical stack.
+  for (const row of view.root.findAllByType('Pressable').filter(n => n.props.accessibilityHint)) {
+    assert.notEqual(typeof row.props.style, 'function', 'Settings row geometry must not depend on a Pressable style callback');
+    const style=Object.assign({},...[row.props.style].flat(Infinity).filter(Boolean));
+    assert.equal(style.flexDirection,'row');assert.equal(style.alignItems,'center');assert.ok(style.minHeight>=44);
+    const content=row.findAllByType('View').find(n=>n.props.style?.flex===1);assert(content,'Text must retain flexible width');
+  }
   for(const [label,route]of [['Minha conta','/account'],['Meu Plano','/plan'],['Sincronização','/preferences?section=sync'],['Tema do aplicativo','/preferences?section=appearance'],['Conforto durante a leitura','/preferences?section=comfort'],['Minhas bibliotecas','/sources'],['Serviços de leitura','/preferences?section=services'],['Comunidade literária','/community'],['Privacidade e Dados','/legal/data'],['Legal e informações','/legal']]){await click(label);assert.equal(routes.at(-1),route);}
   await click('Preferências do leitor');assert.match(text(),/Preferências abertas/);
   await click('Ajuda e feedback');assert.equal(routes.at(-1),'/support');
