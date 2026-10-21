@@ -1816,3 +1816,39 @@ pagamentos ou publicar automaticamente em tarefas de interface.
   somente nos dois arquivos sintéticos/QA B foram autorizadas; não usar40 livros ou
   QA A/Amêndoas como fixtures. Username-login/limiter, admissão e retenção continuam
   dependentes de aprovações/infraestrutura; nenhum deploy de função ou convite executado.
+
+
+### 21/10/2026 — Landing cinematográfica Web com livro e particle morphing
+
+- Implementação funcional 82be6a46788b3bbb2d9a90aeccb4b9fd88f2b418, main, com preview somente de homologação:
+  https://kindle-reader-odm52odxt-matheus-projects-70f48ed9.vercel.app
+  dpl_BxvqohCbqz67k6q14w3Dd3PB9NtV, READY; metadata/HTML/entry e chunk WebGL comparados byte a byte; HTTP público200. Sem promoção de produção, domínio ou mudanças Auth/Supabase.
+- Three.js0.186.1 e tipos0.186.0; avisos MIT gerados pelo fluxo existente. Three puro escolhido por integrar um renderer descartável ao Expo Web sem adicionar R3F/GSAP ou outro scheduler React. Nada de modelos/texturas externos ou módulos Native.
+- Um livro principal: capa/lombada/bloco de papel sólidos, quatro folhas subdivididas com curvatura no vertex shader, texturas Canvas próprias, sombras suaves e câmera perspectiva. Capas menores da Biblioteca são ilustrações internas, não livros principais separados.
+- Sete cenas: formação do livro fechado, abertura, Biblioteca, Reader, estudo/flashcards, comunidade explicitamente em evolução, reconstrução/fechamento com CTA real. Superfícies se dissolvem e Points/BufferGeometry interpolam sete alvos estáveis na GPU. Nenhum vídeo, DOM por partícula ou biblioteca privada consultada.
+- ScrollBookStory acompanha o contêiner real data-landing-scroll, eventos passivos, geometria em ResizeObserver e requestAnimationFrame sob demanda e sondas finitas de até24 quadros por capítulo/resize, sempre desenhando a mesma pose da rolagem. Sem relógio que avance a pose ou React state por frame; parar mantém a pose, voltar reconstrói a mesma pose. Skip/âncoras e rolagem nativa preservados.
+- BookScene é importado dinamicamente apenas pela landing Web. Orçamentos: desktop4096 partículas/DPR≤1,5/sombras512; mobile1600/DPR≤1,25/sem sombras; perfil limitado900/DPR1. Redução adaptativa após frames lentos consecutivos. Pausa invisível/documento oculto e dispose de geometrias, materiais, texturas, sombra/contexto/listeners.
+- Fallback HTML estático com capa e resumo semântico completo para reduced motion, Save-Data/perfil muito limitado, falha de inicialização ou perda WebGL; no-JS também navega. Sem trilha vazia obrigatória; conteúdo essencial fora do Canvas.
+- Typecheck, export Web, metadata do export, pt-BR/marketing/SEO, contratos cinematográficos e 81/81 críticas PASS. Primeiro ensaio concorrente teve timeout180s em Battle; repetição serial sem ensaio gráfico PASS, sem alterar Battle nem aumentar timeout.
+- Chromium ANGLE/SwiftShader na rodada inicial e D3D11 na matriz final: shader real, oito poses0/10/25/40/55/70/85/100%,72 amostras de viewport (360/390/430/768/1024/1440/1920 e extras320/landscape844), hold/reverse/wheel, descarte/remount, falha GPU/context loss, perfil limitado, reduced motion, no-JS, AX/teclado, menu, FAQ, login/cadastro, catálogo e guards Library/Admin e rotas legais PASS. Fixtures HTTP sintéticas; nenhuma conta real usada.
+- Comparação sequencial contra bundle público anterior f6cf52c, hash conferido, mesmo Chromium/viewport/240 frames de ida e volta, sem builds/testes concorrentes. GPU POR SOFTWARE; não é prova de GPU física, Android, dispositivo modesto real ou garantia60FPS.
+- 1440×1000: cadência total 6.9→8.4 FPS; p95 267.1→250.0ms; frames>50ms 233→226/240.
+  Canvas ativo: 3.7FPS; fallback {"frame":8,"elapsedMs":4466.299999952316,"reason":"performance-limited"}; após fallback 8.8FPS. A média total que contém fallback NÃO representa3D contínuo.
+  CPU TaskDuration 21.9→7.6s; heap JS 16.2→19.0MiB; loadEventEnd 5153.8→2671.2ms; primeira renderização 3D 1481.7ms; qualidade final adaptive-low.
+- 390×844 emulado: cadência total 27.5→38.6 FPS; p95 66.7→66.7ms; frames>50ms 25→23/240.
+  Canvas ativo: 16.5FPS; fallback {"frame":29,"elapsedMs":2081.100000023842,"reason":"performance-limited"}; após fallback 47.8FPS. A média total que contém fallback NÃO representa3D contínuo.
+  CPU TaskDuration 5.9→1.9s; heap JS 16.1→25.3MiB; loadEventEnd 1899.5→1132.4ms; primeira renderização 3D 1483.5ms; qualidade final adaptive-low.
+- Entry gzip anterior 1474393B, atual 1472020B (delta-2373B); chunk3D separado 850770B raw/200929B gzip, baixado sob demanda. Não requerido no reduced motion inicial nem pela entrada Native.
+- Evidências ignoradas: .expo/cinematic-validation (capturas/results.json); artifacts/landing-cinematic (logs, paired/*.json e baseline de origem pública). Memória é heap JS amostrado, não VRAM total; contadores de dispose não certificam ausência universal de vazamentos.
+- Permanecem: homologação em outros GPUs/mobile físico, domínio/canonical oficial e callbacks de um eventual novo domínio de preview não autorizados nesta missão. Sem novos testes físicos no Android, APK ou alterações Reader/Auth/Drive/Admin/Sync/RLS/migrations/pagamentos. Bloqueios beta anteriores continuam válidos; não declarar GO.
+- Alterações locais preexistentes em .gitignore/PROJECT_CONTEXT.md/BUGS_ATUAIS.md preservadas por hash; somente estes acréscimos documentais entram no commit. Nenhum novo dossiê permanente.
+- Sondas de cadência são contíguas e limitadas: não confundem a velocidade do mouse ou um intervalo frio de inicialização com GPU lenta. Regressões de gaps400ms, cadência alternada e um pico inicial seguido de60FPS; qualidade900/sem sombras e fallback estático efetivo em software. Primeiras medições insuficientes e falso positivo de cold gap preservados em paired-before-*; não usar esses resultados como prova de3D60FPS.
+- A matriz visual força geometria WebGL via flag de QA para inspecionar cada pose; o orçamento de PRODUÇÃO foi exercitado separadamente sem essa flag. Após o último ajuste de orçamento, typecheck/export/marketing/contratos de cadência foram revalidados; suítes de Reader/Auth/Sync não foram modificadas.
+- GPU de hardware local confirmada: ANGLE/D3D11 Intel HD Graphics520. Canvas ativo durante240/240 frames, sem fallback: desktop 57.5→56.9FPS (p95 16.8ms),390px 58.7→58.9FPS (p95 16.8ms). Não é teste físico Redmi nem promessa universal.
+- Hardware1440×1000: cadência total 57.5→56.9 FPS; p95 16.8→16.8ms; frames>50ms 1→2/240.
+  Canvas ativo: 56.9FPS; fallback não acionado; após fallback não aplicável. A média total que contém fallback NÃO representa3D contínuo.
+  CPU TaskDuration 2.4→1.4s; heap JS 16.4→22.7MiB; loadEventEnd 1818.7→1144.6ms; primeira renderização 3D 1296.8ms; qualidade final desktop.
+- Hardware390×844 emulado: cadência total 58.7→58.9 FPS; p95 16.8→16.8ms; frames>50ms 1→0/240.
+  Canvas ativo: 58.9FPS; fallback não acionado; após fallback não aplicável. A média total que contém fallback NÃO representa3D contínuo.
+  CPU TaskDuration 2.3→1.2s; heap JS 16.4→23.8MiB; loadEventEnd 1794.6→6630.7ms; primeira renderização 3D 779.0ms; qualidade final mobile.
+- Commits: dependências/licenças 8ae2dcd21731377641823647afee36c503f5c12b, experiência/testes 82be6a46788b3bbb2d9a90aeccb4b9fd88f2b418. Navegador no preview real compilou WebGL e percorreu quatro cenas; fixtures Auth sintéticas, sem login ou escritas em conta real. Production deployment existente conferido inalterado após preview.

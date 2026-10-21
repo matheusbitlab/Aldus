@@ -677,3 +677,14 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   AVD encerrado por orientação do dono. Typecheck,80/80 críticas,export e CI39643844900 PASS.
 - Mantidos bloqueios de custódia externa, grifo Native→Web e leitura prolongada final,
   além de recuperação Web e runtime privado. Sem GO, produção, migrations ou pagamentos.
+
+
+### 21/10/2026 — Homologação da landing Web cinematográfica
+
+- SUBSTITUÍDO: sequência CSS anterior por livro sólido WebGL e morphing GPU entre estruturas distintas; um objeto principal fechado no início e no fim. Header/Auth/planos/FAQ/legal/SEO preservados.
+- CORRIGIDOS durante revisão visual: oclusão do texto Reader pelo bloco de papel (folhas agora acima do bloco/abaixo da capa), proporção de flashcards, área reservada para legendas e sobreposição em landscape844×390. Contratos e capturas finais atualizados.
+- 81/81 críticas, typecheck/export/marketing e Chromium72 amostras PASS. Timeout inicial do Battle sob carga concorrente preservado no log; rodada serial PASS, sem mudança do recurso. Harness corrigido para escrita momentânea do DevToolsActivePort/fechamento CDP e capitalização real dos títulos legais.
+- Fallback estático validado com GPU indisponível/contexto perdido/perfil limitado/reduced motion/no-JS; sem branco, ciclo de retry ou rolagem vazia forçada. Dispose/remount, hold e reversibilidade PASS.
+- DESEMPENHO: números comparativos e limites registrados no PROJECT_CONTEXT.md; rodadas em SwiftShader e D3D11 com hardware local confirmado, sem garantia universal de60FPS. Outros GPUs/mobile físico pendentes.
+- Preview https://kindle-reader-odm52odxt-matheus-projects-70f48ed9.vercel.app, código82be6a46788b3bbb2d9a90aeccb4b9fd88f2b418; nenhuma produção/Auth/OAuth/conta/Supabase/Android alterada. Novo domínio de preview não recebe callbacks automaticamente. Bloqueios de beta/recovery/Drive/QA anteriores preservados.
+- GPU local Intel HD520/D3D11 confirmada:240/240 frames com Canvas ativo/sem fallback nos dois tamanhos. Falso positivo de cold gap corrigido; sondas não dependem da cadência da mão do visitante. Outros dispositivos/mobile físico pendentes.
