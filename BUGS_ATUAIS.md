@@ -609,3 +609,22 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   Preparar próximo build com x86_64 nativo; não apagar o app pessoal do Redmi.
 - NO-GO permanece. Evidências anteriores mantidas; novos resultados em PROJECT_CONTEXT.
   Sem migrations, RLS, OWNER, contas reais, Drive ou produção alterados nesta rodada.
+
+
+### 21/10/2026 — Google Web e regressões beta.2
+
+- Google Web REAL também validado no preview22eb657, com conta original/perfil, biblioteca,
+  reload, logout e segunda entrada. Duas URLs exatas desse preview foram autorizadas e
+  adicionadas; callbacks/Site URL Native preservados. Secret válido resolveu o exchange
+  remoto; não enfraquecer PKCE/RLS nem confundir login com a autorização Google Drive.
+- Cliente Android OAuth existente usa só certificado antigo. Nova assinatura privada
+  ainda exige configuração/teste Drive autorizado em instalação isolada. OAuth está
+  Externo/Testando, com três usuários de teste; nenhuma mudança de público foi feita.
+- c92308f: beta.2/code3; typecheck,80/80 críticas,export e CI remoto39638828390 PASS.
+  Novo preview protegido gfwlrbj7z READY com bundle conferido; fluxos autenticados nele
+  e APK novo ainda pendentes. Build ARM64/ARMv7/x86_64 em execução, sem declarar sucesso.
+- Cadastro sintético e e-mails autorizados; formulário preparado, senha e envio deixados
+  ao proprietário. Cadastro/confirm/recovery Web não declarados PASS antes de resultado.
+- Ajustes: correção7ed1339 aguardando novo APK físico. Leitura prolongada, grifo Native→Web,
+  username-login, admissão/retenção e custódia fora deste Windows continuam pendentes.
+  Somente C: disponível; não exportar PFX/keystore/segredos sem destino aprovado.

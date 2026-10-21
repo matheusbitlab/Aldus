@@ -1642,3 +1642,55 @@ pagamentos ou publicar automaticamente em tarefas de interface.
   NO-GO mantido. Username-login ainda ausente; cadastro atual, recovery Web, grifo
   Native→Web, Reader prolongado e custódia fora desta máquina continuam pendentes.
   QA A/Amêndoas e outbox preservados. Não iniciar publicação de produção/convites.
+
+
+### 21/10/2026 — Google Web validado; beta.2 em homologação
+
+- Após aprovação específica, adicionadas SOMENTE duas Redirect URLs do preview 22eb657:
+  https://kindle-reader-ro081u87x-matheus-projects-70f48ed9.vercel.app/auth/callback
+  https://kindle-reader-ro081u87x-matheus-projects-70f48ed9.vercel.app/auth/callback?next=reset-password
+  Total conferido: quatro URLs; dois retornos Native e Site URL aldus://auth/callback
+  preservados, sem wildcard, alteração de proteção Vercel ou produção. Reversão: remover
+  somente as duas novas entradas após aprovação. Não são autorização para outras origens.
+- Google Web REAL no Chromium integrado/preview 22eb657: callback concluído, header
+  autenticado, biblioteca abriu; navegação com reload à Conta confirmou identidade
+  original e perfil disponível. Logout removeu identidade visível e abriu login; segunda
+  entrada Google voltou ao header autenticado, sem erro de callback. Servidor confirmou
+  login/provider google e nova sessão original. Evidências sanitizadas em artifacts/
+  beta-20261021/google-web-confirmed.json e google-native-confirmed.json. Google login
+  passa nesses dois ambientes; ainda não é prova do APK beta.2 com nova assinatura/Drive.
+- Cliente Android Google existente vincula com.aldus.reader ao SHA-1 antigo
+  5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25. Certificado beta privado
+  tem SHA-1 BC:6B:12:C9:C3:3E:6C:97:F9:FC:FD:96:73:E7:8A:D6:55:1F:61:96.
+  Configurar segundo cliente para beta exige aprovação específica; preservar o antigo.
+  OAuth continua Externo/Testando, três usuários de teste, sem alteração de público.
+- Código c92308fe6a00e6b8e1e3a19f5baf74ae1c1d3920, main enviada: beta.2/versionCode3,
+  versões Expo/package/lock/Gradle consistentes. Typecheck e 80/80 críticas PASS. Export
+  Web PASS e metadata/arquivos conferidos; dirty=true significa só as três diferenças
+  contextuais preexistentes reconhecidas, não código de runtime fora do commit.
+  CI 39638828390 SUCCESS: https://github.com/matheusbitlab/Aldus/actions/runs/39638828390
+- Novo preview PRIVADO, sem promoção de produção:
+  https://kindle-reader-gfwlrbj7z-matheus-projects-70f48ed9.vercel.app
+  dpl_ACviy4EVTJyg8EvefxdLF4XwYkEt, READY, metadata e bundle remoto idênticos ao export.
+  JS SHA-256 a8aa8fa9e626d9517596d31465587ec6484d0323426272d43dd8083081c37167.
+  GET anônimo retorna302 para autenticação Vercel. Autenticação/Reader nesse novo
+  preview ainda não ensaiados; callbacks dessa NOVA origem ainda não autorizados.
+- Build APK privado c92308f em andamento no wrapper oficial, ARM64/ARMv7/x86_64 para
+  testar sem tradução ARM no AVD. Não declarar APK gerado, inicialização ou correção
+  física dos Ajustes até conferir artefato e executar. Não distribuir derivado Redmi.
+- Proprietário autorizou uma nova conta sintética no alias Gmail de teste desta rodada
+  e e-mails de confirmação/recovery. Formulário preparado no preview 22eb657, senhas
+  deixadas para entrada direta pelo proprietário; não registrar nem recuperar senha.
+  Cadastro/confirm/recovery ainda pendentes de resultado, não criar contas duplicadas.
+- Custódia externa preparada como procedimento, NÃO executada: escolher destino offline
+  cifrado aprovado; exportar certificado/chave EFS em PFX com senha forte inserida pelo
+  proprietário; preservar backup/objetos/manifestos, keystore beta e recuperação de suas
+  senhas em invólucros cifrados separados. Blobs DPAPI isolados não bastam em outro Windows.
+  Não copiar chaves/segredos para Git, Vercel ou chat. Em segunda máquina isolada, importar
+  material com participação do proprietário, confirmar decriptação/hashes e restore
+  loopback, e conferir certificado do keystore sem assinar/publicar release por engano.
+  Só unidade C: disponível nesta sessão; destino externo/segunda máquina não aprovados.
+  Portão de custódia permanece BLOQUEADO; backup comprovado anterior ao piloto preservado.
+- Configuração temporária de manter Redmi acordado restaurada a0; fonte1.0, Wi-Fi1 e
+  dados móveis1 preservados. Conta original e40 livros confirmados após Google/reabertura.
+  Matrizes guardam evidências anteriores; NO-GO e demais pendências mantidos.
