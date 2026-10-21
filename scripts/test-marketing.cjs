@@ -57,4 +57,28 @@ for(const invalid of ['javascript:alert(1)','https://user:secret@example.invalid
 assert.match(fs.readFileSync('app/index.tsx','utf8'),/Redirect href="\/library"/,'Native entry remains unchanged');
 assert.match(fs.readFileSync('app/_layout.tsx','utf8'),/Stack.Protected guard=\{appReady\}/);
 require('child_process').execFileSync(process.execPath,['scripts/generate-public-catalog.cjs','--check'],{stdio:'pipe'});
+// Real Web entry component: an authenticated account still needing a username
+// must reach the existing completion screen instead of seeing a signup loop.
+let accountState={loading:false,session:null,profile:null};
+const entryLoad=require('./community-test-loader.cjs')({
+ 'expo-router':{Redirect:({href})=>React.createElement('a',{'data-profile-redirect':href})},
+ 'expo-router/head':()=>null,
+ '@/src/presentation/contexts/AuthContext':{useAuth:()=>accountState},
+ '@/src/presentation/services/dependencies':{accountPlanRepository:{readCatalog:async()=>null}},
+ '@/src/presentation/saas/useSaasRead':{useSaasRead:()=>({data:null})},
+ '@/src/legal/legalConfig':{legalIdentity:{contactEmail:null}},
+ './LandingDocument':{LandingDocument:({signedIn})=>React.createElement('main',{'data-entry-state':signedIn?'signed-in':'guest'})},
+});
+const Entry=entryLoad('src/marketing/LandingPage.web.tsx').LandingPage;
+const renderEntry=()=>renderToStaticMarkup(React.createElement(Entry));
+assert.match(renderEntry(),/data-entry-state="guest"/);
+const complete={id:'synthetic-a',username:'reader_a',account_status:'active'};
+accountState={loading:false,session:{user:{id:'synthetic-a'}},profile:{...complete,username:null}};
+assert.match(renderEntry(),/data-profile-redirect="\/auth\/complete-profile"/,'Fresh verified account must complete its profile');
+accountState.profile=complete;assert.match(renderEntry(),/data-entry-state="signed-in"/);
+for(const profile of [{...complete,id:'synthetic-b',username:null},{...complete,account_status:'disabled',username:null},null]){
+ accountState.profile=profile;const html=renderEntry();assert.doesNotMatch(html,/data-profile-redirect/);assert.match(html,/data-entry-state="guest"/);
+}
+accountState={loading:true,session:{user:{id:'synthetic-a'}},profile:{...complete,username:null}};
+assert.doesNotMatch(renderEntry(),/data-profile-redirect/,'Do not navigate during profile resolution');
 console.log('PASS single-book SSR/accessible summary, finite continuous and reversible cover/leaf geometry, safe real-scroller progress math, public login/signup/library links, localized initial/authenticated catalog, no active purchase/private data, SEO; Native entry/protected stack preserved. Browser/Android separate.');
