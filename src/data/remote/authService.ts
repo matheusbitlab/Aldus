@@ -8,6 +8,7 @@ import { buildAuthCallback, validateGoogleAuthorizationUrl } from "./authRedirec
 import { authOAuthContext, authOAuthGeneration, beginGoogleAuthOperation, finishAuthOAuthOperation, isCurrentGoogleAuthOperation } from "@/src/utils/authOAuthDiagnostics";
 import { hardenPkceParameters } from "./authPkce";
 import { nativeAuthCallbacks } from './nativeAuthCallback';
+import { callbackExchangeFailureMessage } from './authCallback';
 
 export function authCallbackUrl(next?: "reset-password") {
   const webOrigin = Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : undefined;
@@ -148,17 +149,17 @@ export function exchangeCallbackCode(code: string | null, operationId?: string):
     authDiagnostic("OAUTH_EXCHANGE", { ...context, callbackReceived: true, exchangeStarted: true, exchangeResult: "pending" });
     try {
       const { data, error } = await requireSupabase().auth.exchangeCodeForSession(code);
-      if (error) throw new Error();
+      if (error) throw error;
       if (!data?.session?.user?.id || !data.session.access_token || !data.session.refresh_token) {
         authDiagnostic("OAUTH_EXCHANGE", { ...context, exchangeStarted: true, exchangeResult: "missing_session", session: false });
         throw new Error();
       }
       authDiagnostic("OAUTH_EXCHANGE", { ...context, exchangeStarted: true, exchangeResult: "success", session: true });
       finishAuthOAuthOperation(operationId, data.session.user.id);
-    } catch {
+    } catch (failure) {
       authDiagnostic("OAUTH_EXCHANGE", { ...context, exchangeStarted: true, exchangeResult: "error" });
       finishAuthOAuthOperation(operationId);
-      throw new Error("Link inválido ou expirado. Solicite um novo link.");
+      throw new Error(callbackExchangeFailureMessage(failure));
     } finally { entry.pending = false; }
   })();
   return entry.promise;

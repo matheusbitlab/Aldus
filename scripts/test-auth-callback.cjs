@@ -132,6 +132,28 @@ async function redirectContract() {
   let finish;exchangeResult=new Promise(resolve=>finish=resolve);const pending=service.exchangeCallbackCode('PRIVATE_CANARY_pending');
   await assert.rejects(service.loginWithGoogle(),/anterior.*concluída/);finish(successResult);await pending;
   exchangeResult={data:{session:null},error:null};await assert.rejects(service.exchangeCallbackCode('PRIVATE_CANARY_no_session'),/inválido/);
+  // A second browser/device has no first browser's PKCE verifier. Use the installed
+  // SDK to prove the missing-verifier failure happens before a token HTTP request.
+  let tokenRequests=0;
+  const otherBrowser=createClient('https://isolated-pkce.example.invalid','fixture-public-key',{
+    auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,flowType:'pkce'},
+    global:{fetch:async()=>{tokenRequests++;throw Error('Unexpected network request');}},
+  });
+  const missingVerifier=await otherBrowser.auth.exchangeCodeForSession('PRIVATE_CANARY_cross_device');
+  assert.equal(missingVerifier.error?.code,'pkce_code_verifier_not_found');assert.equal(tokenRequests,0);
+  exchangeResult=missingVerifier;
+  await assert.rejects(service.exchangeCallbackCode('PRIVATE_CANARY_cross_device'),error=>{
+    assert.match(error.message,/outro navegador ou dispositivo/);
+    assert.match(error.message,/Se já confirmou o e-mail/);
+    assert.match(error.message,/redefinir a senha/);
+    assert.doesNotMatch(error.message,/inválido ou expirado|PRIVATE_CANARY|PKCE|storage|code verifier/);return true;
+  });
+  exchangeResult={data:{session:null},error:{code:'bad_code_verifier',message:'PRIVATE_CANARY_raw_provider_body'}};
+  await assert.rejects(service.exchangeCallbackCode('PRIVATE_CANARY_wrong_verifier'),/outro navegador ou dispositivo/);
+  exchangeResult={data:{session:null},error:{code:'unknown',message:'PRIVATE_CANARY_transport'}};
+  await assert.rejects(service.exchangeCallbackCode('PRIVATE_CANARY_unknown_exchange'),error=>{
+    assert.match(error.message,/inválido ou expirado/);assert.doesNotMatch(error.message,/PRIVATE_CANARY/);return true;
+  });
   // A slow previous authorize response must not open a second browser after a newer attempt.
   let release;gate=new Promise(resolve=>release=resolve);const old=service.loginWithGoogle();gate=null;await service.loginWithGoogle();const count=opened.length;release();await old;assert.equal(opened.length,count);
   let reject;gate=new Promise((resolve,fail)=>reject=fail);const oldFailure=service.loginWithGoogle();gate=null;await service.loginWithGoogle();const countAfterNew=opened.length,logsAfterNew=logs.length;
