@@ -587,3 +587,25 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - Preservar QA A/Amêndoas e outbox; não tratar A como descartável. Seis arquivos privados
   anteriores e 40 livros originais mantidos. Nenhuma migration, OAuth, OWNER, cobrança
   ou produção modificada. Detalhes de hashes/caminhos/portões em PROJECT_CONTEXT.md.
+
+
+### 21/10/2026 — Google Android corrigido; ajustes e homologação pendentes
+
+- GOOGLE AUTH: causa remota confirmada no callback Google/Supabase: secret rejeitado
+  com invalid_client. Proprietário, com aprovação específica, criou segunda chave
+  no cliente Web existente e salvou somente o secret no Supabase, preservando anterior.
+  Redmi retornou à conta original, servidor registrou login google e nova sessão,
+  perfil ativo e 40 livros; sessão persiste após cold reopen. Google Android VALIDADO
+  no payload 22eb657 compatível; Google Web segue pendente de allowlist/teste específico.
+  Não confundir esse sucesso com autorização/indexação Google Drive.
+- ff2f131: cache opcional com erro não substitui perfil remoto fresco/desativado.
+  de64178: erro de exchange do provedor não é confundido com cancelamento. Regressões
+  antes FAIL/depois PASS e typecheck da primeira correção PASS. Rebuild pendente;
+  incidente original de primeiro perfil novo permanece com causa inconclusiva.
+- REPRODUZIDO no Redmi: Ajustes empilha ícone/título/seta. Correção estática local e
+  teste de navegação passam; confirmação física no novo artefato ainda pendente.
+- APK privado 22eb657 instalado no AVD isolado com hash idêntico, mas a tradução
+  ARM→x86_64 falha antes da UI em SoLoader/libreactnative.so. Não é PASS de runtime.
+  Preparar próximo build com x86_64 nativo; não apagar o app pessoal do Redmi.
+- NO-GO permanece. Evidências anteriores mantidas; novos resultados em PROJECT_CONTEXT.
+  Sem migrations, RLS, OWNER, contas reais, Drive ou produção alterados nesta rodada.

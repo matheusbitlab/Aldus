@@ -1599,3 +1599,46 @@ pagamentos ou publicar automaticamente em tarefas de interface.
   Não ocultar Google ou alterar configuração OAuth sem autorização específica. Nenhuma
   migration/RLS/OWNER/cobrança/produção modificada nesta rodada. Próximas ações externas
   precisam de aprovação específica; preservar todo dado pessoal e a fila QA A.
+
+
+### 21/10/2026 — Fechamento Beta: Google Android validado e checkpoint local
+
+- HEAD inicial e14480c3e610bb7e0ecec87933d61889d152017b, main. As diferenças anteriores
+  em .gitignore e nos dois contextos foram preservadas; não são parte dos commits locais.
+- Causa confirmada do login Google: Auth remoto registrou, em 19/10, erro no callback
+  de troca com o provedor: invalid_client / The provided client secret is invalid.
+  Cliente Web Aldus reader, projeto Google coral-antonym-393317, coincide com o Client ID
+  do Supabase e callback /auth/v1/callback correto. Não foi falha da troca PKCE do app.
+- Com autorização específica, o proprietário criou segunda chave no MESMO cliente Web,
+  preservou a anterior e salvou somente o novo secret do provedor Google no Supabase.
+  Nenhum secret foi lido, registrado ou enviado ao Git. Nenhum Client ID, URL, switch,
+  conta, RLS, migration, OWNER, Drive ou pagamento foi alterado pelo agente.
+- VALIDAÇÃO REAL: Redmi Android 16, payload 22eb657/assinatura antiga compatível, retornou
+  da escolha Google à conta original. Logs 21/10 16:25–16:32 UTC: login/provider google,
+  nova sessão, perfil ativo, zero invalid_client ou falhas de exchange nessa janela.
+  Biblioteca mantém 40 livros; sessão original preservada após force-stop/cold reopen.
+  Isso valida o Google nesse fluxo Android; não valida Web ou a autorização Drive.
+- Bloqueio Web concreto: allowlist Supabase contém somente os dois callbacks Native;
+  nenhum callback HTTPS do preview. Não alterar URLs sem aprovação específica.
+- ff2f131: falha ao gravar cache opcional não substitui mais perfil fresco retornado
+  pelo servidor. Regressões incluem perfil desativado e resposta tardia A→B. Antes FAIL,
+  depois PASS; typecheck PASS. A causa do incidente intermitente de primeiro perfil
+  relatado em 19/10 continua inconclusiva; não atribuir retroativamente ao cache.
+- de64178: falha de configuração do provedor recebida como access_denied não é mais
+  exibida como cancelamento. Regressão do callback antes FAIL/depois PASS; PKCE Native,
+  cancelamento legítimo e sanitização preservados. Essas duas correções exigem rebuild.
+- Redmi confirmou regressão visual dos Ajustes: ícone, título e seta empilhados.
+  Correção local envia geometria estática à linha Pressable, mantendo feedback Android;
+  navegação/área de toque passam no teste controlado. Revalidação física do novo APK
+  pendente. Não refatorar Reader nem generalizar causa de interop sem ensaio do build.
+- Novo AVD isolado Aldus_Beta_20261021, Android 17/API37, dados privados com ACL/EFS,
+  loopback e nenhuma identidade pessoal. APK privado 22eb657 instalado e hash conferido,
+  sem Metro, mas processo falhou ANTES da interface: SoLoader não encontra libreactnative.so
+  na tradução ARM em x86_64 com carregamento direto do APK. Comando am start retornou ok,
+  o que NÃO equivale a inicialização funcional. AVD desligado; imagem e dados preservados.
+  Próximo build pode incluir ABI x86_64 já suportada pelo projeto para teste nativo.
+- Matriz existente atualizada sem apagar evidências: Google Native PASS, Web pendente;
+  Ajustes físicos FAIL até revalidar; instalação privada não declarada funcional.
+  NO-GO mantido. Username-login ainda ausente; cadastro atual, recovery Web, grifo
+  Native→Web, Reader prolongado e custódia fora desta máquina continuam pendentes.
+  QA A/Amêndoas e outbox preservados. Não iniciar publicação de produção/convites.
