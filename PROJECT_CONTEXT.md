@@ -1694,3 +1694,125 @@ pagamentos ou publicar automaticamente em tarefas de interface.
 - Configuração temporária de manter Redmi acordado restaurada a0; fonte1.0, Wi-Fi1 e
   dados móveis1 preservados. Conta original e40 livros confirmados após Google/reabertura.
   Matrizes guardam evidências anteriores; NO-GO e demais pendências mantidos.
+
+
+### 21/10/2026 — Cadastro real entre dispositivos expôs dois novos bloqueios Web
+
+- O proprietário trocou o endereço sintético sugerido por outro endereço sob seu controle
+  e enviou o cadastro diretamente. Consulta restrita à identidade indicada confirmou
+  uma conta nova desta rodada, e-mail verificado e perfil ativo. Senha inserida somente
+  pelo proprietário. Não registrar o endereço privado/UUID nem usar contas pessoais
+  existentes como fixtures. A conta de teste é preservada; não criar duplicata.
+- Link aberto pelo proprietário no Redmi foi conferido na tela autorizada do Chrome:
+  abriu a WEB do preview22eb657, não o app Native. Exibia erro genérico de link inválido
+  ou expirado, apesar da confirmação já efetivada. Nenhum link/código/token foi capturado
+  no relatório. O cadastro começou no navegador integrado do computador, que detém o
+  verificador PKCE; outro dispositivo não compartilha esse material. SDK instalado, em
+  ensaio controlado sem rede, reproduz pkce_code_verifier_not_found antes de chamar HTTP.
+  Não equiparar essa prova controlada a uma captura do erro interno daquela sessão.
+- 68d6061 preserva PKCE e trata apenas códigos allowlisted de verificador ausente/incorreto
+  com orientação segura: login por senha se e-mail já confirmado; novo pedido no navegador
+  desejado para recovery. Erros desconhecidos/expirados mantêm fallback, sem corpos brutos.
+  Regressão antes FAIL/depois PASS, SDK real sem HTTP, NativePKCE e Auth lifecycle PASS.
+  Não torna códigos reutilizáveis nem transfere sessão silenciosamente entre aparelhos.
+- Login por senha real da conta nova no computador foi aceito; servidor confirmou sessão
+  e perfil ativo, mas username ainda vazio. A Web voltou à landing com CTA de visitante.
+  Causa local determinística: entrada Web exige username para signedIn, mas não encaminha
+  ao complete-profile, ao contrário da entrada Native. Não confundir com incidente Native
+  de primeiro perfil de19/10, cuja causa permanece inconclusiva.
+- f6cf52ce542f0332a4625b315381eb9533309826 corrige esse encaminhamento Web após resolver
+  perfil ativo da MESMA sessão. Anônimo, perfil ausente, conta desativada, UUID diferente
+  e loading não são encaminhados indevidamente. Teste do componente real antes FAIL/depois
+  PASS; typecheck PASS. Perfil remoto do teste foi mantido sem username para testar a
+  conclusão no preview corrigido; cadastro completo ainda não é PASS final.
+- Sem modificar Site URL/templates: dashboard confirmou templates padrão e ausência de
+  SMTP personalizado, necessário pela interface atual para editar conteúdo. Não contratar
+  SMTP nem escolher provedor automaticamente. Uma entrada Web estável e aprovada poderá
+  orientar abrir Aldus/entrar na Web; só mudar URL não supera vínculo PKCE entre contextos.
+  Recovery Web ainda não solicitado nesta rodada, nem senha principal alterada.
+- Candidato anterior c92308f GERADO/VERIFICADO: artifacts/apk/Aldus-c92308f.apk,
+  309.993.585 bytes, SHA-256 bc9436a59634909aae9e188211733332e9c8d611f4778cafbc1ffdc00c55756c,
+  beta.2/code3, release não depurável, ARM64/ARMv7/x86_64, módulos Drive/OCR e Hermes.
+  Certificado privado SHA-2564adef0a46afa7f9d685a3ae7dba564379a5c9eb406a9452b05decdea11cb9875.
+  Bundle7.537.936 bytes/SHA-2567af2e78b7cf1a38058839a11fcbc7b61bb915b4ee53aa120c62cc78fea26710f.
+  Esse candidato antecede68d6061/f6cf52c e NÃO é o artefato final atualizado. Não instalado
+  no Redmi nem declarado funcional no AVD. Preservar como evidência; não distribuí-lo.
+- main/f6cf52c enviada. Nova matriz crítica e export Web em execução devido às regressões
+  descobertas no teste real. Depois, gerar APK com mesmo certificado/ABIs usando caches,
+  conferir, instalar no AVD dedicado e derivado compatível no Redmi, sem apagar dados.
+  Nenhum outro ajuste Native/dependência/migration/RLS/OWNER/produção foi realizado.
+- Automação do painel Google deixou de responder em duas leituras de navegação; nenhum
+  segundo cliente Android foi criado, nem houve autorização para isso. Revalidar estado
+  da aba antes de retomar. Após artefatos prontos, pendem aprovações específicas para
+  callbacks da origem final, cliente Android do certificado beta e alterações sintéticas
+  de leitura somente em QA B/dois arquivos permitidos. Não interpretar aprovação das
+  duas URLs antigas como autorização ampla para outras mudanças. NO-GO permanece.
+
+
+### 21/10/2026 — Beta.2 atualizada, preview público autorizado e recuperação limitada pelo serviço
+
+- Código funcional main/f6cf52ce542f0332a4625b315381eb9533309826: typecheck PASS,
+  80/80 suítes críticas PASS, export Web e verificação do export PASS. CI remoto
+  39643844900 SUCCESS: https://github.com/matheusbitlab/Aldus/actions/runs/39643844900
+- Preview dessa mesma versão READY, metadata/HTML/rotas/bundle conferidos:
+  https://kindle-reader-oe05lf7iw-matheus-projects-70f48ed9.vercel.app
+  dpl_3XYBQQcVszSvnywoRpASRwbKSiRL; JS SHA-256
+  eba315153fdd839b425be7315849a02ee97831e63cacffcc58fbf9f36d115235.
+- Cadastro autorizado: conta criada/confirmada no preview anterior, perfil ativo com
+  username persistido após interação do proprietário, login por senha no preview f6cf52c
+  e header autenticado preservado após reload. Tela intermediária do proprietário não
+  foi capturada; encaminhamento do componente real tem regressão controlada antes/depois.
+  Não registrar endereço, UUID, senha ou link privado nem duplicar a conta.
+- Após autorização específica, incluídas APENAS as duas Redirect URLs da origem f6cf52c,
+  /auth/callback e /auth/callback?next=reset-password. Total seis, quatro entradas anteriores
+  e Site URL aldus://auth/callback preservados. Leitura posterior e screenshot conferidos.
+- NOVA DECISÃO EXPLÍCITA DO PROPRIETÁRIO: tornar o projeto Vercel público, removendo a
+  exigência de login Vercel para homologação. CLI oficial confirmou projeto kindle-reader
+  /prj_zwDSZceLWCUigb4GedVycWAEQMIm e mudou SOMENTE ssoProtection preview para null.
+  Git fork protection preservada; sem promoção/deploy de produção, mudança de RLS ou Auth
+  do aplicativo. HTTP sem cookies/credenciais retornou200 na landing/login/callback/reset
+  e shell Admin; navegador anônimo exibiu login Aldus e redirecionou /admin e /library
+  à landing sem dados privados. A barreira Vercel não é mais requisito deste preview.
+- Senha da conta principal recusada no Redmi e no Chrome isolado, inserida exclusivamente
+  pelo proprietário. E-mail exato conferido na tentativa Native das17:58:59UTC: servidor
+  retornou400/invalid_credentials antes de sessão/perfil. Conta única, confirmada, ativa,
+  não banida, com credencial de senha e username presentes. Não afirmar falha exclusiva
+  do Android nem verificar/registrar o valor da senha. Nenhuma senha redefinida pelo agente.
+- Primeiro recovery principal autorizado foi aceito pela UI às18:03UTC; proprietário
+  encontrou a barreira Vercel. Segundo envio especificamente autorizado, após tornar
+  público, foi RECUSADO às18:12:29UTC com429/over_email_send_rate_limit; UI mostrou erro
+  e não houve confirmação de envio/alteração de senha. Sem retry automático, aumento de
+  limites, contratação/configuração SMTP, template ou outro ajuste Auth. Recovery Web
+  continua BLOQUEADO. Não declarar e-mail enviado quando o serviço o recusou.
+- Cliente Android adicional expressamente autorizado foi criado e lido de volta:
+  Aldus Reader Beta - assinatura privada, ID
+  712522561124-aoihj2tg6m9dvrask2o8ibe4mroeteak.apps.googleusercontent.com,
+  com.aldus.reader, SHA-1 BC:6B:12:C9:C3:3E:6C:97:F9:FC:FD:96:73:E7:8A:D6:55:1F:61:96.
+  Cliente Android antigo e Web preservados, sem mudança de secrets, público ou escopos.
+  Cadastro não comprova consentimento/Drive funcional com a assinatura privada.
+- APK final GERADO/VERIFICADO: C:\Kindle\artifacts\apk\Aldus-f6cf52c.apk,
+  309.991.893 bytes, SHA-256016f7cf752596f9e7792b0c3c1ecaeda72009f83b0e3f8f235f4f0fc2802167e.
+  com.aldus.reader,1.0.0-beta.2/code3, release não depurável, ARM64/ARMv7/x86_64, Drive/OCR
+  e Hermes. Certificado privado SHA-2564adef0a46afa7f9d685a3ae7dba564379a5c9eb406a9452b05decdea11cb9875;
+  bundle7.536.244 bytes/SHA-256868eca2f31b3a21e8536278e6c7575fd0aff8a72c459a1d81814bafd2f517ddf.
+- Derivado SOMENTE para homologação no Redmi, NÃO DISTRIBUIR:
+  artifacts/apk/Aldus-f6cf52c-redmi.apk,310.099.484 bytes,
+  SHA-256f31c9d09c4d4f39a233fd104495f1ab94ba2de07977989681b97be98b8637adf.
+  Payload não relacionado à assinatura idêntico ao beta; certificado antigo conferido
+  contra APK realmente instalado antes de adb install -r. Hash instalado corresponde,
+  primeira instalação preservada, sem uninstall/clear. Rede e manter acordado restaurados.
+- Redmi Android16 FÍSICO, f6cf52c compatível: login Google original concluído pelo dono,
+  identidade conferida na Conta,40 livros. Ajustes agora mostram ícone/título/seta na
+  mesma linha, comprovados visualmente em redmi-settings-after.png. Reabertura a frio
+  offline/sem Metro manteve sessão e40 livros; processo ativo, depois rede restaurada.
+  Isso fecha regressão visual reproduzida, sem alegar certificação física TalkBack.
+- Proprietário pediu priorizar Redmi/evitar Android Studio; AVD dedicado encerrado.
+  Inicialização do APK privado f6cf52c NÃO executada no AVD/segundo aparelho. Falha anterior
+  da tradução ARM no AVD refere-se ao22eb657 e permanece registrada; três ABIs no novo
+  APK ainda não são prova de execução. Não instalar certificado incompatível no Redmi.
+- Evidências sanitizadas em artifacts/beta-20261021/f6cf52c, matriz existente preservada.
+  NO-GO mantido: recovery Web, grifo Native→Web, leitura prolongada no artefato final,
+  runtime da assinatura privada e custódia externa ainda pendentes. Escritas de leitura
+  somente nos dois arquivos sintéticos/QA B foram autorizadas; não usar40 livros ou
+  QA A/Amêndoas como fixtures. Username-login/limiter, admissão e retenção continuam
+  dependentes de aprovações/infraestrutura; nenhum deploy de função ou convite executado.

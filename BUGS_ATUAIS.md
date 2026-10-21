@@ -628,3 +628,52 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - Ajustes: correção7ed1339 aguardando novo APK físico. Leitura prolongada, grifo Native→Web,
   username-login, admissão/retenção e custódia fora deste Windows continuam pendentes.
   Somente C: disponível; não exportar PFX/keystore/segredos sem destino aprovado.
+
+
+### 21/10/2026 — Novos bloqueios encontrados no cadastro real Web
+
+- Conta de teste com endereço escolhido pelo proprietário foi criada e verificada;
+  login por senha aceito. Link no Chrome do Redmi abriu a WEB do preview e mostrou erro
+  de sessão genérico. Não foi falha da confirmação de e-mail, comprovada no servidor.
+- 68d6061 diferencia ausência/incompatibilidade do verificador local de links expirados,
+  orienta login por senha ou novo recovery no contexto correto; sem relaxar PKCE e sem
+  afirmar confirmação baseada só em URL. SDK controlado/regressões antesFAIL/depoisPASS.
+  A mensagem anterior não identifica a causa interna exata daquele callback real.
+- BUG WEB REPRODUZIDO: primeira entrada confirmada sem username volta à landing como
+  visitante, podendo entrar em loop de cadastro. f6cf52c encaminha perfil ativo/matching
+  à conclusão existente, preservando bloqueios de conta desativada, UUID estranho, loading
+  e ausência de perfil. Teste real do componente antesFAIL/depoisPASS; typecheckPASS.
+  Conclusão remota do username foi deixada pendente até o preview corrigido. Incidente
+  Native intermitente de19/10 permanece separado e inconclusivo.
+- APK c92308f foi gerado com certificado privado/3ABIs e conferido, mas antecede essas
+  correções e não deve ser entregue como artefato atualizado. Main atualf6cf52c enviada;
+  matriz/export/build finais em andamento. Dados pessoais e conta QA A/outbox preservados.
+- Templates atuais são padrão; não há SMTP personalizado. Site URL/template não foram
+  alterados nesta análise. RecoveryWeb, grifoNative→Web, homologação prolongada, nova
+  assinatura/Drive, custódia e admissão continuam pendentes. Sem GO ou convites.
+
+
+### 21/10/2026 — Resultado físico beta.2 e bloqueio real de recovery
+
+- CORRIGIDO/VALIDADO no Redmi Android16: Ajustes com ícone/título/seta alinhados, após
+  atualização compatível f6cf52c beta.2/code3. Login Google original, identidade,40 livros
+  e reabertura offline/sem Metro PASS; primeira instalação/dados preservados.
+- Cadastro autorizado confirmado, perfil/username presentes, login e reload do preview
+  f6cf52c PASS. Tela intermediária do dono não capturada; regressão de encaminhamento
+  do componente real PASS. Incidente Native intermitente antigo permanece inconclusivo.
+- Senha principal recusada nas duas plataformas; Native17:58:59UTC recebeu400/
+  invalid_credentials com e-mail correto, antes da sessão. Conta ativa/confirmada e
+  credencial presente; não atribuir a falha a perfil/Android, nem alterar senha automaticamente.
+- Recovery principal extra autorizado às18:12:29UTC falhou com429/over_email_send_rate_limit.
+  NÃO enviado, sem novo retry, mudança de SMTP/limites ou senha. Web recovery permanece
+  BLOQUEADO até envio permitido e conclusão pessoal do proprietário.
+- Por nova instrução explícita, projeto Vercel tornou-se público: somente SSO da Vercel
+  desativado. Preview f6cf52c abre sem login Vercel; /admin e /library anônimos continuam
+  sem acesso ao conteúdo privado. Seis callbacks exatos conferidos; Site URL preservado.
+- Cliente OAuth Android do certificado beta criado sob aprovação específica; antigo e
+  Web preservados. Funcionalidade Drive com nova assinatura ainda NÃO validada.
+- APK privado f6cf52c gerado/conferido com bundle atualizado/3ABIs. Derivado Redmi de
+  mesmo payload validado fisicamente; não confundir com execução da nova assinatura.
+  AVD encerrado por orientação do dono. Typecheck,80/80 críticas,export e CI39643844900 PASS.
+- Mantidos bloqueios de custódia externa, grifo Native→Web e leitura prolongada final,
+  além de recuperação Web e runtime privado. Sem GO, produção, migrations ou pagamentos.
