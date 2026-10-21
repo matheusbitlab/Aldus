@@ -47,7 +47,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setProfile(null); setOverrides({}); setLoading(true);
     }
     authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: "remote", result: "started" });
-    let stage: "profile" | "profile_cache_write" = "profile";
     try {
       const [profileResult, overrideResult] = await Promise.all([
         supabase.from("profiles").select("id,username,display_name,avatar_url,role,account_status").eq("id", next.user.id).single(),
@@ -63,10 +62,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (run !== revision.current) return;
       setProfile(found); setOverrides(features); setError(null);
       authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: found.id, source: "remote", result: "success", username: !!found.username, accountStatus: found.account_status });
-      stage = "profile_cache_write";
-      await AsyncStorage.setItem(cacheKey(next.user.id), JSON.stringify({ profile: found, overrides: features, cachedAt: Date.now() }));
+      // A cache write is optional: its failure must not replace the server's
+      // current profile/status with an older cached decision (or no profile).
+      try {
+        await AsyncStorage.setItem(cacheKey(next.user.id), JSON.stringify({ profile: found, overrides: features, cachedAt: Date.now() }));
+      } catch (failure) {
+        if (run === revision.current) authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id,
+          source: "cache", result: "error", stage: "profile_cache_write", ...authFailureDetails(failure) });
+      }
     } catch (failure) {
-      authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: stage === "profile" ? "remote" : "cache", result: "error", stage, ...authFailureDetails(failure) });
+      authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: "remote", result: "error", stage: "profile", ...authFailureDetails(failure) });
       authDiagnostic("PROFILE_RESOLUTION", { operationId, correlation: "candidate", uuid: next.user.id, source: "cache", result: "started" });
       const cached = await AsyncStorage.getItem(cacheKey(next.user.id)).catch(() => null);
       if (run !== revision.current) return;

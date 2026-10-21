@@ -53,7 +53,11 @@ function harness(options = {}) {
     'expo-router': { router, Redirect: 'Redirect' }, 'expo-linking': {},
     '@react-native-async-storage/async-storage': {
       getItem: async key => storage.get(key) ?? null,
-      setItem: async (key, value) => { storage.set(key, value); }, removeItem: async key => { storage.delete(key); },
+      setItem: async (key, value) => {
+        if (options.cacheWrite) await options.cacheWrite(key, value);
+        if (options.cacheWriteError) throw new Error('CONTROLLED_PROFILE_CACHE_WRITE_FAILURE');
+        storage.set(key, value);
+      }, removeItem: async key => { storage.delete(key); },
     },
     '@/src/data/remote/supabase': { supabase: client, requireSupabase: () => client },
     '@/src/presentation/contexts/AppThemeContext': { useAppTheme: () => ({ palette: {} }) },
@@ -143,8 +147,35 @@ async function sdkContract() {
   listener.subscription.unsubscribe();
   console.log('PASS installed Supabase SDK / controlled HTTP: invalid never creates session; SIGNED_IN precedes promise; prior session survives rejection; logout removes it');
 }
+async function profileCacheFailures() {
+  const logs=[];
+  let h=harness({initialSession:session,cacheWriteError:true,diagnostics:true,logs});
+  await h.mount();await h.settle();
+  assert.equal(h.state().profile?.id,uuid,'A failed optional cache write must not discard a valid remote profile');
+  assert.equal(h.state().error,null);assert.equal(h.allowed(),true);assert.equal(h.state().loading,false);
+  const records=logs.map(args=>JSON.parse(args[1]));
+  assert.ok(records.some(r=>r.event==='PROFILE_RESOLUTION'&&r.source==='cache'&&r.result==='error'&&r.stage==='profile_cache_write'));
+  assert.equal(records.some(r=>r.event==='PROFILE_RESOLUTION'&&r.source==='remote'&&r.result==='error'),false);
+  await h.unmount();
+
+  h=harness({initialSession:session,profile:{...account,account_status:'disabled'},cacheWriteError:true,
+    cache:{profile:account,overrides:{flashcards:true}}});
+  await h.mount();await h.settle();
+  assert.equal(h.state().profile?.account_status,'disabled','Cache failure cannot replace a current remote denial with an older active profile');
+  assert.equal(h.allowed(),false);assert.equal(h.state().canUse('flashcards'),false);await h.unmount();
+
+  const write=deferred(),secondUuid='22222222-2222-4222-8222-222222222222';
+  h=harness({initialSession:session,profileById:id=>({data:{...account,id},error:null}),
+    cacheWrite:async key=>{if(key.endsWith(uuid)){await write.promise;throw new Error('CONTROLLED_LATE_CACHE_FAILURE');}}});
+  await h.mount();await h.emitSessions([{user:{id:secondUuid}}]);
+  assert.equal(h.state().profile?.id,secondUuid);
+  write.resolve();await h.settle();assert.equal(h.state().profile?.id,secondUuid);
+  assert.equal(h.state().session.user.id,secondUuid);assert.equal(h.state().error,null);await h.unmount();
+  console.log('PASS profile cache failures: fresh remote profile/disabled decision preserved; late A cache failure cannot affect B');
+}
 async function run() {
   await sdkContract();
+  if (!baseline) await profileCacheFailures();
   let h = harness({ invalid: true }); await h.mount(); await login(h); await h.settle();
   assert.equal(h.allowed(), false); assert.equal(h.navigation.length, 0); assert.ok(h.error());
   await h.unmount(); console.log('PASS A: invalid sign-in, no session, no navigation/access');
