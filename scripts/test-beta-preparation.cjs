@@ -16,6 +16,12 @@ assert.match(parsed.searchParams.get('body'),/Falha ao abrir & voltar/);assert.m
 assert.equal(feedbackMailto({...data,contact:null}),null);assert.equal(feedbackMailto({...data,description:'  '}),null);
 assert.equal(feedbackMailto({...data,contact:'x@example.invalid?bcc=elsewhere'}),null);
 assert(!uri.includes('access_token'));assert(!uri.includes('attachment='));
+const appConfig=require('../app.json').expo;
+assert.equal(require('../package.json').version,appConfig.version);
+assert.equal(require('../package-lock.json').packages[''].version,appConfig.version);
+const nativeGradle=require('node:fs').readFileSync('android/app/build.gradle','utf8');
+assert.equal(Number(nativeGradle.match(/versionCode (\d+)/)?.[1]),appConfig.android.versionCode);
+assert.equal(nativeGradle.match(/versionName "([^"]+)"/)?.[1],appConfig.version);
 const metadataLoader=require('./community-test-loader.cjs')({'expo-constants':{},'../../app.json':require('../app.json')});
 assert.deepEqual(metadataLoader('src/legal/appMetadata.ts').getAppMetadata(),{version:require('../app.json').expo.version,build:String(require('../app.json').expo.android.versionCode)});
 const nativeLoader=require('./community-test-loader.cjs')({'expo-constants':{expoConfig:{version:'native-version'},nativeBuildVersion:'9'},'../../app.json':require('../app.json')});
