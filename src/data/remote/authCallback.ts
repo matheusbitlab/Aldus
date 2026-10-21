@@ -8,8 +8,11 @@ export function readAuthCallback(url: string | null | undefined) {
 }
 
 export function callbackFailureMessage(description?: string, error?: string) {
+  // GoTrue also returns access_denied when the external provider rejects its
+  // code exchange. Preserve that distinction without displaying backend details.
+  if (description?.includes("Unable to exchange external code")) {
+    return "O serviço não conseguiu concluir o acesso com o Google. A configuração do provedor precisa ser verificada.";
+  }
   if (error === "access_denied") return "A autenticação foi cancelada ou não autorizada. Você pode tentar novamente.";
-  return description?.includes("Unable to exchange external code")
-    ? "O serviço não conseguiu concluir o acesso com o Google. A configuração do provedor precisa ser verificada."
-    : "Não foi possível concluir a autenticação. Solicite um novo link ou tente entrar novamente.";
+  return "Não foi possível concluir a autenticação. Solicite um novo link ou tente entrar novamente.";
 }

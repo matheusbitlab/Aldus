@@ -80,6 +80,15 @@ function loader(mocks, environment = {}, logs) {
     linkedUrl='aldus://auth/callback#error=access_denied';params={error:'access_denied'};
     await act(async()=>{tree=create(React.createElement(Screen));});
     assert.equal(calls,1);assert.match(JSON.stringify(tree.toJSON()),/cancelada/);await act(async()=>tree.unmount());
+    const providerFailure='500: Unable to exchange external code: PRIVATE_CANARY_provider_detail';
+    linkedUrl='aldus://auth/callback#error=access_denied&error_description='+encodeURIComponent(providerFailure);
+    params={error:'access_denied',error_description:providerFailure};
+    await act(async()=>{tree=create(React.createElement(Screen));});
+    const providerMessage=JSON.stringify(tree.toJSON());
+    assert.equal(calls,1,'A provider error must never attempt PKCE code exchange');
+    assert.match(providerMessage,/configuração do provedor/,'A provider exchange failure is not user cancellation');
+    assert.doesNotMatch(providerMessage,/cancelada|PRIVATE_CANARY|Unable to exchange/);
+    await act(async()=>tree.unmount());
     linkedUrl=null;params={code:'PRIVATE_CANARY_route_without_origin'};
     await act(async()=>{tree=create(React.createElement(Screen));});
     assert.equal(calls,1,'Native route parameters alone cannot exchange an authorization code');
