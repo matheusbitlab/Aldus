@@ -5,41 +5,22 @@ const {LandingDocument}=load('src/marketing/LandingDocument.tsx');
 const {initialCatalogReference:plans}=load('src/marketing/catalogReference.generated.ts');
 const {publicSiteUrl}=load('src/marketing/seo.ts');
 const {buildPublicHtml}=require('./write-public-web.cjs');
-const {resolveBookPose,bookScrollProgress}=load('src/marketing/bookMotion.ts');
 const initial=renderToStaticMarkup(React.createElement(LandingDocument));
 const markup=initial.replace(/<style>[\s\S]*?<\/style>/g,'');
 const visible=markup.replace(/<[^>]*>/g,' ');
-assert.equal((markup.match(/data-book-scene(?:=|\s|>)/g)||[]).length,1,'Exactly one principal 3D book');
-for(const part of ['story','cover','spine','block'])assert.match(markup,new RegExp(`data-book-${part}(?:=|\\s|>)`),'Book geometry '+part);
-assert.equal((markup.match(/data-book-leaf(?:=|\s|>)/g)||[]).length,4,'Four independent turning leaves');
-assert.equal((markup.match(/class="al-book-strip al-book-strip-/g)||[]).length,16,'Each leaf has four connected physical segments');
-for(let index=0;index<4;index++)assert.match(markup,new RegExp(`data-leaf-index="${index}"`));
-assert.match(markup,/<[^>]*data-book-scene[^>]*aria-hidden="true"|<[^>]*aria-hidden="true"[^>]*data-book-scene/,'Visual geometry is hidden from assistive technology');
+assert.equal((markup.match(/data-book-scene(?:=|\s|>)/g)||[]).length,1,'One principal visual surface');
+assert.equal((markup.match(/data-book-cover(?:=|\s|>)/g)||[]).length,1,'One closed static book, also available before WebGL');
+assert.match(markup,/<[^>]*data-book-scene[^>]*aria-hidden="true"|<[^>]*aria-hidden="true"[^>]*data-book-scene/,'Canvas/fallback are decorative');
 assert.match(markup,/data-book-progress="0(?:\.0+)?"/,'SSR starts closed');
-assert.doesNotMatch(markup,/data-enhanced="true"|<(?:video|canvas)\b|preview-tab-/,'Static HTML cannot depend on animation or the removed preview');
+assert.doesNotMatch(markup,/data-enhanced="true"|<(?:video|canvas)\b|preview-tab-/,'HTML must work without GPU or JavaScript');
 assert.match(markup,/href="#experiencia"[^>]*>Pular demonstração/);
 assert.match(markup,/Etapa anterior do livro/);assert.match(markup,/Próxima etapa do livro/);
-for(const label of ['Sua Biblioteca','Reader','Estudo','Meu Plano','Gratuito','Pro'])assert.ok(visible.includes(label),'Readable static summary: '+label);
-const closed=resolveBookPose(0),opened=resolveBookPose(1);
-assert.ok(Math.abs(closed.coverAngle)<1e-8);assert.equal(opened.coverAngle,-180);assert.equal(closed.chapter,0);assert.equal(opened.chapter,5);
-assert.equal(closed.leaves.length,4);assert.equal(opened.leaves.length,4);
-assert.ok(closed.leaves.every(leaf=>Math.abs(leaf.angle)<1e-8&&Math.abs(leaf.curl)<1e-8));assert.ok(opened.leaves.every(leaf=>leaf.angle===-179.5&&Math.abs(leaf.curl)<1e-8));
-const finite=value=>typeof value==='number'?Number.isFinite(value):Array.isArray(value)?value.every(finite):value&&typeof value==='object'?Object.values(value).every(finite):true;
-for(const p of [0,.04,.08,.16,.19,.23,.35,.43,.54,.62,.73,.81,.92,1]){
- const pose=resolveBookPose(p);assert.ok(finite(pose),'All geometry is finite at '+p);assert.equal(pose.progress,p);assert.deepEqual(resolveBookPose(p),pose,'Deterministic reversible pose');
- assert.ok(pose.leaves.every(leaf=>leaf.angle<=0&&leaf.angle>=-179.5&&leaf.curl>=0));
-}
-for(const [index,p]of [.35,.54,.73,.92].entries()){
- const pose=resolveBookPose(p);assert.ok(pose.leaves[index].angle<0&&pose.leaves[index].angle>-179.5&&pose.leaves[index].curl>0,'Individual curved turn '+index);
- assert.ok(pose.leaves.slice(0,index).every(leaf=>leaf.angle===-179.5));assert.ok(pose.leaves.slice(index+1).every(leaf=>leaf.angle===0));
-}
-assert.ok(resolveBookPose(.08).coverAngle<0&&resolveBookPose(.08).coverAngle>-180,'Opening has continuous intermediate geometry');
-for(const [p,chapter]of [[0,0],[.23,1],[.43,2],[.62,3],[.81,4],[1,5]])assert.equal(resolveBookPose(p).chapter,chapter);
-assert.deepEqual(resolveBookPose(-2),closed);assert.deepEqual(resolveBookPose(2),opened);
-assert.ok(finite(resolveBookPose(NaN)));assert.ok(finite(resolveBookPose(Infinity)));
-assert.equal(bookScrollProgress(100,100,1200,200),0);assert.equal(bookScrollProgress(600,100,1200,200),.5);assert.equal(bookScrollProgress(1100,100,1200,200),1);
-assert.equal(bookScrollProgress(-100,100,1200,200),0);assert.equal(bookScrollProgress(2100,100,1200,200),1);
-for(const args of [[0,0,0,0],[10,0,100,200],[NaN,0,1000,200],[0,NaN,1000,200],[0,0,Infinity,200]])assert.equal(bookScrollProgress(...args),0,'Invalid geometry is safe');
+for(const label of ['Sua Biblioteca','Reader','Estudo','Comunidade','Meu Plano','Gratuito','Pro'])assert.ok(visible.includes(label),'Semantic summary: '+label);
+const story=fs.readFileSync('src/marketing/ScrollBookStory.tsx','utf8');
+assert.match(story,/import\('\.\/cinematic\/BookScene\.web'\)/,'Three renderer is a dynamic Web-only chunk');
+assert.match(story,/closest<HTMLElement>\('\[data-landing-scroll\], \.al-page-scroll'\)/,'Actual nested scroller');
+assert.doesNotMatch(story,/window\.scrollY|preventDefault\(|setInterval\(/,'No window-scroll assumption, scroll-jacking or animation timer');
+assert.match(story,/renderer\?\.dispose\(\)/,'GPU is disposable');
 for(const id of ['conteudo','experiencia','recursos','como-funciona','planos','perguntas'])assert.ok(initial.includes(`id="${id}"`));
 assert.equal((initial.match(/<h1[ >]/g)||[]).length,1);assert.match(initial,/href="\/auth\/signup"/);assert.match(initial,/href="\/auth\/login"/);
 assert.match(visible,/Referência inicial/);assert.match(visible,/500 MiB/);assert.match(visible,/10 GiB/);assert.match(visible,/Preço ainda não disponível/);assert.match(initial,/<button[^>]*disabled=""[^>]*>Contratação ainda indisponível/);
@@ -81,4 +62,4 @@ for(const profile of [{...complete,id:'synthetic-b',username:null},{...complete,
 }
 accountState={loading:true,session:{user:{id:'synthetic-a'}},profile:{...complete,username:null}};
 assert.doesNotMatch(renderEntry(),/data-profile-redirect/,'Do not navigate during profile resolution');
-console.log('PASS single-book SSR/accessible summary, finite continuous and reversible cover/leaf geometry, safe real-scroller progress math, public login/signup/library links, localized initial/authenticated catalog, no active purchase/private data, SEO; Native entry/protected stack preserved. Browser/Android separate.');
+console.log('PASS cinematic SSR/accessible summary, optional Web-only GPU loader, nested-scroll lifecycle, public login/signup/library links, localized initial/authenticated catalog, no active purchase/private data, SEO and profile routing; Native entry/protected stack preserved. GPU/Android proof separate.');

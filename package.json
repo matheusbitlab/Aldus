@@ -30,7 +30,7 @@
     "test:saas:web": "node scripts/test-saas-web.cjs",
     "test:admin": "node scripts/test-admin-security.cjs && node scripts/test-admin-client.cjs",
     "test:admin:web": "node scripts/test-admin-web.cjs",
-    "test:marketing": "node scripts/test-pt-br.cjs && node scripts/test-marketing.cjs",
+    "test:marketing": "node scripts/test-pt-br.cjs && node scripts/test-marketing.cjs && node scripts/test-cinematic-book.cjs",
     "test:marketing:web": "node scripts/test-marketing-web.cjs",
     "test:library:account": "node scripts/test-library-account.cjs",
     "test:library:rls": "node scripts/test-library-rls.cjs",

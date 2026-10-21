@@ -47,7 +47,7 @@ export function LandingDocument({signedIn=false,catalog,contactEmail=null}:Landi
    <details className="al-mobile-menu" ref={menu}><summary aria-label="Menu de navegação"><span aria-hidden="true">☰</span></summary><nav aria-label="Navegação para celular">{nav}{!signedIn&&<a href="/auth/login">Entrar</a>}<a href={cta}>{ctaText} <Arrow/></a></nav></details>
   </div></header>
   <main id="conteudo" tabIndex={-1}>
-   <ScrollBookStory plans={plans}>
+   <ScrollBookStory plans={plans} cta={cta} ctaText={ctaText}>
     <div className="al-hero-copy al-enter"><div className="al-eyebrow"><span/> SUA LEITURA. SEU TEMPO.</div><h1>Muito mais que <br/>uma <em>biblioteca.</em></h1><p className="al-lead">Leia, organize e estude. Um lugar para os seus livros — e para tudo o que eles despertam em você.</p>
      <div className="al-hero-actions"><a href={cta} className="al-button">{ctaText} <Arrow/></a><a className="al-text-link" href="#experiencia">Conhecer o Aldus <span aria-hidden="true">↓</span></a></div>
      <p className="al-hero-note">Comece pela leitura local, gratuitamente.<br/>EPUB e PDF, com o seu jeito de ler.</p>
