@@ -70,11 +70,11 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       const changed = !cachedPose || cachedPose.progress !== progress;
       const pose = changed ? resolveBookPose(progress) : cachedPose!;
       cachedPose = pose;
-      if (changed) { visual.dataset.bookProgress = pose.progress.toFixed(5); visual.dataset.bookChapter = String(pose.chapter); }
-      const intro = 1 - smooth(Math.min(1, pose.progress / .125));
+      if (changed) { visual.dataset.bookProgress = pose.progress.toFixed(5); visual.dataset.bookVisualProgress = pose.visualProgress.toFixed(5); visual.dataset.bookChapter = String(pose.chapter); }
+      const intro = 1 - smooth(Math.min(1, pose.visualProgress / .125));
       if (intro !== previousIntro) { element.style.setProperty('--story-intro', String(intro)); previousIntro = intro; }
       if (pose.atmosphere !== previousAtmosphere) { element.style.setProperty('--story-dark', String(pose.atmosphere)); previousAtmosphere = pose.atmosphere; }
-      const caption = pose.captionOpacity * smooth(Math.max(0, Math.min(1, (pose.progress - .075) / .065)));
+      const caption = pose.captionOpacity * smooth(Math.max(0, Math.min(1, (pose.visualProgress - .075) / .065)));
       if (caption !== previousCaption) { element.style.setProperty('--story-caption', String(caption)); previousCaption = caption; }
       chapterChange(pose.chapter);
       try {

@@ -83,6 +83,15 @@ async function harness({ delayImport = false } = {}) {
   const trajectory = h.renders.slice(before).map(p => p.progress);
   assert.ok(trajectory.every((p, i) => !i || p >= trajectory[i - 1]));
   const stopped = h.renders.length; await h.tick(); assert.equal(h.renders.length, stopped, 'No autonomous rendering during idle');
+  await h.scroll(.32); await h.drain();
+  const fixed = h.renders.at(-1), holdWrites = h.styleWrites.length;
+  for(const p of [.36,.4,.33]){
+    await h.scroll(p); await h.drain();
+    const {progress,...view}=h.renders.at(-1),{progress:initialScroll,...initialView}=fixed;
+    assert.deepEqual(view,initialView,'Continued and reversed scrolling inside a reading interval keep the entire visual pose fixed');
+    assert.equal(progress,p); assert.equal(h.visual.dataset.bookVisualProgress,'0.37000');
+    assert.equal(h.styleWrites.length,holdWrites,'Reading intervals do not fade the caption or rewrite its CSS');
+  }
   await h.scroll(.8); await h.tick(); const turning = h.renders.at(-1).progress;
   await h.scroll(.1); await h.tick(); assert.ok(h.renders.at(-1).progress < turning, 'Reverse scroll reverses movement on the next frame');
   await h.drain(); assert.equal(h.renders.at(-1).progress, .1);

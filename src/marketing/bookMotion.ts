@@ -1,5 +1,16 @@
 /** Scroll is the only clock. Shared by the WebGL renderer and deterministic tests. */
-export const bookStops = [0, .19, .36, .52, .69, .85, 1] as const;
+/** Each completed scene gets its own reading interval, measured in real scroll.
+ * Only the gaps between these intervals move the camera, paper and objects. */
+export const bookBeats = [
+  { start: 0, end: .045, pose: 0 },
+  { start: .155, end: .235, pose: .215 },
+  { start: .305, end: .415, pose: .37 },
+  { start: .465, end: .575, pose: .535 },
+  { start: .635, end: .745, pose: .695 },
+  { start: .795, end: .905, pose: .865 },
+  { start: .975, end: 1, pose: 1 },
+] as const;
+export const bookStops = bookBeats.map((beat, i) => i === 0 ? 0 : i === bookBeats.length - 1 ? 1 : (beat.start + beat.end) / 2);
 export const bookChapters = [
   { title: 'Sua leitura. Seu tempo.', description: 'Um livro. Histórias, ideias e possibilidades. Role para conhecer o Aldus.', label: 'O nascimento do Aldus' },
   { title: 'Todo livro abre um universo.', description: 'Abra espaço para a próxima página. EPUB e PDF, com o seu jeito de ler.', label: 'Abra o livro' },
@@ -14,6 +25,16 @@ export const ramp = (value: number, start: number, end: number) => clamp((value 
 export const smooth = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t); };
 export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const envelope = (p: number, a: number, b: number, c: number, d: number) => smooth(ramp(p, a, b)) * (1 - smooth(ramp(p, c, d)));
+
+export function bookVisualProgress(value: number): number {
+  const progress = clamp(value);
+  for (let i = 0; i < bookBeats.length; i++) {
+    const beat = bookBeats[i], next = bookBeats[i + 1];
+    if (progress <= beat.end) return beat.pose;
+    if (next && progress < next.start) return mix(beat.pose, next.pose, smooth(ramp(progress, beat.end, next.start)));
+  }
+  return 1;
+}
 
 export function bookScrollProgress(scrollTop: number, start: number, height: number, stickyHeight: number): number {
   if (![scrollTop, start, height, stickyHeight].every(Number.isFinite) || height <= stickyHeight) return 0;
@@ -33,9 +54,14 @@ export function followBookScroll(current: number, target: number, elapsedMs: num
 /** 0 book, 1 open paper, 2 library, 3 Reader, 4 study, 5 community, 6 dispersed paper. */
 const particleKeys = [[0, 6], [.075, 0], [.19, 1], [.36, 2], [.52, 3], [.69, 4], [.85, 5], [1, 0]] as const;
 export function resolveBookPose(value: number) {
-  const progress = clamp(value), open = smooth(ramp(progress, .065, .20)) * (1 - smooth(ramp(progress, .88, 1)));
-  let chapter = 0;
-  for (let i = 1; i < bookStops.length; i++) if (progress >= (bookStops[i - 1] + bookStops[i]) / 2) chapter = i;
+  const scroll = clamp(value), progress = bookVisualProgress(scroll);
+  const open = smooth(ramp(progress, .065, .20)) * (1 - smooth(ramp(progress, .88, 1)));
+  let chapter = 0, captionOpacity = 1;
+  for (let i = 1; i < bookBeats.length; i++) {
+    const boundary = (bookBeats[i - 1].end + bookBeats[i].start) / 2;
+    if (scroll >= boundary) chapter = i;
+    captionOpacity = Math.min(captionOpacity, smooth(Math.abs(scroll - boundary) / .012));
+  }
   let key = 0;
   while (key < particleKeys.length - 2 && progress > particleKeys[key + 1][0]) key++;
   const [start, from] = particleKeys[key], [end, to] = particleKeys[key + 1];
@@ -44,7 +70,7 @@ export function resolveBookPose(value: number) {
   const study = envelope(progress, .56, .65, .72, .79), community = envelope(progress, .74, .82, .88, .96);
   const closing = smooth(ramp(progress, .88, 1));
   return {
-    progress, chapter, open, coverAngle: -174 * open,
+    progress: scroll, visualProgress: progress, chapter, open, coverAngle: -174 * open,
     cameraX: mix(8, 3, open), cameraY: -22 + 26 * Math.sin(progress * Math.PI * 1.1),
     cameraZ: -5 + 5 * open, cameraDistance: 7 - .75 * open + .6 * community,
     bookScale: 1 - .29 * library - .26 * study - .48 * community,
@@ -53,9 +79,11 @@ export function resolveBookPose(value: number) {
     // Opening, page turns and closing keep the printed paper completely clean.
     from, to, morph, pulse, particleOpacity: (.10 + pulse * .74) * (1 - smooth(ramp(progress, .025, .065))),
     atmosphere: community * .94,
-    captionOpacity: 1 - Math.pow(pulse, 4),
-    leaves: [.27, .43, .59, .76].map((start, index) => {
-      const t = smooth(ramp(progress, start, start + .095));
+    captionOpacity,
+    leaves: Array.from({ length: 4 }, (_, index) => {
+      // Use the full gap between completed scenes for the turn. The scroll
+      // mapping already eases this movement; easing twice would rush its middle.
+      const t = ramp(progress, bookBeats[index + 1].pose, bookBeats[index + 2].pose);
       return { angle: -171 * t * (1 - closing), curl: Math.sin(t * Math.PI) * .6 * (1 - closing), z: mix(.14 - index * .013, -.085 + index * .014, t) };
     }),
   };
