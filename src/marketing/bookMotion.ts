@@ -1,17 +1,7 @@
 /** Scroll is the only clock. Shared by the WebGL renderer and deterministic tests. */
-export const bookStoryViewports = 10.5;
-/** Each completed scene gets its own reading interval, measured in real scroll.
- * Only the gaps between these intervals move the camera, paper and objects. */
-export const bookBeats = [
-  { start: 0, end: .045, pose: 0 },
-  { start: .155, end: .235, pose: .215 },
-  { start: .305, end: .415, pose: .37 },
-  { start: .465, end: .575, pose: .535 },
-  { start: .635, end: .745, pose: .695 },
-  { start: .795, end: .905, pose: .865 },
-  { start: .975, end: 1, pose: 1 },
-] as const;
-export const bookStops = bookBeats.map((beat, i) => i === 0 ? 0 : i === bookBeats.length - 1 ? 1 : (beat.start + beat.end) / 2);
+export const bookStoryViewports = 12;
+/** Navigation anchors identify complete scenes without freezing scroll between them. */
+export const bookStops = [0, .215, .37, .535, .695, .865, 1] as const;
 export const bookChapters = [
   { title: 'Sua leitura. Seu tempo.', description: 'Um livro. Histórias, ideias e possibilidades. Role para conhecer o Aldus.', label: 'O nascimento do Aldus' },
   { title: 'Todo livro abre um universo.', description: 'Abra espaço para a próxima página. EPUB e PDF, com o seu jeito de ler.', label: 'Abra o livro' },
@@ -28,7 +18,7 @@ export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const envelope = (p: number, a: number, b: number, c: number, d: number) => smooth(ramp(p, a, b)) * (1 - smooth(ramp(p, c, d)));
 
 /** Feather acceleration and deceleration, then cruise through the middle.
- * Position, velocity, acceleration and jerk meet the stationary holds at zero;
+ * Each leaf begins and ends with zero velocity, acceleration and jerk;
  * the maximum speed stays below a conventional cubic/quintic ease-in-out. */
 export function bookTransitionEase(value: number): number {
   const t = clamp(value), feather = .24;
@@ -37,13 +27,8 @@ export function bookTransitionEase(value: number): number {
 }
 
 export function bookVisualProgress(value: number): number {
-  const progress = clamp(value);
-  for (let i = 0; i < bookBeats.length; i++) {
-    const beat = bookBeats[i], next = bookBeats[i + 1];
-    if (progress <= beat.end) return beat.pose;
-    if (next && progress < next.start) return mix(beat.pose, next.pose, bookTransitionEase(ramp(progress, beat.end, next.start)));
-  }
-  return 1;
+  // Keep moving throughout the real scroll range; no artificial reading plateaus.
+  return clamp(value);
 }
 
 export function bookScrollProgress(scrollTop: number, start: number, height: number, stickyHeight: number): number {
@@ -74,8 +59,8 @@ export function resolveBookPose(value: number) {
   const scroll = clamp(value), progress = bookVisualProgress(scroll);
   const open = smooth(ramp(progress, .065, .20)) * (1 - smooth(ramp(progress, .88, 1)));
   let chapter = 0, captionOpacity = 1;
-  for (let i = 1; i < bookBeats.length; i++) {
-    const boundary = (bookBeats[i - 1].end + bookBeats[i].start) / 2;
+  for (let i = 1; i < bookStops.length; i++) {
+    const boundary = (bookStops[i - 1] + bookStops[i]) / 2;
     if (scroll >= boundary) chapter = i;
     captionOpacity = Math.min(captionOpacity, smooth(Math.abs(scroll - boundary) / .012));
   }
@@ -98,9 +83,9 @@ export function resolveBookPose(value: number) {
     atmosphere: community * .94,
     captionOpacity,
     leaves: Array.from({ length: 4 }, (_, index) => {
-      // Use the full gap between completed scenes for the turn. The scroll
-      // mapping already eases this movement; easing twice would rush its middle.
-      const t = ramp(progress, bookBeats[index + 1].pose, bookBeats[index + 2].pose);
+      // Spread the turn across the entire distance between scenes, gently
+      // accelerating each leaf while the camera and overall story keep moving.
+      const t = bookTransitionEase(ramp(progress, bookStops[index + 1], bookStops[index + 2]));
       return { angle: -171 * t * (1 - closing), curl: Math.sin(t * Math.PI) * .6 * (1 - closing), z: mix(.14 - index * .013, -.085 + index * .014, t) };
     }),
   };

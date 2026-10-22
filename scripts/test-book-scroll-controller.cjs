@@ -85,13 +85,14 @@ async function harness({ delayImport = false, deferSmooth = false } = {}) {
   assert.ok(trajectory.every((p, i) => !i || p >= trajectory[i - 1]));
   const stopped = h.renders.length; await h.tick(); assert.equal(h.renders.length, stopped, 'No autonomous rendering during idle');
   await h.scroll(.32); await h.drain();
-  const fixed = h.renders.at(-1), holdWrites = h.styleWrites.length;
+  let priorVisual = h.renders.at(-1).visualProgress;
   for(const p of [.36,.4,.33]){
     await h.scroll(p); await h.drain();
-    const {progress,...view}=h.renders.at(-1),{progress:initialScroll,...initialView}=fixed;
-    assert.deepEqual(view,initialView,'Continued and reversed scrolling inside a reading interval keep the entire visual pose fixed');
-    assert.equal(progress,p); assert.equal(h.visual.dataset.bookVisualProgress,'0.37000');
-    assert.equal(h.styleWrites.length,holdWrites,'Reading intervals do not fade the caption or rewrite its CSS');
+    const pose=h.renders.at(-1);
+    assert.deepEqual(pose,motion.resolveBookPose(p),'Continued and reversed scrolling follows the complete current pose without a reading plateau');
+    assert.notEqual(pose.visualProgress,priorVisual,'Each continued scroll changes the actual visual progress');
+    assert.equal(pose.progress,p);assert.equal(h.visual.dataset.bookVisualProgress,p.toFixed(5));
+    priorVisual=pose.visualProgress;
   }
   await h.scroll(.8); await h.tick(); const turning = h.renders.at(-1).progress;
   await h.scroll(.1); await h.tick(); assert.ok(h.renders.at(-1).progress < turning, 'Reverse scroll reverses movement on the next frame');
@@ -108,10 +109,11 @@ async function harness({ delayImport = false, deferSmooth = false } = {}) {
   h.visual.clientWidth = 390; h.visual.clientHeight = 500; await h.resize(); await h.drain();
   assert.deepEqual(h.resizes.at(-1), [390, 500]); assert.equal(h.renders.at(-1).progress, .1);
   const buttons = h.tree.root.findAllByType('button');
+  const nextStop=motion.bookStops[h.renders.at(-1).chapter+1];
   await act(async () => buttons[1].props.onClick()); await h.tick();
   assert.equal(h.scroller.lastScrollBehavior,'smooth','Chapter buttons use the native smooth scroll source');
-  assert(h.renders.at(-1).progress>.1&&h.renders.at(-1).progress<motion.bookStops[2],'Chapter navigation renders an intermediate pose instead of teleporting');
-  await h.drain(); assert.equal(h.renders.at(-1).progress, motion.bookStops[2], 'Explicit chapter navigation reaches exact stop');
+  assert(h.renders.at(-1).progress>.1&&h.renders.at(-1).progress<nextStop,'Chapter navigation renders an intermediate pose instead of teleporting');
+  await h.drain(); assert.equal(h.renders.at(-1).progress, nextStop, 'Explicit chapter navigation reaches exact stop');
   await h.scroll(.7); assert.equal(h.frames.size, 1);
   h.document.hidden = true; await act(async () => h.document.emit('visibilitychange')); assert.equal(h.frames.size, 0);
   const hiddenRenderCount = h.renders.length; await h.scroll(.2); await h.tick(); assert.equal(h.renders.length, hiddenRenderCount);

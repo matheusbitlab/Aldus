@@ -2,8 +2,8 @@
 // synthetic Auth/catalog responses; no production accounts, writes or telemetry.
 const fs=require('fs'),path=require('path'),os=require('os'),http=require('http'),cp=require('child_process'),assert=require('assert/strict');
 const {initialCatalogReference:plans}=require('./community-test-loader.cjs')()('src/marketing/catalogReference.generated.ts');
-const {bookBeats,bookStops,bookStoryViewports}=require('./community-test-loader.cjs')()('src/marketing/bookMotion.ts');
-const pageTurns=bookBeats.slice(1,5).map((beat,index)=>(beat.end+bookBeats[index+2].start)/2);
+const {bookStops,bookStoryViewports}=require('./community-test-loader.cjs')()('src/marketing/bookMotion.ts');
+const pageTurns=bookStops.slice(1,5).map((stop,index)=>(stop+bookStops[index+2])/2);
 const poseSamples=[0,.1,bookStops[1],pageTurns[0],bookStops[2],pageTurns[1],bookStops[3],pageTurns[2],bookStops[4],pageTurns[3],bookStops[5],1];
 const angle=process.env.CINEMATIC_CHROME_ANGLE||'swiftshader';assert(['swiftshader','d3d11'].includes(angle));
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -53,7 +53,7 @@ async function cdp(url){
   const bookAt=async progress=>{await client.evaluate('(()=>{const root=document.querySelector("[data-landing-scroll]"),story=document.querySelector("[data-book-story]"),sticky=story.querySelector(".al-book-sticky"),start=root.scrollTop+story.getBoundingClientRect().top-root.getBoundingClientRect().top-document.querySelector(".al-header").offsetHeight;root.scrollTop=Math.max(0,start+(story.offsetHeight-sticky.offsetHeight)*'+progress+');})()');await until('Math.abs(Number(document.querySelector("[data-book-scene]").dataset.bookProgress)-'+progress+')<.01 && document.querySelector("[data-book-scene]").dataset.bookSettled==="true"','settled actual scroll pose '+progress);await wait(120);return bookState();};
   const assertPose=(s,label)=>{
     assert.equal(s.renderState,'ready',label+' actual GPU rendering');assert.equal(s.canvas,1);assert.equal(s.windowY,0);
-    assert(Math.abs(s.story.height-s.rootViewport*bookStoryViewports)<2,label+' actual scroll track uses the faster configured length');
+    assert(Math.abs(s.story.height-s.rootViewport*bookStoryViewports)<2,label+' actual scroll track uses the configured slower length');
     if(s.metrics.visualProgress>=.065){assert.equal(s.metrics.particlesVisible,false,label+' page sequence has no particle draw');assert.equal(s.metrics.particleOpacity,0);}
     for(const key of ['left','right','top','bottom','coverAngle','particleMorph','cameraDistance'])assert(Number.isFinite(s.metrics[key]),label+' finite '+key);
     assert(s.metrics.left>=-2&&s.metrics.right<=s.scene.width+2&&s.metrics.top>=-2&&s.metrics.bottom<=s.scene.height+2,label+' projected hardcover fits canvas '+JSON.stringify(s));
@@ -82,7 +82,7 @@ async function cdp(url){
     for(let i=1;i<sample.values.length;i++)assert(direction==='forward'?sample.values[i]>=sample.values[i-1]-1e-8:sample.values[i]<=sample.values[i-1]+1e-8,'No overshoot on '+direction);
   }
   const turnMotion={};
-  for(const [direction,from,to]of [['forward',.405,.475],['reverse',.475,.405]]){
+  for(const [direction,from,to]of [['forward',bookStops[2],bookStops[3]],['reverse',bookStops[3],bookStops[2]]]){
     await bookAt(from);
     turnMotion[direction]=await client.evaluate(`(async()=>{
       const root=document.querySelector('[data-landing-scroll]'),story=document.querySelector('[data-book-story]'),sticky=story.querySelector('.al-book-sticky'),host=story.querySelector('[data-book-scene]');
@@ -109,28 +109,31 @@ async function cdp(url){
   const held=await bookState();await wait(700);const heldAfter=await bookState();assert.equal(heldAfter.metrics.frames,held.metrics.frames,'No animation clock while scroll is stopped');
   const reversed=await bookAt(.4);assert(Math.abs(reversed.metrics.coverAngle-desktop[3].coverAngle)<.05);assert(Math.abs(reversed.metrics.particleMorph-desktop[3].particleMorph)<.005,'Reverse scroll reproduces actual GPU uniforms');
   for(const p of pageTurns){const cleanTurn=await bookAt(p);assertPose(cleanTurn,'Mid-page turn without particles '+p);if(p===pageTurns[1])await shot('clean-page-turn');}
-  const readingHolds=[];
+  const continuousScenes=[];
   const poseSignature=s=>({visual:s.metrics.visualProgress,cover:s.metrics.coverAngle,leaf0:s.metrics.leafAngle0,leaf1:s.metrics.leafAngle1,camera:s.metrics.cameraDistance,bounds:[s.metrics.left,s.metrics.top,s.metrics.right,s.metrics.bottom],caption:s.captionText,opacity:s.captionOpacity});
   const canvasDigest=async s=>{const clip={x:s.scene.left+16,y:s.scene.top,width:s.scene.width-32,height:s.scene.height,scale:1};const image=await client.command('Page.captureScreenshot',{format:'png',clip,captureBeyondViewport:false});return require('crypto').createHash('sha256').update(image.data).digest('hex');};
-  for(let index=1;index<bookBeats.length-1;index++){
-    const beat=bookBeats[index],before=await bookAt(beat.start+.012),signature=poseSignature(before),pixels=await canvasDigest(before);
-    const scrollSpan=(beat.end-beat.start)*(before.story.height-before.sticky.height);
-    if(index>=2)assert(scrollSpan>=before.root.height,'Faster sequence still fixes each feature for at least a viewport of real scroll');
+  for(let index=1;index<bookStops.length-1;index++){
+    const before=await bookAt(bookStops[index]),signature=poseSignature(before),pixels=await canvasDigest(before);
     for(let i=0;i<3;i++)await client.command('Input.dispatchMouseEvent',{type:'mouseWheel',x:1080,y:500,deltaY:120,deltaX:0});
-    await until('Number(document.querySelector("[data-book-scene]").dataset.bookProgress)>'+String(before.progress+.005)+' && document.querySelector("[data-book-scene]").dataset.bookSettled==="true"','wheel advances inside reading interval');
-    const after=await bookState();assert(after.progress<beat.end);assert.deepEqual(poseSignature(after),signature,'Real wheel leaves camera, objects and caption fixed');assert.equal(after.captionOpacity,1);assert.equal(await canvasDigest(after),pixels,'Rendered book pixels stay fixed while scrolling through a reading interval');assert.equal(after.metrics.frames,before.metrics.frames,'Scrolling inside a hold does not redraw the GPU');
+    await until('Number(document.querySelector("[data-book-scene]").dataset.bookProgress)>'+String(before.progress+.005)+' && document.querySelector("[data-book-scene]").dataset.bookSettled==="true"','wheel advances through the scene without a reading plateau');
+    const after=await bookState(),afterPixels=await canvasDigest(after);
+    assert(after.progress<bookStops[index+1]);assert(after.metrics.visualProgress>before.metrics.visualProgress,'Real wheel advances the visual pose continuously');
+    assert.notDeepEqual(poseSignature(after),signature,'Camera and book no longer freeze while the visitor keeps scrolling');
+    assert.notEqual(afterPixels,pixels,'Rendered book pixels actually change on continued scrolling');
+    assert(after.metrics.frames>before.metrics.frames,'Moving through the scene redraws the GPU');
+    await wait(350);const paused=await bookState();assert.equal(paused.metrics.frames,after.metrics.frames,'Only stopping real scroll pauses the renderer');assert.equal(await canvasDigest(paused),afterPixels,'The exact stopped pose remains cached');
     await client.command('Input.dispatchMouseEvent',{type:'mouseWheel',x:1080,y:500,deltaY:-240,deltaX:0});
-    await until('Number(document.querySelector("[data-book-scene]").dataset.bookProgress)<'+String(after.progress-.005)+' && document.querySelector("[data-book-scene]").dataset.bookSettled==="true"','reverse wheel inside reading interval');
-    const reversedHold=await bookState();assert.deepEqual(poseSignature(reversedHold),signature);assert.equal(await canvasDigest(reversedHold),pixels);assert.equal(reversedHold.metrics.frames,before.metrics.frames);
-    readingHolds.push({chapter:index,visual:signature.visual,scrollSpanPx:scrollSpan,rawBefore:before.progress,rawAfter:after.progress,rawReversed:reversedHold.progress,pixelSha256:pixels});
-    await shot('reading-hold-'+index);
+    await until('Number(document.querySelector("[data-book-scene]").dataset.bookProgress)<'+String(after.progress-.005)+' && document.querySelector("[data-book-scene]").dataset.bookSettled==="true"','reverse wheel moves the visual scene back');
+    const reversedScene=await bookState();assert(reversedScene.metrics.visualProgress<after.metrics.visualProgress);assert.notDeepEqual(poseSignature(reversedScene),poseSignature(after));assert.notEqual(await canvasDigest(reversedScene),afterPixels);assert(reversedScene.metrics.frames>after.metrics.frames);
+    continuousScenes.push({chapter:index,rawBefore:before.progress,rawAfter:after.progress,rawReversed:reversedScene.progress,visualBefore:signature.visual,visualAfter:after.metrics.visualProgress,visualReversed:reversedScene.metrics.visualProgress,pixelBeforeSha256:pixels,pixelAfterSha256:afterPixels,framesWhileStopped:paused.metrics.frames-after.metrics.frames});
+    await shot('continuous-scene-'+index);
   }
   const beforeDpr=await bookAt(.36);await client.command('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1.25,mobile:false});
   // This CDP driver changes DPR silently (no resize or resolution media event).
   // Supply the browser resize signal explicitly; automatic media subscription
   // and its rearming/cleanup are exercised by the controlled component test.
   await client.evaluate('window.dispatchEvent(new Event("resize"))');
-  const afterDpr=await bookAt(.36);assert(afterDpr.metrics.frames>beforeDpr.metrics.frames&&afterDpr.metrics.dpr>beforeDpr.metrics.dpr,'DPR invalidates a cached reading interval '+JSON.stringify({before:beforeDpr.metrics,after:afterDpr.metrics}));assertPose(afterDpr,'DPR resize inside a fixed scene');
+  const afterDpr=await bookAt(.36);assert(afterDpr.metrics.frames>beforeDpr.metrics.frames&&afterDpr.metrics.dpr>beforeDpr.metrics.dpr,'DPR invalidates a cached stopped pose '+JSON.stringify({before:beforeDpr.metrics,after:afterDpr.metrics}));assertPose(afterDpr,'DPR resize at a stopped scene');
   await client.command('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await client.evaluate('window.dispatchEvent(new Event("resize"))');await bookAt(.36);
   await bookAt(0);
   const navigationMotion=await client.evaluate(`(async()=>{
@@ -200,7 +203,7 @@ async function cdp(url){
   console.log('Checking legal routes and final no-JS state');
   for(const [route,label] of [['/legal/privacy','Privacidade'],['/legal/terms','Termos de Uso'],['/legal/copyright','Direitos Autorais e Conteúdo']]){await navigate(route);await until('location.pathname==='+JSON.stringify(route)+'&&document.body.innerText.includes('+JSON.stringify(label)+')','legal route '+route);}
   await client.command('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await client.command('Emulation.setScriptExecutionDisabled',{value:true});await navigate('/');await until('!!document.querySelector("[data-book-cover]")','prerender static cover');assert.equal(await client.evaluate('document.querySelectorAll("canvas").length'),0);assert.doesNotMatch(await text(),/You need to enable JavaScript/);assert(await client.evaluate('getComputedStyle(document.querySelector(".al-book-sticky")).position!=="sticky"'));assert(await client.evaluate('getComputedStyle(document.querySelector(".al-book-outline")).clipPath==="none"'));await shot('nojs-reduced-motion');await client.command('Emulation.setScriptExecutionDisabled',{value:false});
-  assert.deepEqual(client.errors,[],'No unhandled browser exceptions');fs.writeFileSync(path.join(shots,'results.json'),JSON.stringify({at:new Date().toISOString(),platform:'Chromium ANGLE/'+angle+'; geometry QA forces rendering; production budget tested separately; HTTP fixtures, no remote writes or physical mobile proof',gpuDriver,desktop,layouts,scrollCatchup,turnMotion,readingHolds,navigationMotion,navigationReversal,webglCompiled:true,reverse:true,hold:true,contextLost:true,initializationFailure:true,constrainedProfile:true,reducedMotion:true,noJavaScript:true,existingPublicFlows:true},null,2));console.log('PASS Chromium cinematic story: GPU rendering, five reading holds with real wheel and identical book pixels, clean page turns, scroll/hold/reverse, 108 viewport/pose samples, resource disposal, context failure, constrained profile, reduced motion/no-JS, menu/FAQ/keyboard/Auth/catalog/legal-route regressions. Software-rendered measurements are not hardware GPU or physical phone proof.');
+  assert.deepEqual(client.errors,[],'No unhandled browser exceptions');fs.writeFileSync(path.join(shots,'results.json'),JSON.stringify({at:new Date().toISOString(),platform:'Chromium ANGLE/'+angle+'; geometry QA forces rendering; production budget tested separately; HTTP fixtures, no remote writes or physical mobile proof',gpuDriver,desktop,layouts,scrollCatchup,turnMotion,continuousScenes,navigationMotion,navigationReversal,webglCompiled:true,reverse:true,stopsOnlyWithScroll:true,contextLost:true,initializationFailure:true,constrainedProfile:true,reducedMotion:true,noJavaScript:true,existingPublicFlows:true},null,2));console.log('PASS Chromium cinematic story: GPU rendering, five continuously moving scenes with real wheel and changed book pixels, stopped-pose caching, clean page turns, scroll/stop/reverse, 108 viewport/pose samples, resource disposal, context failure, constrained profile, reduced motion/no-JS, menu/FAQ/keyboard/Auth/catalog/legal-route regressions. Software-rendered measurements are not hardware GPU or physical phone proof.');
  }catch(error){
   if(client)try{const image=await client.command('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(shots,'book-failure.png'),Buffer.from(image.data,'base64'));const state=await client.evaluate(`(()=>{const root=document.querySelector('[data-landing-scroll]'),story=document.querySelector('[data-book-story]'),scene=document.querySelector('[data-book-scene]'),sticky=document.querySelector('.al-book-sticky');const rect=node=>{if(!node)return null;const r=node.getBoundingClientRect();return{top:r.top,left:r.left,right:r.right,bottom:r.bottom,height:r.height,width:r.width};};return{path:location.pathname,viewport:{width:innerWidth,height:innerHeight},root:rect(root),scrollTop:root?.scrollTop,windowY:window.scrollY,motion:story?.dataset.motion,progress:scene?.dataset.bookProgress,chapter:scene?.dataset.bookChapter,story:rect(story),sticky:rect(sticky),scene:rect(scene),caption:document.querySelector('.al-book-caption h2')?.textContent};})()`);fs.writeFileSync(path.join(shots,'book-failure.json'),JSON.stringify(state,null,2));console.error('Browser failure state '+JSON.stringify(state)+'; screenshots .expo/cinematic-validation/book-failure.png');}catch{}
   throw error;

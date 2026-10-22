@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const load=require('./community-test-loader.cjs')();
-const {resolveBookPose,bookScrollProgress,bookStops,bookBeats,bookStoryViewports,bookVisualProgress,bookTransitionEase,followBookScroll,chooseBookQuality,assessBookPerformance,initialBookPerformance}=load('src/marketing/bookMotion.ts');
+const {resolveBookPose,bookScrollProgress,bookStops,bookStoryViewports,bookVisualProgress,bookTransitionEase,followBookScroll,chooseBookQuality,assessBookPerformance,initialBookPerformance}=load('src/marketing/bookMotion.ts');
 const {createParticleTargets,communityNodes,communityEdges}=load('src/marketing/cinematic/particleTargets.ts');
 const finite=x=>typeof x==='number'?Number.isFinite(x):Array.isArray(x)?x.every(finite):x&&typeof x==='object'?Object.values(x).every(finite):true;
 const closed=resolveBookPose(0),end=resolveBookPose(1);
@@ -19,18 +19,24 @@ assert(closed.leaves.every(leaf=>leaf.z>.085&&leaf.z<.1475),'Printed leaves stay
 for(const [p,key]of [[.36,'library'],[.52,'reader'],[.69,'study'],[.85,'community']])assert(resolveBookPose(p)[key]>.99,'A complete readable scene: '+key);
 assert(resolveBookPose(0).particleOpacity>0,'Closed-book introduction retains a little atmosphere');
 for(let i=0;i<=1000;i++){const pose=resolveBookPose(i/1000);if(pose.visualProgress>=.065)assert.equal(pose.particleOpacity,0,'Opening, every page turn and closing stay free of particles');}
-for(const [index,beat]of bookBeats.entries()){
- const samples=[beat.start,(beat.start+beat.end)/2,beat.end];
- const view=p=>{const {progress,...visual}=resolveBookPose(p);return visual;};
- for(const p of samples){assert.deepEqual(view(p),view(samples[0]),'Camera, paper, content and caption stay exactly fixed throughout reading interval '+index);assert.equal(resolveBookPose(p).captionOpacity,1);assert.equal(resolveBookPose(p).chapter,index);}
- assert.equal(bookVisualProgress(bookStops[index]),beat.pose,'Navigation lands on a completed readable pose');
- if(index>=2&&index<=5){const pose=resolveBookPose(bookStops[index]);assert.equal(pose.leaves[index-2].angle,-171,'A reading interval starts after its page has fully turned');assert(beat.end-beat.start>=.1,'Feature scenes have substantial scroll dwell');}
- for(const edge of [beat.start,beat.end])assert(Math.abs(bookVisualProgress(edge-1e-7)-bookVisualProgress(edge+1e-7))<.00001,'Reading intervals join continuously');
+for(const [index,stop]of bookStops.entries()){
+ assert.equal(bookVisualProgress(stop),stop,'Navigation reaches its completed scene without a frozen interval');
+ assert.equal(resolveBookPose(stop).captionOpacity,1);
+ if(index>=2&&index<=5)assert.equal(resolveBookPose(stop).leaves[index-2].angle,-171,'The preceding leaf is fully turned at its navigation anchor');
+ if(index>0&&index<bookStops.length-1){
+  assert.notEqual(resolveBookPose(stop-.005).visualProgress,resolveBookPose(stop+.005).visualProgress,'Scroll keeps moving through every scene');
+  assert.notEqual(resolveBookPose(stop-.005).cameraY,resolveBookPose(stop+.005).cameraY,'Physical camera moves through scene anchors');
+ }
 }
-for(let i=1;i<=1000;i++)assert(bookVisualProgress(i/1000)>=bookVisualProgress((i-1)/1000),'Scroll mapping never reverses direction or jumps stages');
+for(let i=1;i<=1000;i++){
+ const current=bookVisualProgress(i/1000),previous=bookVisualProgress((i-1)/1000);
+ assert(current>previous,'No scroll interval freezes the visual story');
+ assert(Math.abs(current-previous-.001)<1e-12,'Continuous mapping avoids compressed bursts between stationary scenes');
+}
+assert(bookStoryViewports>10.5,'A longer physical track slows motion per pixel without increasing input lag');
 for(let index=0;index<4;index++){
- const start=bookBeats[index+1].end,end=bookBeats[index+2].start;
- assert((end-start)*(bookStoryViewports-1)>=.45,'Faster turns retain a gradual transition of nearly half a viewport');
+ const start=bookStops[index+1],end=bookStops[index+2];
+ assert((end-start)*(bookStoryViewports-1)>1.7,'Each slower page turn spans more than 1.7 viewports of continuous scroll');
  for(const t of [0,.25,.5,.75,1])assert(Math.abs(resolveBookPose(start+(end-start)*t).leaves[index].angle+171*bookTransitionEase(t))<1e-8,'A turn uses the whole transition with one easing curve');
 }
 assert.equal(bookTransitionEase(0),0);assert.equal(bookTransitionEase(.5),.5);assert.equal(bookTransitionEase(1),1);
@@ -42,9 +48,9 @@ for(let i=1;i<=1000;i++){
 for(const edge of [0,1]){
  const h=.0001,velocity=(bookTransitionEase(edge+h)-bookTransitionEase(edge-h))/(2*h);
  const acceleration=(bookTransitionEase(edge+h)-2*bookTransitionEase(edge)+bookTransitionEase(edge-h))/(h*h);
- assert(Math.abs(velocity)<1e-7&&Math.abs(acceleration)<.001,'A stationary hold meets the turn with zero speed and acceleration');
+ assert(Math.abs(velocity)<1e-7&&Math.abs(acceleration)<.001,'A leaf starts and finishes gently while the rest of the scene keeps moving');
 }
-for(const [index,beat]of bookBeats.entries())if(index){const boundary=(bookBeats[index-1].end+beat.start)/2;assert(resolveBookPose(boundary).captionOpacity<1e-8,'Only the chapter handover fades the caption');}
+for(let index=1;index<bookStops.length;index++){const boundary=(bookStops[index-1]+bookStops[index])/2;assert(resolveBookPose(boundary).captionOpacity<1e-8,'Only the chapter handover fades the caption');}
 assert.notEqual(resolveBookPose(.12).cameraY,resolveBookPose(.7).cameraY);
 for(const value of [NaN,Infinity,-2])assert.deepEqual(resolveBookPose(value),closed);assert.deepEqual(resolveBookPose(2),end);
 assert.equal(bookScrollProgress(100,100,1200,200),0);assert.equal(bookScrollProgress(600,100,1200,200),.5);assert.equal(bookScrollProgress(1100,100,1200,200),1);
