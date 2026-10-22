@@ -123,11 +123,17 @@ async function harness({ delayImport = false } = {}) {
     await timing.scroll(.425);await timing.drain();timing.elapse(idle);
     await timing.scroll(.445);await timing.tick();
     const first=timing.renders.at(-1).progress;
-    assert(Math.abs(first-motion.followBookScroll(.425,.445,1000/60))<1e-12,'First wheel frame does not consume the idle interval '+idle);
+    const firstState=motion.followBookScroll({progress:.425,velocity:0},.445,1000/60);
+    assert(Math.abs(first-firstState.progress)<1e-12,'First wheel frame does not consume the idle interval '+idle);
     await timing.tick(120);
-    assert(Math.abs(timing.renders.at(-1).progress-motion.followBookScroll(first,.445,120))<1e-12,'An active slow frame still follows its real bounded elapsed time');
+    assert(Math.abs(timing.renders.at(-1).progress-motion.followBookScroll(firstState,.445,120).progress)<1e-12,'An active slow frame still follows its real bounded elapsed time');
     await timing.drain();
   }
+  await timing.scroll(.425);await timing.drain();await timing.scroll(.435);await timing.tick();
+  const impulse=motion.followBookScroll({progress:.425,velocity:0},.435,1000/60);
+  await timing.scroll(.445);await timing.tick();
+  assert(Math.abs(timing.renders.at(-1).progress-motion.followBookScroll(impulse,.445,1000/60).progress)<1e-12,'The actual controller retains momentum across successive wheel targets');
+  await timing.drain();
   await timing.unmount();
   const late = await harness({ delayImport: true });
   await late.enter(true); await late.enter(false); await late.resolveImport(); assert.equal(late.mounts, 0, 'Late import cannot mount out of sight');

@@ -23,7 +23,7 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     let frame = 0, visible = true, dirtyGeometry = true, enhanced = false;
     let start = 0, distance = 1, stickyHeight = 1, previousAtmosphere = -1, previousIntro = -1, previousCaption = -1, began = 0;
     let previousWidth = 0, previousHeight = 0, previousDpr = 0, previousHeader = -1, previousViewport = -1;
-    let progress: number | null = null, lastFrameAt = 0, snap = true, pendingChapter: number | null = null;
+    let follower: ReturnType<typeof followBookScroll> | null = null, lastFrameAt = 0, snap = true, pendingChapter: number | null = null;
     let previousTarget = -1, previousSettled: boolean | undefined;
     let cachedPose: ReturnType<typeof resolveBookPose> | undefined;
     const chapterChange = (next: number) => {
@@ -62,7 +62,8 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       }
       const target = bookScrollProgress(scroller.scrollTop, start, distance + stickyHeight, stickyHeight);
       const gap = at - lastFrameAt;
-      progress = snap || progress === null ? target : followBookScroll(progress, target, lastFrameAt > 0 && gap > 0 ? gap : 1000 / 60);
+      follower = snap || follower === null ? { progress: target, velocity: 0 } : followBookScroll(follower, target, lastFrameAt > 0 && gap > 0 ? gap : 1000 / 60);
+      const progress = follower.progress;
       snap = false; lastFrameAt = at;
       const settled = progress === target;
       if (target !== previousTarget) { visual.dataset.bookTarget = target.toFixed(5); previousTarget = target; }
@@ -96,7 +97,7 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       if (reason !== 'reduced-motion') failed = true;
       if (frame) cancelAnimationFrame(frame); frame = 0;
       renderer?.dispose(); renderer = undefined;
-      cachedPose = undefined; progress = null; lastFrameAt = 0; snap = true;
+      cachedPose = undefined; follower = null; lastFrameAt = 0; snap = true;
       previousWidth = 0; previousHeight = 0; pendingChapter = null;
       element.dataset.enhanced = 'false'; element.dataset.motion = media.matches ? 'reduce' : 'static';
       visual.dataset.renderState = reason;

@@ -51,16 +51,27 @@ assert.equal(bookScrollProgress(100,100,1200,200),0);assert.equal(bookScrollProg
 for(const values of [[0,0,0,0],[10,0,100,200],[NaN,0,1000,200],[0,NaN,1000,200],[0,0,Infinity,200]])assert.equal(bookScrollProgress(...values),0);
 // A discrete wheel sample is spread across frames without an autonomous clock,
 // overshoot or asymptotic work forever. Refresh rate must not alter its timing.
-const after=(ms,step)=>{let p=0;for(let t=0;t<ms;t+=step)p=followBookScroll(p,1,Math.min(step,ms-t));return p;};
-assert(followBookScroll(0,1,16)>0&&followBookScroll(0,1,16)<1);
-assert(Math.abs(after(120,1000/60)-after(120,1000/120))<1e-8);
-assert.equal(after(800,1000/60),1,'Idle settles exactly and can stop scheduling');
-for(const [from,to]of [[.1,.9],[.9,.1],[.5,.5]]){let p=from;for(let i=0;i<60;i++){const next=followBookScroll(p,to,16.7);assert(next>=Math.min(p,to)&&next<=Math.max(p,to));p=next;}assert.equal(p,to);}
+const resting=progress=>({progress,velocity:0});
+const after=(ms,step)=>{let state=resting(0);for(let t=0;t<ms;t+=step)state=followBookScroll(state,1,Math.min(step,ms-t));return state;};
+assert(followBookScroll(resting(0),1,16).progress>0&&followBookScroll(resting(0),1,16).progress<1);
+assert(Math.abs(after(120,1000/60).progress-after(120,1000/120).progress)<1e-8);
+assert(Math.abs(after(120,1000/60).velocity-after(120,1000/120).velocity)<1e-10);
+assert.deepEqual(after(800,1000/60),resting(1),'Idle settles exactly and can stop scheduling');
+assert(after(96,16).progress>.79,'Gradual acceleration does not add a long input delay');
+for(const [from,to]of [[.1,.9],[.9,.1],[.5,.5]]){let state=resting(from);for(let i=0;i<60;i++){const next=followBookScroll(state,to,16.7);assert(next.progress>=Math.min(state.progress,to)&&next.progress<=Math.max(state.progress,to));state=next;}assert.deepEqual(state,resting(to));}
+const moving=followBookScroll(resting(.42),.44,16.7),retargeted=followBookScroll(moving,.46,0);
+assert.equal(retargeted.velocity,moving.velocity,'Continuing the wheel gesture preserves velocity instead of restarting it');
+const tiny=followBookScroll(moving,.46,.001);
+assert(Math.abs((tiny.progress-moving.progress)/.001-moving.velocity)<1e-6,'Position derivative matches retained velocity when the target changes');
+const gesture=step=>{let state=resting(.4);for(const target of [.42,.445,.46,.475,.45,.42])for(let elapsed=0;elapsed<40;elapsed+=step)state=followBookScroll(state,target,Math.min(step,40-elapsed));return state;};
+assert(Math.abs(gesture(1000/60).progress-gesture(1000/120).progress)<1e-10,'Retargeting and reversal remain frame-rate independent');
+for(const velocity of [-999,-.001,0,.001,999,NaN])for(const target of [.39,.400001,.41]){const next=followBookScroll({progress:.4,velocity},target,64);assert(finite(next));assert(next.progress>=Math.min(.4,target)&&next.progress<=Math.max(.4,target),'Braking prevents adversarial momentum from crossing the target');}
+assert(followBookScroll(moving,.41,16.7).progress<moving.progress,'Reverse scroll responds on the next frame');
 const almost=.44-.00014;
-assert(followBookScroll(almost,.44,16.7)<.44,'A small final gap is eased rather than snapped');
-assert(Math.abs(resolveBookPose(followBookScroll(almost,.44,16.7)).leaves[1].angle-resolveBookPose(almost).leaves[1].angle)<.17,'Terminal correction cannot jump a visible fraction of a page turn');
-assert.equal(followBookScroll(.5,.9,0),.5);assert.equal(followBookScroll(.5,.9,-10),.5);
-assert.equal(followBookScroll(NaN,.4,16),.4);assert(Number.isFinite(followBookScroll(.5,Infinity,NaN)));
+assert(followBookScroll(resting(almost),.44,16.7).progress<.44,'A small final gap is eased rather than snapped');
+assert(Math.abs(resolveBookPose(followBookScroll(resting(almost),.44,16.7).progress).leaves[1].angle-resolveBookPose(almost).leaves[1].angle)<.17,'Terminal correction cannot jump a visible fraction of a page turn');
+assert.equal(followBookScroll(resting(.5),.9,0).progress,.5);assert.equal(followBookScroll(resting(.5),.9,-10).progress,.5);
+assert.deepEqual(followBookScroll(resting(NaN),.4,16),resting(.4));assert(finite(followBookScroll(resting(.5),Infinity,NaN)));
 assert.equal(chooseBookQuality(1440).particles,4096);assert.equal(chooseBookQuality(390).particles,1600);assert.equal(chooseBookQuality(1440,2).particles,900);assert.equal(chooseBookQuality(1440,8,8,true).shadows,false);
 for(const [gap,expected]of [[16,false],[45,false],[55,true],[120,true],[400,true]]){
  let state={...initialBookPerformance};

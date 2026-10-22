@@ -49,16 +49,23 @@ export function bookScrollProgress(scrollTop: number, start: number, height: num
   if (![scrollTop, start, height, stickyHeight].every(Number.isFinite) || height <= stickyHeight) return 0;
   return clamp((scrollTop - start) / (height - stickyHeight));
 }
-/** Brief, frame-rate independent catch-up for discrete wheel events. It never
- * overshoots and converges to the exact scroll pose, so an idle story can sleep. */
-export function followBookScroll(current: number, target: number, elapsedMs: number): number {
+export type BookScrollState = { progress: number; velocity: number };
+/** Analytic critical damping preserves velocity between same-direction wheel
+ * impulses. Two 32ms stages retain the previous 64ms mean response delay.
+ * Reversal and closer targets brake explicitly so the pose cannot overshoot. */
+export function followBookScroll(current: BookScrollState, target: number, elapsedMs: number): BookScrollState {
   const end = clamp(target);
-  if (!Number.isFinite(current)) return end;
-  const start = clamp(current), gap = end - start;
-  if (Math.abs(gap) <= .00001) return end;
+  if (!Number.isFinite(current.progress)) return { progress: end, velocity: 0 };
+  const start = clamp(current.progress), gap = end - start;
+  if (Math.abs(gap) <= .00001) return { progress: end, velocity: 0 };
   const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, Math.min(64, elapsedMs)) : 0;
-  const next = start + gap * (1 - Math.exp(-elapsed / 64));
-  return Math.abs(end - next) <= .00001 ? end : next;
+  const direction = Math.sign(gap), rate = 1 / 32;
+  const velocity = direction * Math.min(Math.max(0, direction * (Number.isFinite(current.velocity) ? current.velocity : 0)), Math.abs(gap) * rate);
+  if (!elapsed) return { progress: start, velocity };
+  const coefficient = velocity - gap * rate, decay = Math.exp(-elapsed * rate);
+  const next = end + (-gap + coefficient * elapsed) * decay;
+  if (Math.abs(end - next) <= .00001) return { progress: end, velocity: 0 };
+  return { progress: Math.min(Math.max(next, Math.min(start, end)), Math.max(start, end)), velocity: (velocity - rate * coefficient * elapsed) * decay };
 }
 /** 0 book, 1 open paper, 2 library, 3 Reader, 4 study, 5 community, 6 dispersed paper. */
 const particleKeys = [[0, 6], [.075, 0], [.19, 1], [.36, 2], [.52, 3], [.69, 4], [.85, 5], [1, 0]] as const;
