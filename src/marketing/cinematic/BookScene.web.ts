@@ -301,11 +301,16 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
     cards[2].rotation.y = radians(180 * smooth(Math.max(0, Math.min(1, (pose.progress - .705) / .05))));
     linkMaterial.opacity = pose.community * .55;
     const uniforms = particleMaterial.uniforms;
+    particles.visible = pose.particleOpacity > .001;
     uniforms.uFrom.value = pose.from; uniforms.uTo.value = pose.to; uniforms.uMorph.value = pose.morph;
     uniforms.uProgress.value = pose.progress; uniforms.uOpacity.value = pose.particleOpacity; uniforms.uDpr.value = dpr; uniforms.uDark.value = pose.atmosphere;
     // Fit the same physical proportions in portrait, without stretching a model.
     const fitWidth = mix(3.2, 4.5, pose.open);
-    const distance = Math.max(pose.cameraDistance, fitWidth / (2 * Math.tan(radians(17.5)) * aspect));
+    // A curved sheet comes closer to the lens mid-turn. Leave room for that
+    // physical depth so its lower edge stays inside the stage as it passes.
+    let turningDepth = 0;
+    for (const leaf of pose.leaves) turningDepth = Math.max(turningDepth, leaf.curl);
+    const distance = Math.max(pose.cameraDistance, fitWidth / (2 * Math.tan(radians(17.5)) * aspect)) + turningDepth * .55;
     camera.position.set(Math.sin(pose.progress * Math.PI * 1.4) * .3, .45, distance);
     camera.lookAt(0, .02, 0);
     ground.position.x = contact.position.x = world.position.x;
@@ -340,7 +345,8 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
     }
     metricsHost.aldusBookMetrics = { frames, particles: budget, dpr, drawCalls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries,
-      quality: effectiveQuality, progress: current.progress, disposed: false, shadowUpdates, ...bounds,
+      quality: effectiveQuality, progress: current.progress, disposed: false, shadowUpdates,
+      particlesVisible: particles.visible, particleOpacity: pose.particleOpacity, ...bounds,
       coverAngle: pose.coverAngle, leafAngle0: pose.leaves[0].angle, leafAngle1: pose.leaves[1].angle,
       particleFrom: pose.from, particleTo: pose.to, particleMorph: pose.morph, cameraDistance: distance, particleGeometryId: geometry.id };
   };

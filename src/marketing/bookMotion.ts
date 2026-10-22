@@ -49,9 +49,9 @@ export function resolveBookPose(value: number) {
     cameraZ: -5 + 5 * open, cameraDistance: 7 - .75 * open + .6 * community,
     bookScale: 1 - .29 * library - .26 * study - .48 * community,
     library, reader, study, community, closing,
-    // Particles carry the transition, then recede so printed text and cards
-    // remain legible instead of competing with a second layer of dotted text.
-    from, to, morph, pulse, particleOpacity: mix(.10, .018, Math.max(library, reader, study)) + pulse * .74,
+    // A little atmosphere belongs to the closed-book introduction only.
+    // Opening, page turns and closing keep the printed paper completely clean.
+    from, to, morph, pulse, particleOpacity: (.10 + pulse * .74) * (1 - smooth(ramp(progress, .025, .065))),
     atmosphere: community * .94,
     captionOpacity: 1 - Math.pow(pulse, 4),
     leaves: [.27, .43, .59, .76].map((start, index) => {

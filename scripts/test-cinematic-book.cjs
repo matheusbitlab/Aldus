@@ -17,8 +17,8 @@ assert(resolveBookPose(.12).open>0&&resolveBookPose(.12).open<1,'Partial opening
 assert(resolveBookPose(.94).open>0&&resolveBookPose(.94).open<1,'Physical closing in final reconstruction');
 assert(closed.leaves.every(leaf=>leaf.z>.085&&leaf.z<.1475),'Printed leaves stay above the paper block and below the closed cover');
 for(const [p,key]of [[.36,'library'],[.52,'reader'],[.69,'study'],[.85,'community']])assert(resolveBookPose(p)[key]>.99,'A complete readable scene: '+key);
-assert(resolveBookPose(.52).particleOpacity<.025,'Particles recede over printed Reader text');
-assert(resolveBookPose(.60).particleOpacity>.3,'Transition keeps its visual particle structure');
+assert(resolveBookPose(0).particleOpacity>0,'Closed-book introduction retains a little atmosphere');
+for(let i=65;i<=1000;i++)assert.equal(resolveBookPose(i/1000).particleOpacity,0,'Opening, every page turn and closing stay free of particles');
 assert.notEqual(resolveBookPose(.12).cameraY,resolveBookPose(.7).cameraY);
 for(const value of [NaN,Infinity,-2])assert.deepEqual(resolveBookPose(value),closed);assert.deepEqual(resolveBookPose(2),end);
 assert.equal(bookScrollProgress(100,100,1200,200),0);assert.equal(bookScrollProgress(600,100,1200,200),.5);assert.equal(bookScrollProgress(1100,100,1200,200),1);
