@@ -5,7 +5,7 @@ Este documento descreve somente a landing page pública do Aldus Reader. Ele nã
 ## Estado atual
 
 - Branch de desenvolvimento: `main`.
-- HEAD registrado durante esta atualização: `1019cb72ec8520fef3cec4322202e86c6ea82b58`.
+- Base conferida em 22/10/2026: `6c8e80b28326b2d27628269f77dfc18020fe3021`, alinhada a `origin/main` antes da revisão.
 - Implementação principal: `src/marketing/LandingDocument.tsx`.
 - Página Web: `src/marketing/LandingPage.web.tsx`.
 - Estilos: `src/marketing/landingStyles.ts`.
@@ -71,3 +71,48 @@ Alterações da landing devem ser pequenas e isoladas. Antes de editar, verifica
 - A sincronização e o armazenamento continuam descritos com a condição operacional real de ativação/franquia.
 - Testes físicos Android não são parte deste contexto.
 - Mudanças de domínio/canonical dependem de `EXPO_PUBLIC_SITE_URL` válido; sem ele, o build pode permanecer sem canonical público definitivo.
+
+## Revisão de fluidez, design e renderização — 22/10/2026
+
+Implementação: `37f0aa3` (`perf(marketing): smooth scroll poses and reduce 3D rendering overhead`).
+
+### Comportamento
+
+- `followBookScroll`, em `bookMotion.ts`, suaviza os saltos discretos de rolagem com resposta exponencial de 48 ms, independente da taxa de atualização, sem ultrapassar o destino. Ao convergir, aplica o progresso exato e encerra os frames de acompanhamento. Não há reprodução automática.
+- A rolagem real do contêiner continua sendo a fonte do destino. Navegação explícita por etapas e mudanças de tamanho retomam a posição diretamente. Rolar no sentido contrário reverte a trajetória.
+- `ScrollBookStory` agrupa leituras do layout, só muda variáveis do viewport quando necessário e espera o layout resultante antes de medir o palco. Tamanho e DPR repetidos não redimensionam o renderer.
+- Pose e variáveis CSS são reutilizadas durante sondas de qualidade na mesma posição. React só recebe mudanças de capítulo/modo, sem estado atualizado por partícula ou frame.
+- O observador acompanha a área sticky visível. Importações tardias não montam WebGL fora da área ou com a aba oculta; o retorno retoma a inicialização. Listeners, observers, buffers e contexto são descartados ao encerrar.
+
+### Livro e composição
+
+- Os 14 filetes físicos da borda usam um `InstancedMesh`; geometrias de caixas com dimensões iguais são compartilhadas. Partículas, texturas, curvatura e proporções físicas mantêm seus orçamentos.
+- O mapa de sombras é reutilizado em poses repetidas e invalidado por progresso, tamanho ou qualidade. Sem sombras de mapa, o plano transparente de sombras fica oculto; a sombra de contato permanece.
+- Redimensionamento de buffer e DPR é atômico e só ocorre quando necessário. O shader de papel dispensa cálculo de ruído quando não há dissolução.
+- Partículas recuam nas cenas estáveis de texto, biblioteca e estudo, preservando a formação durante as transições.
+- Cabeçalho em papel sólido, sem backdrop blur; fundo escuro do palco em camada de opacidade; máscara de canvas removida, com recorte de proteção do Hero preservado. Títulos, FAQ, cartões e navegação receberam ajustes editoriais; botões do livro mantêm 44 px de área mínima.
+- Reveals gerais usam 440 ms e deslocamento de 14 px. Reduced motion continua desativando movimento e permite leitura do conteúdo estático.
+
+### Validação efetiva
+
+- Typecheck e export Web: PASS. Matriz crítica: **83/83** (antes desta revisão: 82). Após o ajuste de DPR, a regressão específica do controller foi executada novamente.
+- `scripts/test-book-scroll-controller.cjs` integra `test:critical` e `test:marketing`. Exercita o componente real com DOM/RAF/import/renderer controlados: eventos passivos agrupados, pausa, reversão, assentamento, sondas sem escrita CSS, resize/DPR, etapas, aba oculta, importação tardia, reduced motion e cleanup. Não representa GPU ou aparelho físico.
+- Chromium ANGLE/D3D11 Intel HD Graphics 520: **72 combinações viewport/pose** aprovadas (320–1920 px e paisagem), geometria projetada sem sobreposição de texto/CTA, menu, FAQ, teclado, rotas públicas, acesso autenticado sintético, reduced motion/no-JS, perda/falha de WebGL e descarte. Nenhuma sessão real ou escrita de conta.
+- A ida por um salto de progresso 0→0,34 assentou em 23 amostras/530 ms; reversão para 0,08 em 22 amostras/367 ms nessa execução com inspeção geométrica. A espera passou a exigir o estado assentado antes de afirmar fechamento exato. Pausa não mantém loop autônomo.
+- Capturas e resultado visual: `.expo/cinematic-validation`. Comparação anterior/final, JSONs, logs e capturas: `artifacts/landing-refinement` (ignorados pelo Git). A baseline preserva o export anterior da mesma landing cinematográfica; não é a landing antiga anterior ao livro 3D.
+
+### Desempenho medido e limites
+
+As duas rodadas de comparação usam 240 frames de ida/volta, sem builds nem outras campanhas de teste concorrentes. A segunda rodada inverte a ordem das versões. Canvas ativo em 240/240 frames, sem fallback, nas oito amostras. Viewport mobile é emulação no Windows, não Redmi físico.
+
+| Rodada | Viewport | FPS anterior → revisão | p95 do frame anterior → revisão | TaskDuration anterior → revisão |
+| --- | --- | --- | --- | --- |
+| A | 1440×1000 | 58,7 → 49,1 | 16,8 → 50,0 ms | 1,30 → 3,47 s |
+| A | 390×844 | 55,3 → 53,1 | 33,2 → 17,3 ms | 2,68 → 2,57 s |
+| B (ordem invertida) | 1440×1000 | 56,6 → 57,5 | 17,1 → 17,5 ms | 2,65 → 3,01 s |
+| B (ordem invertida) | 390×844 | 59,9 → 59,0 | 16,8 → 16,9 ms | 2,18 → 2,01 s |
+
+- Ganho estrutural confirmado durante movimento: draw calls **41→28 desktop**, **31→17 mobile**; geometrias carregadas após percorrer cenas **33→21 desktop**, **33→20 mobile**. As sondas paradas podem ter ainda menos chamadas por reutilização de sombras; não usar esse número parado como custo da rolagem.
+- O FPS e o custo de CPU variaram, e a primeira rodada desktop piorou. Não há evidência para prometer aumento universal de FPS ou redução de CPU desktop. A suavização/renderização foi validada; responsividade sob carga e outras GPUs continuam como próximos ensaios de desempenho.
+- Entry + chunk 3D somaram **1.130 bytes gzip adicionais** frente à baseline. Nenhuma dependência nova. Heap JS não equivale à memória total da GPU; esta revisão não certifica ausência universal de vazamentos.
+- Nenhum APK, implantação Vercel, alteração de produção ou configuração de backend foi executado nesta revisão. O preview Vercel anterior mantém sua versão. O export local está disponível para revisão sem publicar um novo ambiente remoto.
