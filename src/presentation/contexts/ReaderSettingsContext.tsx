@@ -13,6 +13,7 @@ interface ReaderSettingsValue {
   maxWidth: number;
   brightness: number;
   useSystemBrightness: boolean;
+  hideReadingCounts: boolean;
   palette: ReaderPalette;
   fontFamily: string;
   marginSize: number;
@@ -25,6 +26,7 @@ interface ReaderSettingsValue {
   setMaxWidth: (value: number) => void;
   setBrightness: (value: number) => void;
   setUseSystemBrightness: (value: boolean) => void;
+  setHideReadingCounts: (value: boolean) => void;
 }
 
 const READER_SETTINGS_STORAGE_KEY = "@kindle/reader-settings.v1";
@@ -42,6 +44,7 @@ export function ReaderSettingsProvider({ children }: PropsWithChildren) {
   const [brightness, setBrightness] = useState(65);
   const [useSystemBrightness, setUseSystemBrightness] = useState(true);
   const [ready, setReady] = useState(false);
+  const [hideReadingCounts, setHideReadingCounts] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -63,6 +66,7 @@ export function ReaderSettingsProvider({ children }: PropsWithChildren) {
           maxWidth: number;
           brightness: number;
           useSystemBrightness: boolean;
+          hideReadingCounts: boolean;
         }>;
 
         if (parsed.theme && parsed.theme in readerThemes) setTheme(parsed.theme);
@@ -74,6 +78,7 @@ export function ReaderSettingsProvider({ children }: PropsWithChildren) {
         if (typeof parsed.maxWidth === "number") setMaxWidth(clamp(parsed.maxWidth, 500, 1400));
         if (typeof parsed.brightness === "number") setBrightness(clamp(parsed.brightness, 20, 100));
         if (typeof parsed.useSystemBrightness === "boolean") setUseSystemBrightness(parsed.useSystemBrightness);
+        if (typeof parsed.hideReadingCounts === "boolean") setHideReadingCounts(parsed.hideReadingCounts);
       } catch {
         // Ignore invalid persisted settings and keep defaults.
       } finally {
@@ -100,8 +105,9 @@ export function ReaderSettingsProvider({ children }: PropsWithChildren) {
       maxWidth,
       brightness,
       useSystemBrightness,
+      hideReadingCounts,
     })).catch(() => undefined);
-  }, [brightness, font, fontSize, lineHeight, margin, maxWidth, paragraphSpacing, ready, theme, useSystemBrightness]);
+  }, [brightness, font, fontSize, hideReadingCounts, lineHeight, margin, maxWidth, paragraphSpacing, ready, theme, useSystemBrightness]);
 
   const value = useMemo<ReaderSettingsValue>(() => ({
     theme,
@@ -113,6 +119,7 @@ export function ReaderSettingsProvider({ children }: PropsWithChildren) {
     maxWidth,
     brightness,
     useSystemBrightness,
+    hideReadingCounts,
     palette: readerThemes[theme],
     fontFamily: fontFamilies[font],
     marginSize: marginSizes[margin],
@@ -125,7 +132,8 @@ export function ReaderSettingsProvider({ children }: PropsWithChildren) {
     setMaxWidth: (value) => setMaxWidth(clamp(value, 500, 1400)),
     setBrightness: (value) => setBrightness(clamp(value, 20, 100)),
     setUseSystemBrightness,
-  }), [brightness, font, fontSize, lineHeight, margin, maxWidth, paragraphSpacing, theme, useSystemBrightness]);
+    setHideReadingCounts,
+  }), [brightness, font, fontSize, hideReadingCounts, lineHeight, margin, maxWidth, paragraphSpacing, theme, useSystemBrightness]);
 
   return <ReaderSettingsContext.Provider value={value}>{children}</ReaderSettingsContext.Provider>;
 }

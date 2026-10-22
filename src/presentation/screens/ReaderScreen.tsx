@@ -953,6 +953,7 @@ export function ReaderScreen({ bookId }: Props) {
     </View>
   );
   const readerControlProps = {
+    hideReadingCounts: settings.hideReadingCounts,
     requestedPage,
     operationId: requestedNavigationId.current,
     diagnosticContext: { mode: isPdf ? (isReflowPdf ? "reflow" : "original") : "epub", controlsVisible, reflowPreparing, feedback: Boolean(reflowFeedback) } as ReaderUiContext,
@@ -1056,6 +1057,7 @@ export function ReaderScreen({ bookId }: Props) {
           visible={readerPanel !== null}
           panelMode={readerPanel ?? "appearance"}
           onClose={() => setReaderPanel(null)}
+          onReadInFocus={() => { setReaderPanel(null); setControlsVisible(false); }}
           pdfMode={isPdf ? pdfReadingMode : undefined}
           pdfSettings={isPdf ? pdfReaderSettings : null}
           onPdfModeChange={isPdf ? handlePdfModeChange : undefined}

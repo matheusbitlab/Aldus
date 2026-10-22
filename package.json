@@ -26,6 +26,7 @@
     "audit:auth:redirects": "node scripts/audit-google-redirects.cjs",
     "export:web": "node scripts/validate-web-env.cjs && node scripts/generate-public-catalog.cjs --check && expo export --platform web && node scripts/copy-books-to-dist.mjs && node scripts/write-public-web.cjs && node scripts/write-build-metadata.cjs",
     "test:critical": "node scripts/test-critical.cjs",
+    "test:reader:concentration:web": "node scripts/test-reader-concentration-web.cjs",
     "test:saas": "node scripts/test-saas-schema.cjs && node scripts/test-saas-client.cjs && node scripts/test-saas-compatibility.cjs && node scripts/test-saas-experience.cjs && node scripts/test-saas-ui.cjs",
     "test:saas:web": "node scripts/test-saas-web.cjs",
     "test:admin": "node scripts/test-admin-security.cjs && node scripts/test-admin-client.cjs",

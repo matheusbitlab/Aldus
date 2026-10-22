@@ -19,6 +19,7 @@ interface Props {
   requestedPage?: number | null;
   operationId?: number;
   controlsVisible?: boolean;
+  hideReadingCounts?: boolean;
 }
 
 export function BottomFooter({
@@ -35,6 +36,7 @@ export function BottomFooter({
   requestedPage,
   operationId = 0,
   controlsVisible = true,
+  hideReadingCounts = false,
 }: Props) {
   const insets = useSafeAreaInsets();
   const paddingBottom = Platform.OS === "web" ? 20 : Math.max(insets.bottom, 20);
@@ -95,7 +97,12 @@ export function BottomFooter({
           <Ionicons name="chevron-forward" size={22} color={accent} />
         </Pressable>
       </View>
-      <View style={styles.meta}>
+      <View
+        accessibilityElementsHidden={hideReadingCounts}
+        importantForAccessibility={hideReadingCounts ? "no-hide-descendants" : "auto"}
+        aria-hidden={hideReadingCounts}
+        style={[styles.meta, hideReadingCounts && { opacity: 0 }]}
+      >
         <Text style={[styles.label, { color: secondaryText }]}>
           {Math.round(shownProgress * 100)}% lido
         </Text>

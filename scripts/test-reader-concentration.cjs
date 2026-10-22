@@ -1,0 +1,75 @@
+// Real settings provider and footer; native platform/storage are controlled boundaries.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const ts = require('typescript');
+const React = require('../.expo/auth-test-tools/node_modules/react');
+const { act, create } = require('../.expo/auth-test-tools/node_modules/react-test-renderer');
+global.IS_REACT_ACT_ENVIRONMENT = true;
+let stored = JSON.stringify({ theme: 'paper', fontSize: 23, margin: 'large', brightness: 81 });
+const writes = [];
+const storage = { getItem: async () => stored, setItem: async (key, value) => { writes.push({ key, value }); stored = value; } };
+const palette = { background: '#fff', text: '#222' };
+function load(file, overrides = {}) {
+  const result = {};
+  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  new Function('require', 'exports', code)(name => {
+    if (name in overrides) return overrides[name];
+    if (name === 'react') return React;
+    if (name === 'react/jsx-runtime') return require('../.expo/auth-test-tools/node_modules/react/jsx-runtime');
+    if (name === '@react-native-async-storage/async-storage') return storage;
+    if (name.endsWith('/tokens')) return { readerThemes: { paper: palette, sepia: palette }, fontFamilies: { serif: 'serif' }, marginSizes: { medium: 20, large: 40 } };
+    if (name === 'react-native') return { View: 'View', Text: 'Text', Pressable: 'Pressable', Platform: { OS: 'android' }, StyleSheet: { create: x => x } };
+    if (name === '@react-native-community/slider') return { __esModule: true, default: 'Slider' };
+    if (name === '@expo/vector-icons') return { Ionicons: 'Icon' };
+    if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 24 }) };
+    if (name.endsWith('/readerNavigationDiagnostics')) return { readerNavigationDiagnostic() {} };
+    throw Error('Uncontrolled dependency: ' + name);
+  }, result);
+  return result;
+}
+(async () => {
+  const { ReaderSettingsProvider, useReaderSettings } = load('src/presentation/contexts/ReaderSettingsContext.tsx');
+  let settings, renderer;
+  function Consumer() { settings = useReaderSettings(); return null; }
+  const mount = async () => act(async () => { renderer = create(React.createElement(ReaderSettingsProvider, null, React.createElement(Consumer))); });
+  await mount();
+  assert.equal(settings.hideReadingCounts, false, 'Legacy preferences preserve current presentation');
+  assert.equal(settings.fontSize, 23);
+  assert.equal(settings.theme, 'paper');
+  await act(async () => settings.setHideReadingCounts(true));
+  const persisted = JSON.parse(writes.at(-1).value);
+  assert.equal(persisted.hideReadingCounts, true);
+  assert.equal(persisted.margin, 'large');
+  assert.equal(persisted.brightness, 81);
+  await act(async () => renderer.unmount());
+  await mount();
+  assert.equal(settings.hideReadingCounts, true, 'Preference survives reopening without network');
+  await act(async () => renderer.unmount());
+  stored = JSON.stringify({ hideReadingCounts: 'true', theme: 'paper' });
+  await mount();
+  assert.equal(settings.hideReadingCounts, false, 'Malformed preference cannot hide counts');
+  await act(async () => renderer.unmount());
+  const { BottomFooter } = load('src/presentation/components/BottomFooter.tsx');
+  let changes = [], next = 0;
+  const props = { progress: .5, pageNumber: 51, totalPages: 101, accent: '#174', secondaryText: '#555', background: '#fff', onChange: x => changes.push(x), onPrevious() {}, onNext: () => next++ };
+  let footer;
+  await act(async () => { footer = create(React.createElement(BottomFooter, props)); });
+  const slider = footer.root.findByType('Slider');
+  const initialTree = footer.toJSON();
+  await act(async () => footer.update(React.createElement(BottomFooter, { ...props, hideReadingCounts: true })));
+  assert.strictEqual(footer.root.findByType('Slider'), slider, 'Hide counts does not remount navigation');
+  const hidden = footer.root.findAllByType('View').find(n => n.props['aria-hidden'] === true);
+  assert.equal(hidden.props.importantForAccessibility, 'no-hide-descendants');
+  assert.equal(hidden.props.accessibilityElementsHidden, true);
+  assert.deepEqual(hidden.props.style[0], initialTree.children[1].props.style[0], 'Counter geometry is retained');
+  assert.equal(footer.root.findByType('Slider').props.value, .5);
+  assert.deepEqual(changes, [], 'Preference alone cannot navigate or persist a new location');
+  await act(async () => footer.root.findAllByType('Pressable')[1].props.onPress());
+  assert.equal(next, 1, 'Page buttons remain usable');
+  await act(async () => slider.props.onSlidingComplete(.75));
+  assert.deepEqual(changes, [.75]);
+  await act(async () => footer.update(React.createElement(BottomFooter, props)));
+  assert.equal(footer.root.findAllByType('View').some(n => n.props['aria-hidden'] === false), true);
+  await act(async () => footer.unmount());
+  console.log('PASS concentration: legacy migration, strict boolean, offline reopening, typography preservation, stable footer/navigation, accessible hiding and recovery. Controlled components; no physical Android claim.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

@@ -13,6 +13,7 @@ interface Props {
   visible: boolean;
   panelMode: "appearance" | "contents" | "search";
   onClose: () => void;
+  onReadInFocus?: () => void;
   pdfMode?: PdfReadingMode;
   pdfSettings?: PdfReaderSettings | null;
   onPdfModeChange?: (mode: PdfReadingMode) => void;
@@ -46,6 +47,7 @@ export function ReaderSettingsPanel({
   visible,
   panelMode,
   onClose,
+  onReadInFocus,
   pdfMode,
   pdfSettings,
   onPdfModeChange,
@@ -89,6 +91,18 @@ export function ReaderSettingsPanel({
           <Text style={[styles.title, { color: palette.text }]}>
             {panelMode === "contents" ? "Sumário" : panelMode === "search" ? "Buscar no livro" : pdfSettings ? "Aparência do PDF" : "Aparência"}
           </Text>
+          {panelMode === "appearance" ? (
+            <View style={{ gap: 10 }}>
+              <Text accessibilityRole="header" style={[styles.label, { color: palette.secondaryText }]}>CONCENTRAÇÃO</Text>
+              <View style={styles.inlineToggleRow}>
+                <Text style={{ color: palette.text, flex: 1 }}>Ocultar porcentagem e contagem de páginas</Text>
+                <Switch accessibilityLabel="Ocultar porcentagem e contagem de páginas" value={settings.hideReadingCounts} onValueChange={settings.setHideReadingCounts} />
+              </View>
+              <Text style={{ color: palette.secondaryText }}>Para ler em foco, feche os ajustes e toque no centro da página para ocultar os controles. Toque novamente para voltar.</Text>
+              <Text style={{ color: palette.secondaryText }}>Esta preferência vale neste dispositivo. A navegação continua disponível.</Text>
+              {onReadInFocus ? <ActionButton label="Ler em foco" onPress={onReadInFocus} palette={palette} /> : null}
+            </View>
+          ) : null}
           {panelMode === "appearance" && pdfSettings && onPdfModeChange ? (
             <>
               <Text style={[styles.label, { color: palette.secondaryText }]}>MODO</Text>
