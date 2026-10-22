@@ -1,4 +1,5 @@
 /** Scroll is the only clock. Shared by the WebGL renderer and deterministic tests. */
+export const bookStoryViewports = 10.5;
 /** Each completed scene gets its own reading interval, measured in real scroll.
  * Only the gaps between these intervals move the camera, paper and objects. */
 export const bookBeats = [
@@ -51,7 +52,7 @@ export function bookScrollProgress(scrollTop: number, start: number, height: num
 }
 export type BookScrollState = { progress: number; velocity: number };
 /** Analytic critical damping preserves velocity between same-direction wheel
- * impulses. Two 32ms stages retain the previous 64ms mean response delay.
+ * impulses. Two 24ms stages give a responsive 48ms nominal mean delay.
  * Reversal and closer targets brake explicitly so the pose cannot overshoot. */
 export function followBookScroll(current: BookScrollState, target: number, elapsedMs: number): BookScrollState {
   const end = clamp(target);
@@ -59,7 +60,7 @@ export function followBookScroll(current: BookScrollState, target: number, elaps
   const start = clamp(current.progress), gap = end - start;
   if (Math.abs(gap) <= .00001) return { progress: end, velocity: 0 };
   const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, Math.min(64, elapsedMs)) : 0;
-  const direction = Math.sign(gap), rate = 1 / 32;
+  const direction = Math.sign(gap), rate = 1 / 24;
   const velocity = direction * Math.min(Math.max(0, direction * (Number.isFinite(current.velocity) ? current.velocity : 0)), Math.abs(gap) * rate);
   if (!elapsed) return { progress: start, velocity };
   const coefficient = velocity - gap * rate, decay = Math.exp(-elapsed * rate);

@@ -25,7 +25,17 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     let previousWidth = 0, previousHeight = 0, previousDpr = 0, previousHeader = -1, previousViewport = -1;
     let follower: ReturnType<typeof followBookScroll> | null = null, lastFrameAt = 0, snap = true, pendingChapter: number | null = null;
     let previousTarget = -1, previousSettled: boolean | undefined;
+    let navigationTarget: number | null = null;
     let cachedPose: ReturnType<typeof resolveBookPose> | undefined;
+    const cancelNavigation = () => {
+      pendingChapter = null;
+      if (navigationTarget === null) return;
+      navigationTarget = null;
+      scroller.scrollTo({ top: scroller.scrollTop, behavior: 'auto' });
+    };
+    const manualKey = (event: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) cancelNavigation();
+    };
     const chapterChange = (next: number) => {
       if (next !== chapterRef.current) { chapterRef.current = next; element.dataset.chapter = String(next); setChapter(next); }
     };
@@ -57,8 +67,9 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       if (disposed || !renderer || !enhanced || !visible || document.hidden) return;
       if (dirtyGeometry && !measure()) { schedule(); return; }
       if (pendingChapter !== null) {
-        scroller.scrollTo({ top: start + bookStops[pendingChapter] * distance, behavior: 'auto' });
+        navigationTarget = start + bookStops[pendingChapter] * distance;
         pendingChapter = null;
+        scroller.scrollTo({ top: navigationTarget, behavior: 'smooth' });
       }
       const target = bookScrollProgress(scroller.scrollTop, start, distance + stickyHeight, stickyHeight);
       const gap = at - lastFrameAt;
@@ -91,8 +102,13 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     const schedule = () => { if (!disposed && enhanced && visible && !document.hidden && !frame) frame = requestAnimationFrame(update); };
     // A sleeping loop has no frame interval. Do not turn the time between wheel
     // gestures into a large first-frame leap; active slow frames still use dt.
-    const scroll = () => { if (!frame) lastFrameAt = 0; schedule(); };
+    const scroll = () => {
+      if (navigationTarget !== null && Math.abs(scroller.scrollTop - navigationTarget) <= 1) navigationTarget = null;
+      if (!frame) lastFrameAt = 0;
+      schedule();
+    };
     const fallback = (reason: string) => {
+      cancelNavigation();
       generation++; loading = false; enhanced = false;
       if (reason !== 'reduced-motion') failed = true;
       if (frame) cancelAnimationFrame(frame); frame = 0;
@@ -123,7 +139,7 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       } catch { if (!disposed && revision === generation) fallback('webgl-unavailable'); }
       finally { if (revision === generation) loading = false; }
     };
-    const resize = () => { dirtyGeometry = true; snap = true; schedule(); };
+    const resize = () => { cancelNavigation(); dirtyGeometry = true; snap = true; schedule(); };
     let resolution: MediaQueryList | undefined;
     const resolutionChange = () => {
       resolution?.removeEventListener('change', resolutionChange);
@@ -132,7 +148,7 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       resize();
     };
     const visibility = () => {
-      if (document.hidden) { if (frame) cancelAnimationFrame(frame); frame = 0; return; }
+      if (document.hidden) { cancelNavigation(); if (frame) cancelAnimationFrame(frame); frame = 0; return; }
       dirtyGeometry = true; snap = true; void begin(); schedule();
     };
     const preference = () => {
@@ -142,7 +158,7 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     navigation.current = index => {
       const next = Math.max(0, Math.min(bookStops.length - 1, index));
       if (!enhanced || media.matches) { chapterChange(next); return; }
-      pendingChapter = next; snap = true; schedule();
+      pendingChapter = next; snap = false; schedule();
     };
     const intersection = typeof IntersectionObserver === 'undefined' ? undefined : new IntersectionObserver(entries => {
       visible = entries[0]?.isIntersecting ?? false;
@@ -153,6 +169,10 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(resize);
     observer?.observe(scroller); observer?.observe(pinned); observer?.observe(visual);
     scroller.addEventListener('scroll', scroll, { passive: true });
+    scroller.addEventListener('wheel', cancelNavigation, { passive: true });
+    scroller.addEventListener('touchstart', cancelNavigation, { passive: true });
+    scroller.addEventListener('pointerdown', cancelNavigation, { passive: true });
+    scroller.addEventListener('keydown', manualKey);
     window.addEventListener('resize', resize, { passive: true });
     document.addEventListener('visibilitychange', visibility); media.addEventListener('change', preference);
     resolutionChange();
@@ -160,9 +180,12 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     if (media.matches) preference(); else if (!intersection) void begin();
     return () => {
       disposed = true; generation++; navigation.current = () => {};
+      cancelNavigation();
       if (frame) cancelAnimationFrame(frame); renderer?.dispose();
       intersection?.disconnect(); observer?.disconnect();
       scroller.removeEventListener('scroll', scroll); window.removeEventListener('resize', resize);
+      scroller.removeEventListener('wheel', cancelNavigation); scroller.removeEventListener('touchstart', cancelNavigation);
+      scroller.removeEventListener('pointerdown', cancelNavigation); scroller.removeEventListener('keydown', manualKey);
       document.removeEventListener('visibilitychange', visibility); media.removeEventListener('change', preference);
       resolution?.removeEventListener('change', resolutionChange);
     };

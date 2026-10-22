@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const load=require('./community-test-loader.cjs')();
-const {resolveBookPose,bookScrollProgress,bookStops,bookBeats,bookVisualProgress,bookTransitionEase,followBookScroll,chooseBookQuality,assessBookPerformance,initialBookPerformance}=load('src/marketing/bookMotion.ts');
+const {resolveBookPose,bookScrollProgress,bookStops,bookBeats,bookStoryViewports,bookVisualProgress,bookTransitionEase,followBookScroll,chooseBookQuality,assessBookPerformance,initialBookPerformance}=load('src/marketing/bookMotion.ts');
 const {createParticleTargets,communityNodes,communityEdges}=load('src/marketing/cinematic/particleTargets.ts');
 const finite=x=>typeof x==='number'?Number.isFinite(x):Array.isArray(x)?x.every(finite):x&&typeof x==='object'?Object.values(x).every(finite):true;
 const closed=resolveBookPose(0),end=resolveBookPose(1);
@@ -30,7 +30,7 @@ for(const [index,beat]of bookBeats.entries()){
 for(let i=1;i<=1000;i++)assert(bookVisualProgress(i/1000)>=bookVisualProgress((i-1)/1000),'Scroll mapping never reverses direction or jumps stages');
 for(let index=0;index<4;index++){
  const start=bookBeats[index+1].end,end=bookBeats[index+2].start;
- assert((end-start)*12>.095*5.1,'Each full turn uses more physical scroll than the previous 610svh sequence');
+ assert((end-start)*(bookStoryViewports-1)>=.45,'Faster turns retain a gradual transition of nearly half a viewport');
  for(const t of [0,.25,.5,.75,1])assert(Math.abs(resolveBookPose(start+(end-start)*t).leaves[index].angle+171*bookTransitionEase(t))<1e-8,'A turn uses the whole transition with one easing curve');
 }
 assert.equal(bookTransitionEase(0),0);assert.equal(bookTransitionEase(.5),.5);assert.equal(bookTransitionEase(1),1);
@@ -57,7 +57,7 @@ assert(followBookScroll(resting(0),1,16).progress>0&&followBookScroll(resting(0)
 assert(Math.abs(after(120,1000/60).progress-after(120,1000/120).progress)<1e-8);
 assert(Math.abs(after(120,1000/60).velocity-after(120,1000/120).velocity)<1e-10);
 assert.deepEqual(after(800,1000/60),resting(1),'Idle settles exactly and can stop scheduling');
-assert(after(96,16).progress>.79,'Gradual acceleration does not add a long input delay');
+assert(after(72,12).progress>.79,'The faster response reaches 80 percent of the target in about 72ms');
 for(const [from,to]of [[.1,.9],[.9,.1],[.5,.5]]){let state=resting(from);for(let i=0;i<60;i++){const next=followBookScroll(state,to,16.7);assert(next.progress>=Math.min(state.progress,to)&&next.progress<=Math.max(state.progress,to));state=next;}assert.deepEqual(state,resting(to));}
 const moving=followBookScroll(resting(.42),.44,16.7),retargeted=followBookScroll(moving,.46,0);
 assert.equal(retargeted.velocity,moving.velocity,'Continuing the wheel gesture preserves velocity instead of restarting it');

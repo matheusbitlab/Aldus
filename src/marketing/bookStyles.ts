@@ -1,3 +1,5 @@
+import { bookStoryViewports } from './bookMotion';
+
 export const bookCss = `
 .al-book-story{--story-dark:0;--story-intro:1;--story-caption:1;position:relative;background:#f6f3ec}
 .al-book-sticky{position:relative;max-width:1920px;margin:auto;min-height:670px;display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:50px max(24px,5vw);gap:30px}
@@ -36,7 +38,7 @@ export const bookCss = `
 [data-aldus-landing] .al-book-outline h3{font:25px/1.15 Georgia,serif;letter-spacing:-.02em;margin:10px 0}
 .al-book-outline p{font-size:13px;line-height:1.65;color:#67735f}
 .al-book-story:not([data-enhanced]) .al-book-navigation{display:none}
-.al-book-story[data-enhanced=true][data-motion=scroll]{height:calc(var(--book-viewport-height,100svh) * 13);min-height:0}
+.al-book-story[data-enhanced=true][data-motion=scroll]{height:calc(var(--book-viewport-height,100svh) * ${bookStoryViewports});min-height:0}
 .al-book-story[data-enhanced=true] .al-book-sticky{position:sticky;top:var(--book-header-height,85px);height:calc(var(--book-viewport-height,100svh) - var(--book-header-height,85px));min-height:0;max-width:none;display:block;padding:0;overflow:hidden;background:#f6f3ec}
 .al-book-story[data-enhanced=true] .al-book-sticky::before{content:'';position:absolute;inset:0;z-index:0;background:#12241f;opacity:var(--story-dark);will-change:opacity;pointer-events:none}
 .al-book-story[data-enhanced=true] .al-story-intro{position:absolute;left:max(32px,calc((100vw - 1280px)/2));top:46%;transform:translateY(-50%);width:39%;opacity:var(--story-intro)}

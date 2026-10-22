@@ -15,10 +15,10 @@ function events(target = {}) {
     listeners, options,
     addEventListener(name, handler, option) { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(handler); options.set(name, option); },
     removeEventListener(name, handler) { listeners.get(name)?.delete(handler); },
-    emit(name) { for (const handler of [...listeners.get(name) ?? []]) handler(); },
+    emit(name, event) { for (const handler of [...listeners.get(name) ?? []]) handler(event); },
   });
 }
-async function harness({ delayImport = false } = {}) {
+async function harness({ delayImport = false, deferSmooth = false } = {}) {
   const imports = deferred(), frames = new Map(), renders = [], resizes = [], instances = [];
   let now = 1000, frameId = 0, observer, resizeObserver, importsCount = 0, mounts = 0, disposed = 0, budgetFrames = 0;
   const media = events({ matches: false }), resolution = events({ matches: true });
@@ -26,9 +26,10 @@ async function harness({ delayImport = false } = {}) {
   const document = events({ hidden: false, fonts: { ready: Promise.resolve() } });
   const styleWrites = [];
   const scroller = events({ clientHeight: 900, scrollTop: 0,
+    scrollCalls: [],
     querySelector: () => ({ getBoundingClientRect: () => ({ height: 80 }) }),
     getBoundingClientRect: () => ({ top: 0 }),
-    scrollTo({ top }) { this.scrollTop = top; this.emit('scroll'); },
+    scrollTo({ top, behavior }) { this.lastScrollBehavior = behavior; this.scrollCalls.push({top,behavior}); if(deferSmooth&&behavior==='smooth')return; this.scrollTop = top; this.emit('scroll'); },
   });
   const track = { dataset: {}, style: { setProperty: (...args) => styleWrites.push(args) }, closest: () => scroller,
     getBoundingClientRect: () => ({ top: 80 - scroller.scrollTop }), offsetHeight: 5400 };
@@ -107,7 +108,10 @@ async function harness({ delayImport = false } = {}) {
   h.visual.clientWidth = 390; h.visual.clientHeight = 500; await h.resize(); await h.drain();
   assert.deepEqual(h.resizes.at(-1), [390, 500]); assert.equal(h.renders.at(-1).progress, .1);
   const buttons = h.tree.root.findAllByType('button');
-  await act(async () => buttons[1].props.onClick()); await h.drain(); assert.equal(h.renders.at(-1).progress, motion.bookStops[2], 'Explicit chapter navigation reaches exact stop');
+  await act(async () => buttons[1].props.onClick()); await h.tick();
+  assert.equal(h.scroller.lastScrollBehavior,'smooth','Chapter buttons use the native smooth scroll source');
+  assert(h.renders.at(-1).progress>.1&&h.renders.at(-1).progress<motion.bookStops[2],'Chapter navigation renders an intermediate pose instead of teleporting');
+  await h.drain(); assert.equal(h.renders.at(-1).progress, motion.bookStops[2], 'Explicit chapter navigation reaches exact stop');
   await h.scroll(.7); assert.equal(h.frames.size, 1);
   h.document.hidden = true; await act(async () => h.document.emit('visibilitychange')); assert.equal(h.frames.size, 0);
   const hiddenRenderCount = h.renders.length; await h.scroll(.2); await h.tick(); assert.equal(h.renders.length, hiddenRenderCount);
@@ -118,6 +122,25 @@ async function harness({ delayImport = false } = {}) {
   await h.unmount(); assert.equal(h.disposed, 2); assert.equal(h.frames.size, 0);
   assert.equal(h.intersectionDisconnected, true); assert.equal(h.resizeDisconnected, true);
   for (const target of [h.document, h.window, h.scroller, h.media, h.resolution]) assert.ok([...target.listeners.values()].every(set => set.size === 0));
+  for(const interruption of ['resize','reduced','hidden','wheel','touchstart','pointerdown','keyboard','unmount']){
+    const nav=await harness({deferSmooth:true});await nav.enter(true);await nav.drain();
+    await act(async()=>nav.tree.root.findAllByType('button')[1].props.onClick());await nav.drain();
+    assert.equal(nav.scroller.lastScrollBehavior,'smooth');
+    // The browser owns the ongoing interpolation; it has not reached its target.
+    await nav.scroll(.08);await nav.tick();const stoppedAt=nav.scroller.scrollTop;
+    if(interruption==='resize')await nav.resize();
+    else if(interruption==='reduced'){nav.media.matches=true;await act(async()=>nav.media.emit('change'));}
+    else if(interruption==='hidden'){nav.document.hidden=true;await act(async()=>nav.document.emit('visibilitychange'));}
+    else if(interruption==='unmount')await nav.unmount();
+    else await act(async()=>nav.scroller.emit(interruption==='keyboard'?'keydown':interruption,{key:'PageUp'}));
+    assert.deepEqual(nav.scroller.scrollCalls.at(-1),{top:stoppedAt,behavior:'auto'},interruption+' cancels only Aldus-owned smooth scrolling at the actual position');
+    const calls=nav.scroller.scrollCalls.length;
+    await act(async()=>nav.scroller.emit('wheel'));
+    assert.equal(nav.scroller.scrollCalls.length,calls,'Manual scrolling without an active chapter navigation is untouched');
+    if(interruption!=='unmount')await nav.unmount();
+    assert.equal(nav.frames.size,0);
+    for(const target of [nav.document,nav.window,nav.scroller,nav.media,nav.resolution])assert.ok([...target.listeners.values()].every(set=>set.size===0),'All navigation cancellation listeners are removed');
+  }
   const timing=await harness();await timing.enter(true);await timing.drain();
   for(const idle of [65,90,300]){
     await timing.scroll(.425);await timing.drain();timing.elapse(idle);
