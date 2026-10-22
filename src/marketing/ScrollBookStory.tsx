@@ -62,7 +62,7 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       }
       const target = bookScrollProgress(scroller.scrollTop, start, distance + stickyHeight, stickyHeight);
       const gap = at - lastFrameAt;
-      progress = snap || progress === null ? target : followBookScroll(progress, target, gap > 0 && gap < 100 ? gap : 1000 / 60);
+      progress = snap || progress === null ? target : followBookScroll(progress, target, lastFrameAt > 0 && gap > 0 ? gap : 1000 / 60);
       snap = false; lastFrameAt = at;
       const settled = progress === target;
       if (target !== previousTarget) { visual.dataset.bookTarget = target.toFixed(5); previousTarget = target; }
@@ -88,6 +88,9 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       } catch { fallback('render-failed'); }
     };
     const schedule = () => { if (!disposed && enhanced && visible && !document.hidden && !frame) frame = requestAnimationFrame(update); };
+    // A sleeping loop has no frame interval. Do not turn the time between wheel
+    // gestures into a large first-frame leap; active slow frames still use dt.
+    const scroll = () => { if (!frame) lastFrameAt = 0; schedule(); };
     const fallback = (reason: string) => {
       generation++; loading = false; enhanced = false;
       if (reason !== 'reduced-motion') failed = true;
@@ -120,6 +123,13 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       finally { if (revision === generation) loading = false; }
     };
     const resize = () => { dirtyGeometry = true; snap = true; schedule(); };
+    let resolution: MediaQueryList | undefined;
+    const resolutionChange = () => {
+      resolution?.removeEventListener('change', resolutionChange);
+      resolution = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      resolution.addEventListener('change', resolutionChange);
+      resize();
+    };
     const visibility = () => {
       if (document.hidden) { if (frame) cancelAnimationFrame(frame); frame = 0; return; }
       dirtyGeometry = true; snap = true; void begin(); schedule();
@@ -141,17 +151,19 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     intersection?.observe(pinned);
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(resize);
     observer?.observe(scroller); observer?.observe(pinned); observer?.observe(visual);
-    scroller.addEventListener('scroll', schedule, { passive: true });
+    scroller.addEventListener('scroll', scroll, { passive: true });
     window.addEventListener('resize', resize, { passive: true });
     document.addEventListener('visibilitychange', visibility); media.addEventListener('change', preference);
+    resolutionChange();
     void document.fonts?.ready.then(() => { if (!disposed) resize(); });
     if (media.matches) preference(); else if (!intersection) void begin();
     return () => {
       disposed = true; generation++; navigation.current = () => {};
       if (frame) cancelAnimationFrame(frame); renderer?.dispose();
       intersection?.disconnect(); observer?.disconnect();
-      scroller.removeEventListener('scroll', schedule); window.removeEventListener('resize', resize);
+      scroller.removeEventListener('scroll', scroll); window.removeEventListener('resize', resize);
       document.removeEventListener('visibilitychange', visibility); media.removeEventListener('change', preference);
+      resolution?.removeEventListener('change', resolutionChange);
     };
   }, []);
 

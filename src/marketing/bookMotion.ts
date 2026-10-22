@@ -22,16 +22,25 @@ export const bookChapters = [
 ] as const;
 export const clamp = (value: number) => Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 export const ramp = (value: number, start: number, end: number) => clamp((value - start) / (end - start));
-export const smooth = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t); };
+export const smooth = (value: number) => { const t = clamp(value); return t * t * t * (t * (t * 6 - 15) + 10); };
 export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const envelope = (p: number, a: number, b: number, c: number, d: number) => smooth(ramp(p, a, b)) * (1 - smooth(ramp(p, c, d)));
+
+/** Feather acceleration and deceleration, then cruise through the middle.
+ * Position, velocity, acceleration and jerk meet the stationary holds at zero;
+ * the maximum speed stays below a conventional cubic/quintic ease-in-out. */
+export function bookTransitionEase(value: number): number {
+  const t = clamp(value), feather = .24;
+  const enter = (x: number) => { const u = x / feather; return feather * u ** 4 * (u * u - 3 * u + 2.5) / (1 - feather); };
+  return t < feather ? enter(t) : t > 1 - feather ? 1 - enter(1 - t) : (t - feather / 2) / (1 - feather);
+}
 
 export function bookVisualProgress(value: number): number {
   const progress = clamp(value);
   for (let i = 0; i < bookBeats.length; i++) {
     const beat = bookBeats[i], next = bookBeats[i + 1];
     if (progress <= beat.end) return beat.pose;
-    if (next && progress < next.start) return mix(beat.pose, next.pose, smooth(ramp(progress, beat.end, next.start)));
+    if (next && progress < next.start) return mix(beat.pose, next.pose, bookTransitionEase(ramp(progress, beat.end, next.start)));
   }
   return 1;
 }
@@ -46,10 +55,10 @@ export function followBookScroll(current: number, target: number, elapsedMs: num
   const end = clamp(target);
   if (!Number.isFinite(current)) return end;
   const start = clamp(current), gap = end - start;
-  if (Math.abs(gap) <= .00015) return end;
+  if (Math.abs(gap) <= .00001) return end;
   const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, Math.min(64, elapsedMs)) : 0;
-  const next = start + gap * (1 - Math.exp(-elapsed / 48));
-  return Math.abs(end - next) <= .00015 ? end : next;
+  const next = start + gap * (1 - Math.exp(-elapsed / 64));
+  return Math.abs(end - next) <= .00001 ? end : next;
 }
 /** 0 book, 1 open paper, 2 library, 3 Reader, 4 study, 5 community, 6 dispersed paper. */
 const particleKeys = [[0, 6], [.075, 0], [.19, 1], [.36, 2], [.52, 3], [.69, 4], [.85, 5], [1, 0]] as const;

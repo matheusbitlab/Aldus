@@ -225,7 +225,7 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
   let lastShadowProgress = NaN, shadowUpdates = 0;
   let dpr = Math.min(devicePixelRatio || 1, quality.dpr), current = resolveBookPose(0), budget: number = quality.particles;
   let effectiveQuality: string = quality.name;
-  let resized = false;
+  let resized = false, renderDirty = true;
   const metricsHost = host as MetricsHost;
   const projected = new Vector3(), bounds: Record<string, number> = {};
   const contextLost = (event: Event) => { event.preventDefault(); if (!disposed) onFailure('context-lost'); };
@@ -254,9 +254,11 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
     // change. A shadow/particle-tier change alone does not resize the buffer.
     if (bufferChanged) { renderer.setDrawingBufferSize(w, h, dpr); camera.aspect = w / h; camera.updateProjectionMatrix(); }
     resized = true;
+    renderDirty = true;
   };
   const render = (pose: BookPose) => {
     if (disposed) return;
+    let probing = false;
     // A bounded consecutive-frame probe measures rendering, not how slowly a
     // person turns their wheel. Its frames draw the exact scroll pose unchanged.
     // Geometry QA may force software WebGL; production probes are tested separately.
@@ -266,6 +268,7 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
         performanceState = { ...initialBookPerformance, reduced: downgraded };
       }
       if (qualitySamples < 24) {
+        probing = true;
         performanceState = assessBookPerformance(performanceState, qualitySamples * .005, performance.now()); qualitySamples++;
         if (performanceState.fallback) { onFailure('performance-limited'); return; }
         if (performanceState.reduced && !downgraded) {
@@ -273,8 +276,13 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
         }
       }
     }
-    current = pose;
     const motion = pose.visualProgress;
+    if (!renderDirty && !probing && current.visualProgress === motion) {
+      current = pose;
+      if (metricsHost.aldusBookMetrics) metricsHost.aldusBookMetrics.progress = pose.progress;
+      return;
+    }
+    current = pose;
     const small = width <= 850;
     const topInset = small ? 0 : Math.min(height * .35, 190) * smooth(Math.max(0, Math.min(1, (motion - .06) / .13)));
     const activeHeight = Math.max(1, height - topInset), aspect = width / activeHeight;
@@ -317,7 +325,7 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
     ground.position.x = contact.position.x = world.position.x;
     if (motion !== lastShadowProgress) { renderer.shadowMap.needsUpdate = true; lastShadowProgress = motion; }
     if (renderer.shadowMap.enabled && renderer.shadowMap.needsUpdate) shadowUpdates++;
-    renderer.render(scene, camera); frames++;
+    renderer.render(scene, camera); frames++; renderDirty = false;
     // Accurate projected vertices are for local visual QA, not a production frame cost.
     if (inspectGeometry) {
       let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;

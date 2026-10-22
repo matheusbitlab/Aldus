@@ -21,8 +21,8 @@ function events(target = {}) {
 async function harness({ delayImport = false } = {}) {
   const imports = deferred(), frames = new Map(), renders = [], resizes = [], instances = [];
   let now = 1000, frameId = 0, observer, resizeObserver, importsCount = 0, mounts = 0, disposed = 0, budgetFrames = 0;
-  const media = events({ matches: false });
-  const window = events({ matchMedia: () => media });
+  const media = events({ matches: false }), resolution = events({ matches: true });
+  const window = events({ matchMedia: query => query.includes('prefers-reduced-motion') ? media : resolution });
   const document = events({ hidden: false, fonts: { ready: Promise.resolve() } });
   const styleWrites = [];
   const scroller = events({ clientHeight: 900, scrollTop: 0,
@@ -57,11 +57,11 @@ async function harness({ delayImport = false } = {}) {
     createNodeMock: element => element.type === 'section' ? track : element.props.className === 'al-book-sticky' ? pinned : element.props['data-book-scene'] !== undefined ? visual : {},
   }); });
   const enter = async value => act(async () => observer.callback([{ isIntersecting: value }]));
-  const tick = async () => act(async () => { const pending = [...frames.values()]; frames.clear(); now += 1000 / 60; pending.forEach(callback => callback(now)); });
+  const tick = async (ms=1000/60) => act(async () => { const pending = [...frames.values()]; frames.clear(); now += ms; pending.forEach(callback => callback(now)); });
   const drain = async () => { let count = 0; while (frames.size && count < 80) { await tick(); count++; } assert.equal(frames.size, 0, 'Controller must sleep after converging'); return count; };
   const scroll = async progress => act(async () => { scroller.scrollTop = progress * (track.offsetHeight - pinned.offsetHeight); scroller.emit('scroll'); });
-  return { frames, renders, resizes, instances, scroller, track, pinned, visual, media, document, window, styleWrites,
-    enter, tick, drain, scroll, tree, resolveImport: async () => act(async () => imports.resolve({ mountBookScene })),
+  return { frames, renders, resizes, instances, scroller, track, pinned, visual, media, resolution, document, window, styleWrites,
+    enter, tick, drain, scroll, tree, elapse: ms => { now += ms; }, resolveImport: async () => act(async () => imports.resolve({ mountBookScene })),
     get mounts() { return mounts; }, get disposed() { return disposed; }, get importsCount() { return importsCount; },
     set budgetFrames(n) { budgetFrames = n; }, resize: async () => act(async () => resizeObserver.callback([])),
     unmount: async () => act(async () => tree.unmount()),
@@ -79,7 +79,7 @@ async function harness({ delayImport = false } = {}) {
   for (let i = 0; i < 20; i++) await h.scroll(.4);
   assert.equal(h.frames.size, 1, 'Scroll burst coalesces into one animation frame');
   await h.tick(); assert.ok(h.renders.at(-1).progress > 0 && h.renders.at(-1).progress < .4);
-  const settled = await h.drain(); assert.ok(settled < 40); assert.equal(h.renders.at(-1).progress, .4);
+  const settled = await h.drain(); assert.ok(settled < 50); assert.equal(h.renders.at(-1).progress, .4);
   const trajectory = h.renders.slice(before).map(p => p.progress);
   assert.ok(trajectory.every((p, i) => !i || p >= trajectory[i - 1]));
   const stopped = h.renders.length; await h.tick(); assert.equal(h.renders.length, stopped, 'No autonomous rendering during idle');
@@ -102,7 +102,7 @@ async function harness({ delayImport = false } = {}) {
   assert.equal(h.styleWrites.length, writesBeforeProbe, 'Stationary quality probes do not rewrite CSS properties');
   const priorResizeCount = h.resizes.length;
   await h.resize(); await h.drain(); assert.equal(h.resizes.length, priorResizeCount, 'Same dimensions do not resize renderer');
-  h.window.devicePixelRatio = 1.5; await h.resize(); await h.drain();
+  h.window.devicePixelRatio = 1.5; await act(async () => h.resolution.emit('change')); await h.drain();
   assert.equal(h.resizes.length, priorResizeCount + 1, 'A DPR-only change still reaches the renderer');
   h.visual.clientWidth = 390; h.visual.clientHeight = 500; await h.resize(); await h.drain();
   assert.deepEqual(h.resizes.at(-1), [390, 500]); assert.equal(h.renders.at(-1).progress, .1);
@@ -117,7 +117,18 @@ async function harness({ delayImport = false } = {}) {
   h.media.matches = false; await act(async () => h.media.emit('change')); await h.drain(); assert.equal(h.mounts, 2);
   await h.unmount(); assert.equal(h.disposed, 2); assert.equal(h.frames.size, 0);
   assert.equal(h.intersectionDisconnected, true); assert.equal(h.resizeDisconnected, true);
-  for (const target of [h.document, h.window, h.scroller, h.media]) assert.ok([...target.listeners.values()].every(set => set.size === 0));
+  for (const target of [h.document, h.window, h.scroller, h.media, h.resolution]) assert.ok([...target.listeners.values()].every(set => set.size === 0));
+  const timing=await harness();await timing.enter(true);await timing.drain();
+  for(const idle of [65,90,300]){
+    await timing.scroll(.425);await timing.drain();timing.elapse(idle);
+    await timing.scroll(.445);await timing.tick();
+    const first=timing.renders.at(-1).progress;
+    assert(Math.abs(first-motion.followBookScroll(.425,.445,1000/60))<1e-12,'First wheel frame does not consume the idle interval '+idle);
+    await timing.tick(120);
+    assert(Math.abs(timing.renders.at(-1).progress-motion.followBookScroll(first,.445,120))<1e-12,'An active slow frame still follows its real bounded elapsed time');
+    await timing.drain();
+  }
+  await timing.unmount();
   const late = await harness({ delayImport: true });
   await late.enter(true); await late.enter(false); await late.resolveImport(); assert.equal(late.mounts, 0, 'Late import cannot mount out of sight');
   await late.enter(true); await late.drain(); assert.equal(late.mounts, 1); await late.unmount();

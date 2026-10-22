@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const load=require('./community-test-loader.cjs')();
-const {resolveBookPose,bookScrollProgress,bookStops,bookBeats,bookVisualProgress,followBookScroll,chooseBookQuality,assessBookPerformance,initialBookPerformance}=load('src/marketing/bookMotion.ts');
+const {resolveBookPose,bookScrollProgress,bookStops,bookBeats,bookVisualProgress,bookTransitionEase,followBookScroll,chooseBookQuality,assessBookPerformance,initialBookPerformance}=load('src/marketing/bookMotion.ts');
 const {createParticleTargets,communityNodes,communityEdges}=load('src/marketing/cinematic/particleTargets.ts');
 const finite=x=>typeof x==='number'?Number.isFinite(x):Array.isArray(x)?x.every(finite):x&&typeof x==='object'?Object.values(x).every(finite):true;
 const closed=resolveBookPose(0),end=resolveBookPose(1);
@@ -31,7 +31,18 @@ for(let i=1;i<=1000;i++)assert(bookVisualProgress(i/1000)>=bookVisualProgress((i
 for(let index=0;index<4;index++){
  const start=bookBeats[index+1].end,end=bookBeats[index+2].start;
  assert((end-start)*12>.095*5.1,'Each full turn uses more physical scroll than the previous 610svh sequence');
- for(const t of [0,.25,.5,.75,1])assert(Math.abs(resolveBookPose(start+(end-start)*t).leaves[index].angle+171*(t*t*(3-2*t)))<1e-8,'A turn uses the whole transition with one easing curve');
+ for(const t of [0,.25,.5,.75,1])assert(Math.abs(resolveBookPose(start+(end-start)*t).leaves[index].angle+171*bookTransitionEase(t))<1e-8,'A turn uses the whole transition with one easing curve');
+}
+assert.equal(bookTransitionEase(0),0);assert.equal(bookTransitionEase(.5),.5);assert.equal(bookTransitionEase(1),1);
+for(let i=1;i<=1000;i++){
+ const p=i/1000,previous=bookTransitionEase(p-.001),next=bookTransitionEase(p);
+ assert(next>=previous&&next<=1);assert((next-previous)/.001<1.32,'Cruising turns avoid a central speed burst');
+ assert(Math.abs(next+bookTransitionEase(1-p)-1)<1e-12,'Forward and reverse use the same motion curve');
+}
+for(const edge of [0,1]){
+ const h=.0001,velocity=(bookTransitionEase(edge+h)-bookTransitionEase(edge-h))/(2*h);
+ const acceleration=(bookTransitionEase(edge+h)-2*bookTransitionEase(edge)+bookTransitionEase(edge-h))/(h*h);
+ assert(Math.abs(velocity)<1e-7&&Math.abs(acceleration)<.001,'A stationary hold meets the turn with zero speed and acceleration');
 }
 for(const [index,beat]of bookBeats.entries())if(index){const boundary=(bookBeats[index-1].end+beat.start)/2;assert(resolveBookPose(boundary).captionOpacity<1e-8,'Only the chapter handover fades the caption');}
 assert.notEqual(resolveBookPose(.12).cameraY,resolveBookPose(.7).cameraY);
@@ -43,8 +54,11 @@ for(const values of [[0,0,0,0],[10,0,100,200],[NaN,0,1000,200],[0,NaN,1000,200],
 const after=(ms,step)=>{let p=0;for(let t=0;t<ms;t+=step)p=followBookScroll(p,1,Math.min(step,ms-t));return p;};
 assert(followBookScroll(0,1,16)>0&&followBookScroll(0,1,16)<1);
 assert(Math.abs(after(120,1000/60)-after(120,1000/120))<1e-8);
-assert.equal(after(480,1000/60),1,'Idle settles exactly and can stop scheduling');
-for(const [from,to]of [[.1,.9],[.9,.1],[.5,.5]]){let p=from;for(let i=0;i<40;i++){const next=followBookScroll(p,to,16.7);assert(next>=Math.min(p,to)&&next<=Math.max(p,to));p=next;}assert.equal(p,to);}
+assert.equal(after(800,1000/60),1,'Idle settles exactly and can stop scheduling');
+for(const [from,to]of [[.1,.9],[.9,.1],[.5,.5]]){let p=from;for(let i=0;i<60;i++){const next=followBookScroll(p,to,16.7);assert(next>=Math.min(p,to)&&next<=Math.max(p,to));p=next;}assert.equal(p,to);}
+const almost=.44-.00014;
+assert(followBookScroll(almost,.44,16.7)<.44,'A small final gap is eased rather than snapped');
+assert(Math.abs(resolveBookPose(followBookScroll(almost,.44,16.7)).leaves[1].angle-resolveBookPose(almost).leaves[1].angle)<.17,'Terminal correction cannot jump a visible fraction of a page turn');
 assert.equal(followBookScroll(.5,.9,0),.5);assert.equal(followBookScroll(.5,.9,-10),.5);
 assert.equal(followBookScroll(NaN,.4,16),.4);assert(Number.isFinite(followBookScroll(.5,Infinity,NaN)));
 assert.equal(chooseBookQuality(1440).particles,4096);assert.equal(chooseBookQuality(390).particles,1600);assert.equal(chooseBookQuality(1440,2).particles,900);assert.equal(chooseBookQuality(1440,8,8,true).shadows,false);

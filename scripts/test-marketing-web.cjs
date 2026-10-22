@@ -80,6 +80,29 @@ async function cdp(url){
     assert(Math.abs(sample.values.at(-1)-sample.target)<.001,'Catch-up reaches real scroll');
     for(let i=1;i<sample.values.length;i++)assert(direction==='forward'?sample.values[i]>=sample.values[i-1]-1e-8:sample.values[i]<=sample.values[i-1]+1e-8,'No overshoot on '+direction);
   }
+  const turnMotion={};
+  for(const [direction,from,to]of [['forward',.405,.475],['reverse',.475,.405]]){
+    await bookAt(from);
+    turnMotion[direction]=await client.evaluate(`(async()=>{
+      const root=document.querySelector('[data-landing-scroll]'),story=document.querySelector('[data-book-story]'),sticky=story.querySelector('.al-book-sticky'),host=story.querySelector('[data-book-scene]');
+      const start=root.scrollTop+story.getBoundingClientRect().top-root.getBoundingClientRect().top-document.querySelector('.al-header').offsetHeight,range=story.offsetHeight-sticky.offsetHeight,samples=[];
+      for(let frame=0;frame<100;frame++){
+        if(frame<48&&frame%4===0)root.scrollTop=start+(${from}+(${to}-${from})*(frame+4)/48)*range;
+        await new Promise(requestAnimationFrame);
+        samples.push({at:performance.now(),scroll:Number(host.dataset.bookProgress),angle:host.aldusBookMetrics.leafAngle1,frames:host.aldusBookMetrics.frames});
+        if(frame>=48&&host.dataset.bookSettled==='true')break;
+      }
+      return samples;
+    })()`);
+    const values=turnMotion[direction];assert(values.length<100,'Finite settling after the scroll gesture');
+    assert(new Set(values.filter(s=>s.angle<-.5&&s.angle>-170.5).map(s=>s.angle.toFixed(3))).size>=12,'A full turn renders many distinct intermediate angles');
+    for(let i=1;i<values.length;i++){
+      const delta=values[i].angle-values[i-1].angle;
+      assert(direction==='forward'?delta<=1e-8:delta>=-1e-8,'A turn follows the gesture without overshoot or reversal');
+      assert(Math.abs(delta)<12,'Discrete scroll input cannot skip a large portion of the turn in one frame');
+    }
+  }
+  await bookAt(.44);const pausedTurn=await bookState();await wait(650);assert.equal((await bookState()).metrics.frames,pausedTurn.metrics.frames,'Stopping midway through a turn stops rendering exactly');
   const desktop=[];for(const p of [0,.1,.25,.4,.55,.7,.85,1]){const s=await bookAt(p);assertPose(s,'Desktop '+p);assert.equal(s.metrics.particleGeometryId,geometry,'One stable GPU particle buffer');desktop.push({p,...s.metrics});await shot('desktop-'+Math.round(p*100));}
   assert.equal(Math.abs(desktop.at(-1).coverAngle),0,'Final reconstruction closes the same book');assert(desktop[1].coverAngle<0&&desktop[1].coverAngle>-174);assert(desktop[3].particleFrom!==desktop[5].particleFrom,'Different actual target structures');
   const held=await bookState();await wait(700);const heldAfter=await bookState();assert.equal(heldAfter.metrics.frames,held.metrics.frames,'No animation clock while scroll is stopped');
@@ -94,13 +117,20 @@ async function cdp(url){
     if(index>=2)assert(scrollSpan>=before.root.height*1.2,'Feature remains fixed for more than a viewport of real scroll');
     for(let i=0;i<3;i++)await client.command('Input.dispatchMouseEvent',{type:'mouseWheel',x:1080,y:500,deltaY:120,deltaX:0});
     await until('Number(document.querySelector("[data-book-scene]").dataset.bookProgress)>'+String(before.progress+.005)+' && document.querySelector("[data-book-scene]").dataset.bookSettled==="true"','wheel advances inside reading interval');
-    const after=await bookState();assert(after.progress<beat.end);assert.deepEqual(poseSignature(after),signature,'Real wheel leaves camera, objects and caption fixed');assert.equal(after.captionOpacity,1);assert.equal(await canvasDigest(after),pixels,'Rendered book pixels stay fixed while scrolling through a reading interval');
+    const after=await bookState();assert(after.progress<beat.end);assert.deepEqual(poseSignature(after),signature,'Real wheel leaves camera, objects and caption fixed');assert.equal(after.captionOpacity,1);assert.equal(await canvasDigest(after),pixels,'Rendered book pixels stay fixed while scrolling through a reading interval');assert.equal(after.metrics.frames,before.metrics.frames,'Scrolling inside a hold does not redraw the GPU');
     await client.command('Input.dispatchMouseEvent',{type:'mouseWheel',x:1080,y:500,deltaY:-240,deltaX:0});
     await until('Number(document.querySelector("[data-book-scene]").dataset.bookProgress)<'+String(after.progress-.005)+' && document.querySelector("[data-book-scene]").dataset.bookSettled==="true"','reverse wheel inside reading interval');
-    const reversedHold=await bookState();assert.deepEqual(poseSignature(reversedHold),signature);assert.equal(await canvasDigest(reversedHold),pixels);
+    const reversedHold=await bookState();assert.deepEqual(poseSignature(reversedHold),signature);assert.equal(await canvasDigest(reversedHold),pixels);assert.equal(reversedHold.metrics.frames,before.metrics.frames);
     readingHolds.push({chapter:index,visual:signature.visual,scrollSpanPx:scrollSpan,rawBefore:before.progress,rawAfter:after.progress,rawReversed:reversedHold.progress,pixelSha256:pixels});
     await shot('reading-hold-'+index);
   }
+  const beforeDpr=await bookAt(.36);await client.command('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1.25,mobile:false});
+  // This CDP driver changes DPR silently (no resize or resolution media event).
+  // Supply the browser resize signal explicitly; automatic media subscription
+  // and its rearming/cleanup are exercised by the controlled component test.
+  await client.evaluate('window.dispatchEvent(new Event("resize"))');
+  const afterDpr=await bookAt(.36);assert(afterDpr.metrics.frames>beforeDpr.metrics.frames&&afterDpr.metrics.dpr>beforeDpr.metrics.dpr,'DPR invalidates a cached reading interval '+JSON.stringify({before:beforeDpr.metrics,after:afterDpr.metrics}));assertPose(afterDpr,'DPR resize inside a fixed scene');
+  await client.command('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await client.evaluate('window.dispatchEvent(new Event("resize"))');await bookAt(.36);
   await bookAt(0);await client.evaluate('[...document.querySelectorAll("[aria-label]")].find(e=>e.getAttribute("aria-label")==="Próxima etapa do livro").click()');await until('Number(document.querySelector("[data-book-scene]").dataset.bookChapter)===1','explicit next chapter');await client.evaluate('[...document.querySelectorAll("[aria-label]")].find(e=>e.getAttribute("aria-label")==="Etapa anterior do livro").click()');await until('Number(document.querySelector("[data-book-scene]").dataset.bookChapter)===0','explicit previous chapter');
   await bookAt(1);const finalTop=(await bookState()).sticky.top;await client.evaluate('document.querySelector("[data-landing-scroll]").scrollTop+=innerHeight');await wait(200);assert((await bookState()).sticky.top<finalTop-20,'Pinned section releases naturally');const off=(await bookState()).metrics.frames;await wait(600);assert.equal((await bookState()).metrics.frames,off,'Offscreen scene does not keep rendering');
   const layouts=[];for(const [width,height]of [[360,800],[390,844],[430,932],[768,1024],[1024,800],[1440,1000],[1920,1080],[320,568],[844,390]]){
@@ -141,7 +171,7 @@ async function cdp(url){
   console.log('Checking legal routes and final no-JS state');
   for(const [route,label] of [['/legal/privacy','Privacidade'],['/legal/terms','Termos de Uso'],['/legal/copyright','Direitos Autorais e Conteúdo']]){await navigate(route);await until('location.pathname==='+JSON.stringify(route)+'&&document.body.innerText.includes('+JSON.stringify(label)+')','legal route '+route);}
   await client.command('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await client.command('Emulation.setScriptExecutionDisabled',{value:true});await navigate('/');await until('!!document.querySelector("[data-book-cover]")','prerender static cover');assert.equal(await client.evaluate('document.querySelectorAll("canvas").length'),0);assert.doesNotMatch(await text(),/You need to enable JavaScript/);assert(await client.evaluate('getComputedStyle(document.querySelector(".al-book-sticky")).position!=="sticky"'));assert(await client.evaluate('getComputedStyle(document.querySelector(".al-book-outline")).clipPath==="none"'));await shot('nojs-reduced-motion');await client.command('Emulation.setScriptExecutionDisabled',{value:false});
-  assert.deepEqual(client.errors,[],'No unhandled browser exceptions');fs.writeFileSync(path.join(shots,'results.json'),JSON.stringify({at:new Date().toISOString(),platform:'Chromium ANGLE/'+angle+'; geometry QA forces rendering; production budget tested separately; HTTP fixtures, no remote writes or physical mobile proof',gpuDriver,desktop,layouts,scrollCatchup,readingHolds,webglCompiled:true,reverse:true,hold:true,contextLost:true,initializationFailure:true,constrainedProfile:true,reducedMotion:true,noJavaScript:true,existingPublicFlows:true},null,2));console.log('PASS Chromium cinematic story: GPU rendering, five reading holds with real wheel and identical book pixels, clean page turns, scroll/hold/reverse, 108 viewport/pose samples, resource disposal, context failure, constrained profile, reduced motion/no-JS, menu/FAQ/keyboard/Auth/catalog/legal-route regressions. Software-rendered measurements are not hardware GPU or physical phone proof.');
+  assert.deepEqual(client.errors,[],'No unhandled browser exceptions');fs.writeFileSync(path.join(shots,'results.json'),JSON.stringify({at:new Date().toISOString(),platform:'Chromium ANGLE/'+angle+'; geometry QA forces rendering; production budget tested separately; HTTP fixtures, no remote writes or physical mobile proof',gpuDriver,desktop,layouts,scrollCatchup,turnMotion,readingHolds,webglCompiled:true,reverse:true,hold:true,contextLost:true,initializationFailure:true,constrainedProfile:true,reducedMotion:true,noJavaScript:true,existingPublicFlows:true},null,2));console.log('PASS Chromium cinematic story: GPU rendering, five reading holds with real wheel and identical book pixels, clean page turns, scroll/hold/reverse, 108 viewport/pose samples, resource disposal, context failure, constrained profile, reduced motion/no-JS, menu/FAQ/keyboard/Auth/catalog/legal-route regressions. Software-rendered measurements are not hardware GPU or physical phone proof.');
  }catch(error){
   if(client)try{const image=await client.command('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(shots,'book-failure.png'),Buffer.from(image.data,'base64'));const state=await client.evaluate(`(()=>{const root=document.querySelector('[data-landing-scroll]'),story=document.querySelector('[data-book-story]'),scene=document.querySelector('[data-book-scene]'),sticky=document.querySelector('.al-book-sticky');const rect=node=>{if(!node)return null;const r=node.getBoundingClientRect();return{top:r.top,left:r.left,right:r.right,bottom:r.bottom,height:r.height,width:r.width};};return{path:location.pathname,viewport:{width:innerWidth,height:innerHeight},root:rect(root),scrollTop:root?.scrollTop,windowY:window.scrollY,motion:story?.dataset.motion,progress:scene?.dataset.bookProgress,chapter:scene?.dataset.bookChapter,story:rect(story),sticky:rect(sticky),scene:rect(scene),caption:document.querySelector('.al-book-caption h2')?.textContent};})()`);fs.writeFileSync(path.join(shots,'book-failure.json'),JSON.stringify(state,null,2));console.error('Browser failure state '+JSON.stringify(state)+'; screenshots .expo/cinematic-validation/book-failure.png');}catch{}
   throw error;
