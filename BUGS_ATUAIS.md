@@ -688,3 +688,12 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - DESEMPENHO: números comparativos e limites registrados no PROJECT_CONTEXT.md; rodadas em SwiftShader e D3D11 com hardware local confirmado, sem garantia universal de60FPS. Outros GPUs/mobile físico pendentes.
 - Preview https://kindle-reader-odm52odxt-matheus-projects-70f48ed9.vercel.app, código82be6a46788b3bbb2d9a90aeccb4b9fd88f2b418; nenhuma produção/Auth/OAuth/conta/Supabase/Android alterada. Novo domínio de preview não recebe callbacks automaticamente. Bloqueios de beta/recovery/Drive/QA anteriores preservados.
 - GPU local Intel HD520/D3D11 confirmada:240/240 frames com Canvas ativo/sem fallback nos dois tamanhos. Falso positivo de cold gap corrigido; sondas não dependem da cadência da mão do visitante. Outros dispositivos/mobile físico pendentes.
+
+
+## Pesquisa de usuários — concentração (21/10/2026)
+
+- Lacuna de UX tratada: ajustes agora expõem Concentração e Ler em foco, reutilizando a ocultação de controles existente. Nova preferência local persistida oculta porcentagem e contagem de páginas, inclusive da acessibilidade, sem remover o espaço do rodapé ou os controles de navegação.
+- Compatibilidade: configuração v1 antiga mantém aparência e padrão de contagens visíveis; nenhuma preferência de fonte/margem é redefinida. Mudança não grava posição. ReaderScreen controlado conserva documento/página 51 ao entrar/sair do foco e alterar a opção.
+- Validação: typecheck/export Web; 82/82 suítes críticas (antes 81); regressão específica de provider/footer; 16 pares de layouts Chromium com temas e texto ampliado. Capturas de componente sintético em .expo/research-cycle1. Não são prova de Android físico.
+- Pendências: Redmi ausente no ADB nesta tarefa; falta ensaio físico de foco e reabertura em EPUB/PDF Original/Leitura Livre. Agrupamento completo de ajustes, organização coletiva, painel privado de metas e seleção/revisão de deck de grifos seguem como próximos ciclos. Geração local determinística tem implementação, mas não foi encontrada integração consumidora em src; não anunciar IA funcional.
+- Nenhum problema remoto de Auth/Drive/Sync previamente aberto foi declarado resolvido. Sem APK, migrations, deploy ou dados pessoais alterados. Matriz detalhada e limites no PROJECT_CONTEXT.md.
