@@ -19,6 +19,17 @@ export function bookScrollProgress(scrollTop: number, start: number, height: num
   if (![scrollTop, start, height, stickyHeight].every(Number.isFinite) || height <= stickyHeight) return 0;
   return clamp((scrollTop - start) / (height - stickyHeight));
 }
+/** Brief, frame-rate independent catch-up for discrete wheel events. It never
+ * overshoots and converges to the exact scroll pose, so an idle story can sleep. */
+export function followBookScroll(current: number, target: number, elapsedMs: number): number {
+  const end = clamp(target);
+  if (!Number.isFinite(current)) return end;
+  const start = clamp(current), gap = end - start;
+  if (Math.abs(gap) <= .00015) return end;
+  const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, Math.min(64, elapsedMs)) : 0;
+  const next = start + gap * (1 - Math.exp(-elapsed / 48));
+  return Math.abs(end - next) <= .00015 ? end : next;
+}
 /** 0 book, 1 open paper, 2 library, 3 Reader, 4 study, 5 community, 6 dispersed paper. */
 const particleKeys = [[0, 6], [.075, 0], [.19, 1], [.36, 2], [.52, 3], [.69, 4], [.85, 5], [1, 0]] as const;
 export function resolveBookPose(value: number) {
@@ -38,7 +49,9 @@ export function resolveBookPose(value: number) {
     cameraZ: -5 + 5 * open, cameraDistance: 7 - .75 * open + .6 * community,
     bookScale: 1 - .29 * library - .26 * study - .48 * community,
     library, reader, study, community, closing,
-    from, to, morph, pulse, particleOpacity: .14 + pulse * .74,
+    // Particles carry the transition, then recede so printed text and cards
+    // remain legible instead of competing with a second layer of dotted text.
+    from, to, morph, pulse, particleOpacity: mix(.10, .018, Math.max(library, reader, study)) + pulse * .74,
     atmosphere: community * .94,
     captionOpacity: 1 - Math.pow(pulse, 4),
     leaves: [.27, .43, .59, .76].map((start, index) => {

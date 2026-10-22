@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const load=require('./community-test-loader.cjs')();
-const {resolveBookPose,bookScrollProgress,bookStops,chooseBookQuality,assessBookPerformance,initialBookPerformance}=load('src/marketing/bookMotion.ts');
+const {resolveBookPose,bookScrollProgress,bookStops,followBookScroll,chooseBookQuality,assessBookPerformance,initialBookPerformance}=load('src/marketing/bookMotion.ts');
 const {createParticleTargets,communityNodes,communityEdges}=load('src/marketing/cinematic/particleTargets.ts');
 const finite=x=>typeof x==='number'?Number.isFinite(x):Array.isArray(x)?x.every(finite):x&&typeof x==='object'?Object.values(x).every(finite):true;
 const closed=resolveBookPose(0),end=resolveBookPose(1);
@@ -17,10 +17,21 @@ assert(resolveBookPose(.12).open>0&&resolveBookPose(.12).open<1,'Partial opening
 assert(resolveBookPose(.94).open>0&&resolveBookPose(.94).open<1,'Physical closing in final reconstruction');
 assert(closed.leaves.every(leaf=>leaf.z>.085&&leaf.z<.1475),'Printed leaves stay above the paper block and below the closed cover');
 for(const [p,key]of [[.36,'library'],[.52,'reader'],[.69,'study'],[.85,'community']])assert(resolveBookPose(p)[key]>.99,'A complete readable scene: '+key);
+assert(resolveBookPose(.52).particleOpacity<.025,'Particles recede over printed Reader text');
+assert(resolveBookPose(.60).particleOpacity>.3,'Transition keeps its visual particle structure');
 assert.notEqual(resolveBookPose(.12).cameraY,resolveBookPose(.7).cameraY);
 for(const value of [NaN,Infinity,-2])assert.deepEqual(resolveBookPose(value),closed);assert.deepEqual(resolveBookPose(2),end);
 assert.equal(bookScrollProgress(100,100,1200,200),0);assert.equal(bookScrollProgress(600,100,1200,200),.5);assert.equal(bookScrollProgress(1100,100,1200,200),1);
 for(const values of [[0,0,0,0],[10,0,100,200],[NaN,0,1000,200],[0,NaN,1000,200],[0,0,Infinity,200]])assert.equal(bookScrollProgress(...values),0);
+// A discrete wheel sample is spread across frames without an autonomous clock,
+// overshoot or asymptotic work forever. Refresh rate must not alter its timing.
+const after=(ms,step)=>{let p=0;for(let t=0;t<ms;t+=step)p=followBookScroll(p,1,Math.min(step,ms-t));return p;};
+assert(followBookScroll(0,1,16)>0&&followBookScroll(0,1,16)<1);
+assert(Math.abs(after(120,1000/60)-after(120,1000/120))<1e-8);
+assert.equal(after(480,1000/60),1,'Idle settles exactly and can stop scheduling');
+for(const [from,to]of [[.1,.9],[.9,.1],[.5,.5]]){let p=from;for(let i=0;i<40;i++){const next=followBookScroll(p,to,16.7);assert(next>=Math.min(p,to)&&next<=Math.max(p,to));p=next;}assert.equal(p,to);}
+assert.equal(followBookScroll(.5,.9,0),.5);assert.equal(followBookScroll(.5,.9,-10),.5);
+assert.equal(followBookScroll(NaN,.4,16),.4);assert(Number.isFinite(followBookScroll(.5,Infinity,NaN)));
 assert.equal(chooseBookQuality(1440).particles,4096);assert.equal(chooseBookQuality(390).particles,1600);assert.equal(chooseBookQuality(1440,2).particles,900);assert.equal(chooseBookQuality(1440,8,8,true).shadows,false);
 for(const [gap,expected]of [[16,false],[45,false],[55,true],[120,true],[400,true]]){
  let state={...initialBookPerformance};

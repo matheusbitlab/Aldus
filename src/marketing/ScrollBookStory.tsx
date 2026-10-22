@@ -1,7 +1,7 @@
 import { type PropsWithChildren, useCallback, useEffect, useRef, useState } from 'react';
 import type { CatalogPlan } from '@/src/domain/saas/accountPlan';
 import type { BookSceneHandle } from './cinematic/BookScene.web';
-import { bookChapters, bookScrollProgress, bookStops, resolveBookPose, smooth } from './bookMotion';
+import { bookChapters, bookScrollProgress, bookStops, followBookScroll, resolveBookPose, smooth } from './bookMotion';
 import { bookCss } from './bookStyles';
 
 type StoryProps = PropsWithChildren<{ plans: CatalogPlan[]; cta?: string; ctaText?: string }>;
@@ -21,28 +21,61 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     let renderer: BookSceneHandle | undefined, disposed = false, generation = 0, loading = false, failed = false;
     let frame = 0, visible = true, dirtyGeometry = true, enhanced = false;
-    let start = 0, distance = 1, stickyHeight = 1, previousAtmosphere = -1, previousIntro = -1, began = 0;
+    let start = 0, distance = 1, stickyHeight = 1, previousAtmosphere = -1, previousIntro = -1, previousCaption = -1, began = 0;
+    let previousWidth = 0, previousHeight = 0, previousDpr = 0, previousHeader = -1, previousViewport = -1;
+    let progress: number | null = null, lastFrameAt = 0, snap = true, pendingChapter: number | null = null;
+    let previousTarget = -1, previousSettled: boolean | undefined;
+    let cachedPose: ReturnType<typeof resolveBookPose> | undefined;
     const chapterChange = (next: number) => {
       if (next !== chapterRef.current) { chapterRef.current = next; element.dataset.chapter = String(next); setChapter(next); }
     };
     const measure = () => {
+      // Read the layout together. A changed CSS viewport gets its own frame to
+      // settle before reading the resulting stage dimensions.
       const headerHeight = scroller.querySelector('.al-header')?.getBoundingClientRect().height ?? 0;
-      element.style.setProperty('--book-header-height', `${headerHeight}px`);
-      element.style.setProperty('--book-viewport-height', `${scroller.clientHeight}px`);
-      start = Math.max(0, element.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - headerHeight);
-      stickyHeight = pinned.offsetHeight; distance = Math.max(1, element.offsetHeight - stickyHeight);
-      renderer?.resize(visual.clientWidth, visual.clientHeight); dirtyGeometry = false;
+      const viewport = scroller.clientHeight, trackTop = element.getBoundingClientRect().top;
+      const scrollTop = scroller.scrollTop, rootTop = scroller.getBoundingClientRect().top;
+      const measuredSticky = pinned.offsetHeight, trackHeight = element.offsetHeight;
+      const width = visual.clientWidth, height = visual.clientHeight;
+      if (headerHeight !== previousHeader || viewport !== previousViewport) {
+        element.style.setProperty('--book-header-height', `${headerHeight}px`);
+        element.style.setProperty('--book-viewport-height', `${viewport}px`);
+        previousHeader = headerHeight; previousViewport = viewport;
+        return false;
+      }
+      start = Math.max(0, trackTop - rootTop + scrollTop - headerHeight);
+      stickyHeight = measuredSticky; distance = Math.max(1, trackHeight - stickyHeight);
+      const dpr = window.devicePixelRatio || 1;
+      if (width !== previousWidth || height !== previousHeight || dpr !== previousDpr) {
+        renderer?.resize(width, height); previousWidth = width; previousHeight = height; previousDpr = dpr;
+      }
+      dirtyGeometry = false;
+      return true;
     };
-    const update = () => {
+    const update = (at: number) => {
       frame = 0;
       if (disposed || !renderer || !enhanced || !visible || document.hidden) return;
-      if (dirtyGeometry) measure();
-      const pose = resolveBookPose(bookScrollProgress(scroller.scrollTop, start, distance + stickyHeight, stickyHeight));
-      visual.dataset.bookProgress = pose.progress.toFixed(5); visual.dataset.bookChapter = String(pose.chapter);
+      if (dirtyGeometry && !measure()) { schedule(); return; }
+      if (pendingChapter !== null) {
+        scroller.scrollTo({ top: start + bookStops[pendingChapter] * distance, behavior: 'auto' });
+        pendingChapter = null;
+      }
+      const target = bookScrollProgress(scroller.scrollTop, start, distance + stickyHeight, stickyHeight);
+      const gap = at - lastFrameAt;
+      progress = snap || progress === null ? target : followBookScroll(progress, target, gap > 0 && gap < 100 ? gap : 1000 / 60);
+      snap = false; lastFrameAt = at;
+      const settled = progress === target;
+      if (target !== previousTarget) { visual.dataset.bookTarget = target.toFixed(5); previousTarget = target; }
+      if (settled !== previousSettled) { visual.dataset.bookSettled = String(settled); previousSettled = settled; }
+      const changed = !cachedPose || cachedPose.progress !== progress;
+      const pose = changed ? resolveBookPose(progress) : cachedPose!;
+      cachedPose = pose;
+      if (changed) { visual.dataset.bookProgress = pose.progress.toFixed(5); visual.dataset.bookChapter = String(pose.chapter); }
       const intro = 1 - smooth(Math.min(1, pose.progress / .125));
       if (intro !== previousIntro) { element.style.setProperty('--story-intro', String(intro)); previousIntro = intro; }
       if (pose.atmosphere !== previousAtmosphere) { element.style.setProperty('--story-dark', String(pose.atmosphere)); previousAtmosphere = pose.atmosphere; }
-      element.style.setProperty('--story-caption', String(pose.captionOpacity * smooth(Math.max(0, Math.min(1, (pose.progress - .075) / .065)))));
+      const caption = pose.captionOpacity * smooth(Math.max(0, Math.min(1, (pose.progress - .075) / .065)));
+      if (caption !== previousCaption) { element.style.setProperty('--story-caption', String(caption)); previousCaption = caption; }
       chapterChange(pose.chapter);
       try {
         renderer.render(pose);
@@ -51,7 +84,7 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
           visual.dataset.renderState = 'ready'; visual.dataset.sceneInitMs = (performance.now() - began).toFixed(1);
         }
         // Finite quality probes redraw the same pose; scroll remains its only clock.
-        if (renderer.needsBudgetFrame()) schedule();
+        if (progress !== target || renderer.needsBudgetFrame()) schedule();
       } catch { fallback('render-failed'); }
     };
     const schedule = () => { if (!disposed && enhanced && visible && !document.hidden && !frame) frame = requestAnimationFrame(update); };
@@ -60,13 +93,16 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       if (reason !== 'reduced-motion') failed = true;
       if (frame) cancelAnimationFrame(frame); frame = 0;
       renderer?.dispose(); renderer = undefined;
+      cachedPose = undefined; progress = null; lastFrameAt = 0; snap = true;
+      previousWidth = 0; previousHeight = 0; pendingChapter = null;
       element.dataset.enhanced = 'false'; element.dataset.motion = media.matches ? 'reduce' : 'static';
       visual.dataset.renderState = reason;
       element.style.setProperty('--story-dark', '0'); element.style.setProperty('--story-intro', '1');
+      previousAtmosphere = -1; previousIntro = -1; previousCaption = -1;
       chapterChange(0); setMode(media.matches ? 'reduced' : reason === 'performance-limited' || reason === 'constrained-device' ? 'limited' : 'unavailable');
     };
     const begin = async () => {
-      if (disposed || failed || loading || renderer || media.matches || !visible) return;
+      if (disposed || failed || loading || renderer || media.matches || !visible || document.hidden) return;
       const capabilities = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
       if (capabilities.connection?.saveData || ((capabilities.deviceMemory ?? 8) < 4 && navigator.hardwareConcurrency <= 2)) {
         fallback('constrained-device'); return;
@@ -74,7 +110,7 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       const revision = ++generation; began = performance.now(); loading = true; setMode('loading');
       try {
         const { mountBookScene } = await import('./cinematic/BookScene.web');
-        if (disposed || revision !== generation || media.matches) return;
+        if (disposed || revision !== generation || media.matches || !visible || document.hidden) return;
         const inspection = !!(window as Window & { __ALDUS_CINEMATIC_QA__?: boolean }).__ALDUS_CINEMATIC_QA__;
         renderer = mountBookScene(visual, fallback, inspection);
         enhanced = true; element.dataset.enhanced = 'true'; element.dataset.motion = 'scroll';
@@ -83,10 +119,10 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
       } catch { if (!disposed && revision === generation) fallback('webgl-unavailable'); }
       finally { if (revision === generation) loading = false; }
     };
-    const resize = () => { dirtyGeometry = true; schedule(); };
+    const resize = () => { dirtyGeometry = true; snap = true; schedule(); };
     const visibility = () => {
-      if (document.hidden && frame) { cancelAnimationFrame(frame); frame = 0; }
-      else schedule();
+      if (document.hidden) { if (frame) cancelAnimationFrame(frame); frame = 0; return; }
+      dirtyGeometry = true; snap = true; void begin(); schedule();
     };
     const preference = () => {
       if (media.matches) fallback('reduced-motion');
@@ -95,15 +131,14 @@ export function ScrollBookStory({ children, cta = '/auth/signup', ctaText = 'Cri
     navigation.current = index => {
       const next = Math.max(0, Math.min(bookStops.length - 1, index));
       if (!enhanced || media.matches) { chapterChange(next); return; }
-      if (dirtyGeometry) measure();
-      scroller.scrollTo({ top: start + bookStops[next] * distance, behavior: 'auto' }); schedule();
+      pendingChapter = next; snap = true; schedule();
     };
     const intersection = typeof IntersectionObserver === 'undefined' ? undefined : new IntersectionObserver(entries => {
       visible = entries[0]?.isIntersecting ?? false;
-      if (visible) { void begin(); schedule(); }
+      if (visible) { dirtyGeometry = true; snap = true; void begin(); schedule(); }
       else if (frame) { cancelAnimationFrame(frame); frame = 0; }
     }, { root: scroller, threshold: 0 });
-    intersection?.observe(element);
+    intersection?.observe(pinned);
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(resize);
     observer?.observe(scroller); observer?.observe(pinned); observer?.observe(visual);
     scroller.addEventListener('scroll', schedule, { passive: true });

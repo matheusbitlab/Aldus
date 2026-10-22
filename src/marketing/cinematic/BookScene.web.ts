@@ -1,7 +1,7 @@
 // This module is dynamically imported by the public Web story only.
 import {
   ACESFilmicToneMapping, BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, DirectionalLight,
-  CylinderGeometry, DoubleSide, Group, HemisphereLight, LineBasicMaterial, LineSegments, Mesh,
+  CylinderGeometry, DoubleSide, Group, HemisphereLight, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh,
   MeshStandardMaterial, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Points,
   Scene, ShaderMaterial, ShadowMaterial, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer,
   type Material, type Texture,
@@ -32,8 +32,10 @@ const paperFragment = `
   uniform sampler2D uMap; uniform float uDissolve; varying vec2 vUv; varying float vLight;
   float grain(vec2 p){return fract(sin(dot(floor(p*145.),vec2(127.1,311.7)))*43758.5453);}
   void main(){
-    float edge=vUv.x+.055*sin(vUv.y*17.)+.04*grain(vUv);
-    if(edge<uDissolve*1.3-.07)discard;
+    if(uDissolve>0.){
+      float edge=vUv.x+.055*sin(vUv.y*17.)+.04*grain(vUv);
+      if(edge<uDissolve*1.3-.07)discard;
+    }
     vec2 uv=gl_FrontFacing?vUv:vec2(1.-vUv.x,vUv.y);
     vec3 color=gl_FrontFacing?texture2D(uMap,uv).rgb:vec3(.94,.90,.82);
     float gutter=.83+.17*smoothstep(0.,.12,vUv.x);
@@ -76,10 +78,14 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
   renderer.toneMapping = ACESFilmicToneMapping; renderer.toneMappingExposure = 1;
   renderer.debug.onShaderError = () => { throw new Error('Book shader initialization failed'); };
   renderer.shadowMap.enabled = quality.shadows; renderer.shadowMap.type = PCFSoftShadowMap;
+  // Scroll poses are deterministic. Budget probes of the same pose can reuse
+  // the shadow map instead of redrawing every caster into it again.
+  renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   const canvas = renderer.domElement; canvas.setAttribute('aria-hidden', 'true'); canvas.setAttribute('data-cinematic-canvas', '');
   canvas.style.cssText = 'width:100%;height:100%;display:block;pointer-events:none';
   host.appendChild(canvas);
   const geometries = new Set<BufferGeometry>(), materials = new Set<Material>(), textures = new Set<Texture>();
+  const instances = new Set<InstancedMesh>();
   let lostHandler: ((event: Event) => void) | undefined;
   try {
   const scene = new Scene(), world = new Group(), book = new Group(), coverHinge = new Group();
@@ -95,8 +101,12 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
   const keepGeometry = <T extends BufferGeometry>(g: T) => { geometries.add(g); return g; };
   const keepMaterial = <T extends Material>(m: T) => { materials.add(m); return m; };
   const solid = (color: string, map?: Texture) => keepMaterial(new MeshStandardMaterial({ color, map, roughness: .9, metalness: .02 }));
+  const boxGeometries = new Map<string, BoxGeometry>();
   const cube = (parent: Group, w: number, h: number, d: number, material: Material | Material[], x = 0, y = 0, z = 0) => {
-    const mesh = new Mesh(keepGeometry(new BoxGeometry(w, h, d)), material);
+    const key = `${w}:${h}:${d}`;
+    let geometry = boxGeometries.get(key);
+    if (!geometry) { geometry = keepGeometry(new BoxGeometry(w, h, d)); boxGeometries.set(key, geometry); }
+    const mesh = new Mesh(geometry, material);
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = false; parent.add(mesh); return mesh;
   };
   const makeTexture = (kind: string, title = '', background = '#f4ecda') => {
@@ -140,11 +150,14 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
   const forest = solid('#173e30'), paper = solid('#e8ddc5'), inside = solid('#ffffff', makeTexture('inside')), front = solid('#ffffff', coverTexture);
   cube(book, 1.94, 2.76, .055, forest, .95, 0, -.18);
   cube(book, 1.85, 2.64, .24, paper, .96, 0, -.035);
-  // Fine, solid fore-edge lines; reused box geometry/material, no page-stack textures.
+  // Fine, solid fore-edge lines use one draw call and one shared geometry.
   const edgeGeometry = keepGeometry(new BoxGeometry(.008, 2.60, .0015)), edgeMaterial = solid('#c2b497');
   const bookMaterials = [forest, paper, inside, front, edgeMaterial];
   bookMaterials.forEach(material => { material.transparent = true; });
-  for (let i = 0; i < 14; i++) { const line = new Mesh(edgeGeometry, edgeMaterial); line.position.set(1.89, 0, -.14 + i * .017); book.add(line); }
+  const foreEdges = new InstancedMesh(edgeGeometry, edgeMaterial, 14), instanceTransform = new Matrix4();
+  instances.add(foreEdges);
+  for (let i = 0; i < 14; i++) { instanceTransform.makeTranslation(1.89, 0, -.14 + i * .017); foreEdges.setMatrixAt(i, instanceTransform); }
+  foreEdges.instanceMatrix.needsUpdate = true; book.add(foreEdges);
   cube(book, .07, 2.76, .34, forest, -.015, 0, -.02);
   cube(coverHinge, 1.94, 2.76, .055, [forest, forest, forest, forest, front, inside], .95);
   coverHinge.position.z = .175;
@@ -209,23 +222,38 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
   let disposed = false, frames = 0, width = 1, height = 1, downgraded = false;
   let performanceState = { ...initialBookPerformance };
   let qualitySamples = 0, budgetChapter = -1;
+  let lastShadowProgress = NaN, shadowUpdates = 0;
   let dpr = Math.min(devicePixelRatio || 1, quality.dpr), current = resolveBookPose(0), budget: number = quality.particles;
   let effectiveQuality: string = quality.name;
+  let resized = false;
   const metricsHost = host as MetricsHost;
   const projected = new Vector3(), bounds: Record<string, number> = {};
   const contextLost = (event: Event) => { event.preventDefault(); if (!disposed) onFailure('context-lost'); };
   lostHandler = contextLost;
   canvas.addEventListener('webglcontextlost', contextLost, false);
   const resize = (w: number, h: number) => {
-    if (disposed || w < 1 || h < 1) return;
+    if (disposed || !Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1) return;
+    const next = chooseBookQuality(w, nav.deviceMemory ?? 8, nav.hardwareConcurrency, nav.connection?.saveData);
+    const nextBudget = Math.min(quality.particles, downgraded ? 900 : next.particles);
+    const nextQuality = downgraded ? 'adaptive-low' : next.name;
+    const nextDpr = Math.min(devicePixelRatio || 1, downgraded ? 1 : next.dpr);
+    const nextShadows = !downgraded && next.shadows && quality.shadows;
+    if (resized && w === width && h === height && nextDpr === dpr && nextBudget === budget &&
+      nextShadows === renderer.shadowMap.enabled && nextQuality === effectiveQuality) return;
+    const bufferChanged = !resized || w !== width || h !== height || nextDpr !== dpr;
     if (w !== width || h !== height) { qualitySamples = 0; budgetChapter = -1; }
     width = w; height = h;
-    const next = chooseBookQuality(w, nav.deviceMemory ?? 8, nav.hardwareConcurrency, nav.connection?.saveData);
-    budget = Math.min(quality.particles, downgraded ? 900 : next.particles); geometry.setDrawRange(0, budget);
-    effectiveQuality = downgraded ? 'adaptive-low' : next.name;
-    dpr = Math.min(devicePixelRatio || 1, downgraded ? 1 : next.dpr);
-    renderer.shadowMap.enabled = !downgraded && next.shadows && quality.shadows;
-    renderer.setPixelRatio(dpr); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    budget = nextBudget; geometry.setDrawRange(0, budget);
+    effectiveQuality = nextQuality; dpr = nextDpr;
+    renderer.shadowMap.enabled = nextShadows;
+    renderer.shadowMap.needsUpdate = true;
+    // Without shadow maps this large transparent plane would only shade alpha=0.
+    // The inexpensive contact shadow remains visible in every quality tier.
+    ground.visible = renderer.shadowMap.enabled;
+    // Apply dimensions and DPR together; separate calls allocate twice when both
+    // change. A shadow/particle-tier change alone does not resize the buffer.
+    if (bufferChanged) { renderer.setDrawingBufferSize(w, h, dpr); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+    resized = true;
   };
   const render = (pose: BookPose) => {
     if (disposed) return;
@@ -241,7 +269,7 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
         performanceState = assessBookPerformance(performanceState, qualitySamples * .005, performance.now()); qualitySamples++;
         if (performanceState.fallback) { onFailure('performance-limited'); return; }
         if (performanceState.reduced && !downgraded) {
-          downgraded = true; dpr = 1; renderer.shadowMap.enabled = false; geometry.setDrawRange(0, Math.min(900, quality.particles)); resize(width, height);
+          downgraded = true; resize(width, height);
         }
       }
     }
@@ -281,6 +309,8 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
     camera.position.set(Math.sin(pose.progress * Math.PI * 1.4) * .3, .45, distance);
     camera.lookAt(0, .02, 0);
     ground.position.x = contact.position.x = world.position.x;
+    if (pose.progress !== lastShadowProgress) { renderer.shadowMap.needsUpdate = true; lastShadowProgress = pose.progress; }
+    if (renderer.shadowMap.enabled && renderer.shadowMap.needsUpdate) shadowUpdates++;
     renderer.render(scene, camera); frames++;
     // Accurate projected vertices are for local visual QA, not a production frame cost.
     if (inspectGeometry) {
@@ -289,35 +319,42 @@ export function mountBookScene(host: HTMLElement, onFailure: (reason: string) =>
         if (!(object instanceof Mesh) || !object.visible) return;
         const positions = object.geometry.getAttribute('position'), pageIndex = object.userData.pageIndex;
         const leaf = typeof pageIndex === 'number' ? pose.leaves[pageIndex] : undefined;
-        for (let i = 0; i < positions.count; i++) {
-          projected.set(positions.getX(i), positions.getY(i), positions.getZ(i));
-          if (leaf) {
-            const turn = radians(leaf.angle), theta = turn + leaf.curl * projected.x / 1.9;
-            if (Math.abs(leaf.curl) > .0001) { const radius = 1.9 / leaf.curl; projected.x = radius * (Math.sin(theta) - Math.sin(turn)); projected.z += radius * (Math.cos(theta) - Math.cos(turn)); }
-            else { const x = projected.x; projected.x = x * Math.cos(turn); projected.z -= x * Math.sin(turn); }
+        const instanceCount = object instanceof InstancedMesh ? object.count : 1;
+        for (let instance = 0; instance < instanceCount; instance++) {
+          if (object instanceof InstancedMesh) object.getMatrixAt(instance, instanceTransform);
+          for (let i = 0; i < positions.count; i++) {
+            projected.set(positions.getX(i), positions.getY(i), positions.getZ(i));
+            if (leaf) {
+              const turn = radians(leaf.angle), theta = turn + leaf.curl * projected.x / 1.9;
+              if (Math.abs(leaf.curl) > .0001) { const radius = 1.9 / leaf.curl; projected.x = radius * (Math.sin(theta) - Math.sin(turn)); projected.z += radius * (Math.cos(theta) - Math.cos(turn)); }
+              else { const x = projected.x; projected.x = x * Math.cos(turn); projected.z -= x * Math.sin(turn); }
+            }
+            if (object instanceof InstancedMesh) projected.applyMatrix4(instanceTransform);
+            projected.applyMatrix4(object.matrixWorld).project(camera);
+            const x = (projected.x + 1) * width / 2, y = topInset + (1 - projected.y) * activeHeight / 2;
+            left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
           }
-          projected.applyMatrix4(object.matrixWorld).project(camera);
-          const x = (projected.x + 1) * width / 2, y = topInset + (1 - projected.y) * activeHeight / 2;
-          left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
         }
       });
       bounds.left = left; bounds.right = right; bounds.top = top; bounds.bottom = bottom;
     }
     metricsHost.aldusBookMetrics = { frames, particles: budget, dpr, drawCalls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries,
-      quality: effectiveQuality, progress: current.progress, disposed: false, ...bounds,
+      quality: effectiveQuality, progress: current.progress, disposed: false, shadowUpdates, ...bounds,
       coverAngle: pose.coverAngle, leafAngle0: pose.leaves[0].angle, leafAngle1: pose.leaves[1].angle,
       particleFrom: pose.from, particleTo: pose.to, particleMorph: pose.morph, cameraDistance: distance, particleGeometryId: geometry.id };
   };
   resize(host.clientWidth, host.clientHeight);
   return { render, resize, needsBudgetFrame: () => !disposed && !inspectGeometry && qualitySamples < 24, dispose() {
     if (disposed) return; disposed = true; canvas.removeEventListener('webglcontextlost', contextLost);
+    instances.forEach(mesh => mesh.dispose());
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose());
     key.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); canvas.remove(); scene.clear();
     metricsHost.aldusBookMetrics = { frames, disposed: true, quality: effectiveQuality, particles: budget, geometriesDisposed: geometries.size, materialsDisposed: materials.size, texturesDisposed: textures.size };
   } };
   } catch (failure) {
     if (lostHandler) canvas.removeEventListener('webglcontextlost', lostHandler);
+    instances.forEach(mesh => mesh.dispose());
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose());
     renderer.dispose(); renderer.forceContextLoss(); canvas.remove(); throw failure;
   }
