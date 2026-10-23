@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { PanResponder, Pressable, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import { PanResponder, Platform, Pressable, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 
 interface Props {
   accessibilityLabel: string;
@@ -26,6 +26,7 @@ export function ReaderSettingsSlider(props: Props) {
   const valueAtStart = useRef(props.value);
   const quantize = (value: number) => {
     const p = latest.current;
+    if (!Number.isFinite(value)) return p.value;
     return Math.max(p.minimumValue, Math.min(p.maximumValue, p.minimumValue + Math.round((value - p.minimumValue) / p.step) * p.step));
   };
   const responder = useMemo(() => PanResponder.create({
@@ -49,9 +50,18 @@ export function ReaderSettingsSlider(props: Props) {
         accessibilityRole="adjustable"
         accessibilityLabel={props.accessibilityLabel}
         accessibilityValue={{ min: p.minimumValue, max: p.maximumValue, now: shown }}
+        aria-valuemin={p.minimumValue}
+        aria-valuemax={p.maximumValue}
+        aria-valuenow={shown}
+        {...(Platform.OS === "web" ? { onKeyDown: (event: { key: string; preventDefault(): void; stopPropagation(): void }) => {
+          const direction = ["ArrowRight", "ArrowUp"].includes(event.key) ? 1 : ["ArrowLeft", "ArrowDown"].includes(event.key) ? -1 : 0;
+          if (!direction && event.key !== "Home" && event.key !== "End") return;
+          event.preventDefault(); event.stopPropagation();
+          p.onValueChange(event.key === "Home" ? p.minimumValue : event.key === "End" ? p.maximumValue : quantize(p.value + direction * p.step));
+        } } : {})}
         accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
         onAccessibilityAction={event => p.onValueChange(quantize(p.value + (event.nativeEvent.actionName === "increment" ? p.step : -p.step)))}
-        onPress={event => p.onValueChange(quantize(p.minimumValue + Math.max(0, event.nativeEvent.locationX - 12) / Math.max(1, width.current - 24) * (p.maximumValue - p.minimumValue)))}
+        onPress={event => { if (Number.isFinite(event.nativeEvent.locationX)) p.onValueChange(quantize(p.minimumValue + Math.max(0, event.nativeEvent.locationX - 12) / Math.max(1, width.current - 24) * (p.maximumValue - p.minimumValue))); }}
         style={styles.touchArea}
       >
         <View pointerEvents="none" style={[styles.track, { backgroundColor: props.maximumTrackTintColor }]}>

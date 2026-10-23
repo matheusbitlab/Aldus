@@ -90,7 +90,7 @@ export function ReaderSettingsPanel({
               <Text accessibilityRole="header" style={[styles.title, { color: palette.text }]}>{panelMode === 'contents' ? 'Sumário' : panelMode === 'search' ? 'Buscar no livro' : 'Ajustes de leitura'}</Text>
               <Pressable accessibilityRole="button" accessibilityLabel="Fechar ajustes de leitura" onPress={onClose} style={styles.closeButton}><Text style={{color: palette.text, fontSize: 24}}>×</Text></Pressable>
             </View>
-            {panelMode === 'appearance' ? <View style={styles.categories}>{categories.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{selected: category === item.id}} onPress={() => {setCategory(item.id); scroll.current?.scrollTo({y: 0, animated: false});}} style={[styles.category, {borderColor: category === item.id ? palette.accent : palette.separator, backgroundColor: category === item.id ? palette.accent : 'transparent'}]}><Text style={{color: category === item.id ? '#fff' : palette.text, fontSize: 13, textAlign: 'center'}}>{item.label}</Text></Pressable>)}</View> : null}
+            {panelMode === 'appearance' ? <View style={styles.categories}>{categories.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{selected: category === item.id}} aria-pressed={category === item.id} onPress={() => {setCategory(item.id); scroll.current?.scrollTo({y: 0, animated: false});}} style={[styles.category, {borderColor: category === item.id ? palette.accent : palette.separator, backgroundColor: category === item.id ? palette.accent : 'transparent'}]}><Text style={{color: category === item.id ? '#fff' : palette.text, fontSize: 13, textAlign: 'center'}}>{item.label}</Text></Pressable>)}</View> : null}
           </View>
           <ScrollView ref={scroll} style={styles.panelScroll} contentContainerStyle={styles.panelContent} keyboardShouldPersistTaps="handled"
             onLayout={event => readerUiDiagnostic("LAYOUT", "preferencesViewport", undefined, event.nativeEvent.layout)}
@@ -267,12 +267,12 @@ export function ReaderSettingsPanel({
                 />
               </View>
               <Text style={[styles.label, { color: palette.secondaryText }]}>TEMA</Text>
-              <View style={styles.row}>{themes.map((theme) => <Pressable key={theme.value} onPress={() => pdfSettings ? updatePdfSettings({ theme: theme.value as PdfReaderTheme }) : settings.setTheme(theme.value)} style={[styles.option, { borderColor: (pdfSettings ? pdfSettings.theme : settings.theme) === theme.value ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{theme.label}</Text></Pressable>)}</View>
+              <View style={styles.row}>{themes.map((theme) => <Pressable key={theme.value} accessibilityRole="button" aria-pressed={(pdfSettings ? pdfSettings.theme : settings.theme) === theme.value} onPress={() => pdfSettings ? updatePdfSettings({ theme: theme.value as PdfReaderTheme }) : settings.setTheme(theme.value)} style={[styles.option, { borderColor: (pdfSettings ? pdfSettings.theme : settings.theme) === theme.value ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{theme.label}</Text></Pressable>)}</View>
 
               </View>
               <View style={{display: category === "text" ? "flex" : "none"}}>
               <Text style={[styles.label, { color: palette.secondaryText }]}>FONTE</Text>
-              <View style={styles.row}>{fonts.map((font) => <Pressable key={font.value} onPress={() => pdfSettings ? updatePdfSettings({ font: font.value }) : settings.setFont(font.value)} style={[styles.option, { borderColor: (pdfSettings ? pdfSettings.font : settings.font) === font.value ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{font.label}</Text></Pressable>)}</View>
+              <View style={styles.row}>{fonts.map((font) => <Pressable key={font.value} accessibilityRole="button" aria-pressed={(pdfSettings ? pdfSettings.font : settings.font) === font.value} onPress={() => pdfSettings ? updatePdfSettings({ font: font.value }) : settings.setFont(font.value)} style={[styles.option, { borderColor: (pdfSettings ? pdfSettings.font : settings.font) === font.value ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{font.label}</Text></Pressable>)}</View>
 
               <Text style={[styles.label, { color: palette.secondaryText }]}>TAMANHO DA FONTE</Text>
               <View style={styles.fontScaleRow}>
@@ -290,6 +290,7 @@ export function ReaderSettingsPanel({
                   onValueChange={(value) => pdfSettings ? updatePdfSettings({ fontSize: value }) : settings.setFontSize(value)}
                 />
                 <Text style={[styles.fontScaleLarge, { color: palette.text }]}>A</Text>
+                <Text accessibilityLabel="Valor do tamanho da fonte" style={[styles.value, { color: palette.text }]}>{pdfSettings ? pdfSettings.fontSize : settings.fontSize}</Text>
               </View>
 
               <Text style={[styles.label, { color: palette.secondaryText }]}>ESPAÇAMENTO ENTRE LINHAS</Text>
@@ -410,7 +411,7 @@ function SegmentedControl({
         return (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected }} aria-pressed={selected}
             key={option.value}
             onPress={() => onSelect(option.value)}
             style={[styles.segment, { backgroundColor: selected ? palette.accent : "transparent", borderColor: selected ? palette.accent : palette.separator }]}
