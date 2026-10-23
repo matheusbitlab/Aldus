@@ -10,6 +10,7 @@ function EpubPageViewerComponent({
   pageNumber,
   initialRestorePending = false,
   restoreTargetReady = false,
+  restoreTextAnchor,
   navigationRequest,
   fontSize,
   fontFamily,
@@ -153,8 +154,8 @@ function EpubPageViewerComponent({
   useEffect(() => {
     if (!initialRestorePending || !layoutReady || !restoreTargetReady) return;
     console.log(`[FORENSIC:EpubPageViewer:postMessage] t=${performance.timeOrigin + performance.now()} effect -> iframe goToPage(${pageNumber})`);
-    frame.current?.contentWindow?.postMessage({ type: "goToPage", pageNumber, origin: "RESTORE", operationId: 0 }, "*");
-  }, [initialRestorePending, layoutReady, pageNumber, restoreTargetReady]);
+    frame.current?.contentWindow?.postMessage({ type: "restoreReadingPosition", pageNumber, anchor: restoreTextAnchor }, "*");
+  }, [initialRestorePending, layoutReady, pageNumber, restoreTargetReady, restoreTextAnchor]);
 
   const wasRestorePending = useRef(initialRestorePending);
   useEffect(() => {

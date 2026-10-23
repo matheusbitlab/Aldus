@@ -260,6 +260,7 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
   // Page boundaries change with typography. Keep the reading intent across a
   // settings session instead of repeatedly capturing an earlier page start.
   var typographyLogicalAnchor = null;
+  var anchorRestoreStatus = null, restorePositionGeneration = 0;
   var activeOperationId = 0, activeOrigin = 'RESTORE';
   var navigationDiagnostics = ${process.env.EXPO_PUBLIC_READER_NAVIGATION_DIAGNOSTICS === "1" ? "true" : "false"};
   function navigationDiagnostic(origin, requestedPage) {
@@ -331,6 +332,9 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
       }
     });
 
+    if (initialLayoutReady && !restorationPending && !isAnimating && !typographyPending && !typographyLogicalAnchor) {
+      try { typographyLogicalAnchor = studyVisibleAnchor(); } catch (error) { /* Image-only page: numeric position remains available. */ }
+    }
     var state = {
       type: "page",
       pageNumber: currentPage,
@@ -342,6 +346,8 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
       chapterIndex: currentChapterIndex,
       chapterTitle: currentChapterTitle,
       layoutReady: initialLayoutReady,
+      readingAnchor: typographyLogicalAnchor,
+      anchorRestoreStatus: anchorRestoreStatus,
       chapterLocations: chapterLocations
     };
 
@@ -387,8 +393,12 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     });
   }
 
-  window.goToPage = function(page, operationId, origin) {
-    if (origin !== 'SETTINGS_LAYOUT' && origin !== 'LAYOUT_RECALC') typographyLogicalAnchor = null;
+  window.goToPage = function(page, operationId, origin, restoredAnchor) {
+    if (origin !== 'SETTINGS_LAYOUT' && origin !== 'LAYOUT_RECALC') {
+      if (origin !== 'RESTORE') ++restorePositionGeneration;
+      typographyLogicalAnchor = origin === 'RESTORE' ? restoredAnchor || null : null;
+      if (origin !== 'RESTORE') anchorRestoreStatus = null;
+    }
     if (typographyPending) typographyAnchor = null; // An explicit navigation supersedes the old anchor.
     totalPages = calculateTotalPages();
     var requestedPage = Math.max(1, Math.min(totalPages, page));
@@ -442,6 +452,8 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
   window.navigatePage = function(direction, operationId, origin) {
     if (direction !== -1 && direction !== 1) return;
     typographyLogicalAnchor = null;
+    anchorRestoreStatus = null;
+    ++restorePositionGeneration;
     if (typographyPending) typographyAnchor = null;
     if (isAnimating) {
       deferredPage = { page: Math.max(1, Math.min(totalPages, targetPage + direction)), operationId: operationId, origin: origin };
@@ -588,6 +600,32 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     });
   };
 
+  window.restoreReadingPosition = function(position) {
+    var generation = ++restorePositionGeneration;
+    function applyPosition() {
+      if (generation !== restorePositionGeneration) return;
+      if (!initialLayoutReady || typographyPending || isAnimating) { requestAnimationFrame(applyPosition); return; }
+      var page = position.pageNumber, restored = null;
+      anchorRestoreStatus = null;
+      if (position.anchor) {
+        try {
+          var a = parseStudyAnchor(position.anchor);
+          var section = Array.from(content.querySelectorAll('.epub-chapter')).find(function(s) { return s.getAttribute('data-chapter-id') === a.chapterId; });
+          var model = section && studyText(section), resolved = model && resolveStudyAnchor(model.text, a);
+          anchorRestoreStatus = resolved ? resolved.status : 'missing';
+          if (resolved && (resolved.status === 'exact' || resolved.status === 'relocated')) {
+            var range = studyRange(model, resolved.start, resolved.start + 1), rect = range && range.getClientRects()[0];
+            if (rect) { page = Math.floor((rect.left + (currentPage - 1) * getPageWidth()) / getPageWidth()) + 1; restored = Object.assign({}, a, { start: resolved.start, end: resolved.end }); }
+            else anchorRestoreStatus = 'missing';
+          }
+        } catch (error) { anchorRestoreStatus = 'missing'; }
+      }
+      // goToPage emits its ACK synchronously. Install the anchor before sending it.
+      window.goToPage(page, 0, 'RESTORE', restored);
+    }
+    applyPosition();
+  };
+
   function handleMessage(event) {
     var data = event.data;
     if (typeof data === "string") {
@@ -603,6 +641,9 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     } else if (data.type === "completeInitialRestore") {
       restorationPending = false;
       console.log('[FORENSIC:iframe:restore] t=' + (performance.timeOrigin + performance.now()) + ' confirmed; currentPage=' + currentPage + ' totalPages=' + totalPages);
+      sendPageState();
+    } else if (data.type === "restoreReadingPosition") {
+      window.restoreReadingPosition(data);
     } else if (data.type === "goToPage" && typeof data.pageNumber === "number") {
       window.goToPage(data.pageNumber, data.operationId, data.origin);
     } else if (data.type === "navigatePage" && typeof data.direction === "number") {

@@ -10,6 +10,7 @@ export function EpubPageViewer({
   pageNumber,
   initialRestorePending = false,
   restoreTargetReady = false,
+  restoreTextAnchor,
   navigationRequest,
   fontSize,
   fontFamily,
@@ -83,8 +84,8 @@ export function EpubPageViewer({
   // Turn page smoothly via JS injection
   useEffect(() => {
     if (!loaded || !initialRestorePending || !layoutReady || !restoreTargetReady) return;
-    webView.current?.injectJavaScript(`window.goToPage && window.goToPage(${pageNumber}, 0, 'RESTORE'); true;`);
-  }, [loaded, initialRestorePending, layoutReady, restoreTargetReady, pageNumber]);
+    webView.current?.injectJavaScript(`window.restoreReadingPosition && window.restoreReadingPosition(${JSON.stringify({ pageNumber, anchor: restoreTextAnchor })}); true;`);
+  }, [loaded, initialRestorePending, layoutReady, restoreTargetReady, pageNumber, restoreTextAnchor]);
 
   useEffect(() => {
     if (!loaded) return;

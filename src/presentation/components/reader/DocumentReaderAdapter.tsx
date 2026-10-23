@@ -3,7 +3,7 @@ import { Platform, StyleSheet, View } from "react-native";
 import { StoredChapter } from "@/src/domain/entities/LibraryBook";
 import { Highlight } from "@/src/domain/repositories/HighlightRepository";
 import { ReaderPalette } from "@/src/theme/tokens";
-import { EpubNavigationRequest, EpubPageInfo, ReaderStudyRequest, ReaderStudyResult } from "@/src/presentation/components/EpubPageViewerProps";
+import { EpubPageViewerProps, EpubNavigationRequest, EpubPageInfo, ReaderStudyRequest, ReaderStudyResult } from "@/src/presentation/components/EpubPageViewerProps";
 import { PdfPageMode } from "@/src/presentation/components/PdfPageViewerProps";
 import { PdfFitMode, PdfReadingMode } from "@/src/domain/types/pdfReader";
 import { PdfPageViewer } from "@/src/presentation/components/PdfPageViewer";
@@ -28,6 +28,7 @@ export interface DocumentReaderAdapterProps {
   epubPage: number;
   initialRestorePending?: boolean;
   restoreTargetReady?: boolean;
+  restoreTextAnchor?: EpubPageViewerProps["restoreTextAnchor"];
   epubNavigationRequest?: EpubNavigationRequest | null;
   settings: {
     fontSize: number;
@@ -76,6 +77,7 @@ export function DocumentReaderAdapter({
   epubPage,
   initialRestorePending,
   restoreTargetReady,
+  restoreTextAnchor,
   epubNavigationRequest,
   settings,
   onPdfTotalPages,
@@ -164,6 +166,7 @@ export function DocumentReaderAdapter({
             pageNumber={epubPage}
             initialRestorePending={initialRestorePending}
             restoreTargetReady={restoreTargetReady}
+            restoreTextAnchor={restoreTextAnchor}
             navigationRequest={epubNavigationRequest}
             fontSize={settings.fontSize}
             fontFamily={settings.fontFamily}

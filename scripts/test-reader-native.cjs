@@ -21,7 +21,7 @@ new Function('require','exports',source)(name=>{if(name==='react')return React;i
  await act(async()=>emit(1,false));assert.equal(injections.some(x=>/goToPage/.test(x)),false);
  await act(async()=>emit(1,true));assert.equal(injections.some(x=>/goToPage/.test(x)),false);
  await act(async()=>renderer.update(React.createElement(EpubPageViewer,{...props,pageNumber:37,restoreTargetReady:true})));
- assert.ok(injections.some(x=>/goToPage\(37(?:,|\))/.test(x)));
+ assert.ok(injections.some(x=>/restoreReadingPosition/.test(x)&&/"pageNumber":37/.test(x)));
  await act(async()=>emit(37,true));
  await act(async()=>renderer.update(React.createElement(EpubPageViewer,{...props,pageNumber:37,initialRestorePending:false,fontSize:22,textColor:'#eeeeee',backgroundColor:'#111111'})));
  assert.strictEqual(renderer.root.findByType('WebView').props.source,source);assert.ok(injections.some(x=>/completeInitialRestore/.test(x)));

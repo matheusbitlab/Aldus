@@ -1,7 +1,8 @@
 import * as Brightness from "expo-brightness";
 import { MotionCuesOverlay } from "@/src/presentation/components/MotionCuesOverlay";
 import { StudyBookmarksPanel } from "@/src/presentation/components/StudyBookmarksPanel";
-import { ReadingAnchor, parseReadingAnchor } from "@/src/domain/types/readingAnchor";
+import { ReadingAnchor, TextReadingAnchor, parseReadingAnchor } from "@/src/domain/types/readingAnchor";
+import { decodeReaderLocation, encodeReaderLocation } from "@/src/domain/types/readerLocation";
 import { ReaderStudyRequest, ReaderStudyResult } from "@/src/presentation/components/EpubPageViewerProps";
 import { Highlight } from "@/src/domain/repositories/HighlightRepository";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -123,6 +124,10 @@ export function ReaderScreen({ bookId }: Props) {
   const [pdfReflowDocument, setPdfReflowDocument] = useState<PdfReflowDocument | null>(null);
   const [pdfReflowChapters, setPdfReflowChapters] = useState<StoredChapter[]>([]);
   const [reflowRestoreState, setReflowRestoreState] = useState<"inactive" | "pending" | "applying">("inactive");
+  const [restoreTextAnchor, setRestoreTextAnchor] = useState<TextReadingAnchor | null>(null);
+  const persistedLocation = useRef<string | null>(null);
+  const lastProgressWrite = useRef<string | null>(null);
+  const positionRestoreFailed = useRef(false);
   const [reflowPreparing, setReflowPreparing] = useState(false);
   const [reflowProgress, setReflowProgress] = useState({ currentPage: 0, totalPages: 0 });
   const [pdfModeChooserVisible, setPdfModeChooserVisible] = useState(false);
@@ -280,6 +285,9 @@ export function ReaderScreen({ bookId }: Props) {
 
         const isPdfBook = result.book.mimeType === "application/pdf";
         const isEpubBook = result.book.mimeType === "application/epub+zip";
+        persistedLocation.current = result.progress?.cfiPosition ?? null;
+        lastProgressWrite.current = null;
+        positionRestoreFailed.current = false;
         let restoredProgress =
           result.progress?.percentage ?? (isPdfBook || isEpubBook ? 0 : 0.38);
         console.log(`[FORENSIC:restoreProgress] t=${performance.timeOrigin + performance.now()} bookId=${result.book.id} progress=${restoredProgress} epub=${isEpubBook}`);
@@ -343,6 +351,7 @@ export function ReaderScreen({ bookId }: Props) {
           setReflowPreparing(false);
         }
         setCurrentBook(result.book);
+        setRestoreTextAnchor(decodeReaderLocation(persistedLocation.current, isEpubBook ? "epub" : "pdf-reflow"));
 
         initialPdfProgress.current = restoredProgress;
         initialEpubProgress.current = isEpubBook || startsInReflow ? restoredProgress : null;
@@ -452,6 +461,7 @@ export function ReaderScreen({ bookId }: Props) {
       return;
     }
     const reflowProgress = nextSettings.reflowProgress ?? progress;
+    setRestoreTextAnchor(decodeReaderLocation(persistedLocation.current, "pdf-reflow"));
     initialEpubProgress.current = reflowProgress;
     setReflowRestoreState("pending");
     reflowRestoreTarget.current = null;
@@ -730,6 +740,7 @@ export function ReaderScreen({ bookId }: Props) {
     void appDependencies.updateReadingProgress.execute({
         bookId,
         currentChapterId,
+        cfiPosition: persistedLocation.current,
         percentage: nextProgress,
         pageNumber:
           pdfPageNumber ??
@@ -744,7 +755,8 @@ export function ReaderScreen({ bookId }: Props) {
   };
 
   const handleEpubPageInfo = useCallback((info: EpubPageInfo) => {
-    readerNavigationDiagnostic("VIEWER_CONFIRMATION", { ...info, confirmedPage: info.pageNumber, controlsVisible: useReaderStore.getState().controlsVisible });
+    const { readingAnchor: privateAnchor, ...diagnostic } = info;
+    readerNavigationDiagnostic("VIEWER_CONFIRMATION", { ...diagnostic, confirmedPage: info.pageNumber, controlsVisible: useReaderStore.getState().controlsVisible });
     if (info.operationId !== undefined && info.operationId < acceptedNavigationId.current) return;
     if (info.operationId !== undefined) acceptedNavigationId.current = info.operationId;
     if (info.operationId !== undefined && info.operationId >= requestedNavigationId.current) {
@@ -758,6 +770,25 @@ export function ReaderScreen({ bookId }: Props) {
         return;
       }
 
+      const anchorAcknowledged = restoreTextAnchor && info.origin === "RESTORE" && info.anchorRestoreStatus;
+      if (restoreTextAnchor && !anchorAcknowledged) {
+        // Only the dedicated restore ACK may release the saved textual intent.
+        setEpubTotalPages(info.totalPages);
+        const fallback = Math.max(0, Math.min(1, initialEpubProgress.current ?? 0));
+        setEpubPage(Math.round(fallback * Math.max(0, info.totalPages - 1)) + 1);
+        setReflowRestoreState("applying");
+        return;
+      }
+      if (anchorAcknowledged) {
+        if (info.anchorRestoreStatus === "missing" || info.anchorRestoreStatus === "ambiguous") {
+          positionRestoreFailed.current = true;
+          setStudyFeedback("O trecho salvo não pôde ser localizado com segurança. A posição por progresso foi recuperada; confira a leitura antes de continuar.");
+          setStudyVisible(true);
+        }
+        initialEpubProgress.current = null;
+        reflowRestoreTarget.current = null;
+        setReflowRestoreState("inactive");
+      } else {
       const savedProgress = Math.max(0, Math.min(1, initialEpubProgress.current ?? 0));
       const restoredPage = Math.max(
         1,
@@ -788,6 +819,7 @@ export function ReaderScreen({ bookId }: Props) {
       reflowRestoreTarget.current = null;
       setReflowRestoreState("inactive");
       console.log(`[FORENSIC:reflowRestore] completed page=${info.pageNumber} total=${info.totalPages}`);
+      }
     }
 
     setEpubTotalPages(info.totalPages);
@@ -810,12 +842,25 @@ export function ReaderScreen({ bookId }: Props) {
       const progressKey = isReflowPdf ? "reflowProgress" : "originalProgress";
       setPdfReaderSettings(current => current ? { ...current, [progressKey]: nextProgress } : current);
     }
+    if (positionRestoreFailed.current) {
+      if (!info.operationId || ["RESTORE", "LAYOUT_RECALC", "SETTINGS_LAYOUT"].includes(info.origin ?? "")) return;
+      positionRestoreFailed.current = false;
+    }
+    if (info.readingAnchor) {
+      try { persistedLocation.current = encodeReaderLocation(isReflowPdf ? "pdf-reflow" : "epub", info.readingAnchor); } catch { return; }
+    }
+    // UI/layout ACKs must not produce a new durable operation for the same position.
+    const position = { bookId, currentChapterId, percentage: nextProgress, pageNumber: page, cfiPosition: persistedLocation.current };
+    const writeKey = JSON.stringify(position);
+    if (writeKey === lastProgressWrite.current) return;
+    lastProgressWrite.current = writeKey;
     void appDependencies.updateReadingProgress.execute({
         bookId,
         currentChapterId,
+        cfiPosition: persistedLocation.current,
         percentage: nextProgress,
         pageNumber: page,
-      }).catch(() => console.log("[ReaderProgress] Failed to persist acknowledged position"));
+      }).catch(() => { if (lastProgressWrite.current === writeKey) lastProgressWrite.current = null; console.log("[ReaderProgress] Failed to persist acknowledged position"); });
   }, [
     bookId,
     chapters,
@@ -823,6 +868,7 @@ export function ReaderScreen({ bookId }: Props) {
     isPdf,
     isReflowPdf,
     reflowRestoreState,
+    restoreTextAnchor,
     pdfReflowChapters,
     epubPage,
     setProgress,
@@ -936,6 +982,7 @@ export function ReaderScreen({ bookId }: Props) {
         epubPage={epubPage}
         initialRestorePending={(isEpub || isReflowPdf) && reflowRestoreState !== "inactive"}
         restoreTargetReady={(isEpub || isReflowPdf) && reflowRestoreState === "applying"}
+        restoreTextAnchor={restoreTextAnchor}
         epubNavigationRequest={epubNavigationRequest}
         settings={activeReaderSettings}
         onPdfTotalPages={handlePdfTotalPages}

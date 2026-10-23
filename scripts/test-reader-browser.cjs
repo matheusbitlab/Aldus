@@ -1,11 +1,12 @@
 // Actual generated reader document in isolated Chromium/CDP. No user profile/data.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),WebSocket=require('ws'),cp=require('node:child_process');
+const coldBaseline=process.argv.includes('--cold-baseline');
 const baseline=process.argv.includes('--baseline'), fractionalBaseline=process.argv.includes('--fractional-baseline'), columnCountBaseline=process.argv.includes('--column-count-baseline'), cache=new Map();
 const React=require('react'),ReactDOMServer=require('react-dom/server');
 function css(style){const v=Object.assign({},...[style].flat(Infinity).filter(Boolean));for(const axis of ['Horizontal','Vertical']){for(const kind of ['padding','margin']){const key=kind+axis;if(v[key]!==undefined){v[kind+(axis==='Horizontal'?'Left':'Top')]=v[key];v[kind+(axis==='Horizontal'?'Right':'Bottom')]=v[key];delete v[key];}}}for(const key of Object.keys(v))if(key.startsWith('shadow')||key==='elevation')delete v[key];return v;}
 function host(tag){return ({children,style,accessibilityLabel,pointerEvents,...props})=>{const styles=css(style);if(styles.opacity?.value!==undefined)styles.opacity=styles.opacity.value;if(typeof styles.lineHeight==='number')styles.lineHeight+='px';return React.createElement(tag,{style:{...(tag==='span'?{}:{display:'flex',flexDirection:'column',boxSizing:'border-box',flexShrink:0}),...(tag==='button'?{border:0,padding:0}:{}),...styles,...(['none','box-none'].includes(pointerEvents)?{pointerEvents:'none'}:{})},'data-box-none':pointerEvents==='box-none'?'true':undefined,'aria-label':accessibilityLabel},children);};}
 function load(file){if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);
- let original=baseline&&file.endsWith('EpubReaderDocument.ts')?cp.execFileSync('git',['show','77c490c:'+file],{encoding:'utf8'}):fs.readFileSync(file,'utf8');
+ let original=coldBaseline&&file.endsWith('EpubReaderDocument.ts')?cp.execFileSync('git',['show','aa21605:'+file],{encoding:'utf8'}):baseline&&file.endsWith('EpubReaderDocument.ts')?cp.execFileSync('git',['show','77c490c:'+file],{encoding:'utf8'}):fs.readFileSync(file,'utf8');
  if(fractionalBaseline&&file.endsWith('EpubReaderDocument.ts')){const previous=cp.execFileSync('git',['show','77c490c:'+file],{encoding:'utf8'}).match(/function getPageWidth\(\) \{[\s\S]*?\n  \}/)[0];original=original.replace(/function getPageWidth\(\) \{[\s\S]*?\n  \}/,previous);}
  if(columnCountBaseline&&file.endsWith('EpubReaderDocument.ts'))original=original.replace(/function calculateTotalPages\(\) \{[\s\S]*?\n  \}/,`function calculateTotalPages() {
     var width = getPageWidth();
@@ -90,6 +91,30 @@ function load(file){if(cache.has(file))return cache.get(file);const exports={};c
   const roundtrip=await evaluate(`(async()=>{const rows=[];for(const options of ${JSON.stringify([options,{...options,fontSize:25,lineHeight:2,marginSize:40},options])}){const start=messages.length;window.updateTypography(options);await new Promise((resolve,reject)=>{let frames=0;function step(){if(messages.slice(start).some(m=>m.type==='page'&&m.origin==='SETTINGS_LAYOUT'))return resolve();if(++frames>600)return reject(Error('Settings roundtrip not acknowledged'));requestAnimationFrame(step)}step()});rows.push({size:options.fontSize,page:messages.filter(m=>m.type==='page').at(-1).pageNumber})}return rows})()`);
   for(const row of roundtrip.filter(r=>r.size===options.fontSize))assert.equal(row.page,beforePage,'Repeated typography changes must retain the original reading intent, not drift toward earlier page starts');
   console.log('PASS typography roundtrip without cumulative anchor drift',JSON.stringify(roundtrip));
+ }
+ // Cold restart uses a fresh document and the exact persisted text anchor, never the prior JS closure.
+ if(!baseline){
+  const instrument=source=>source.replace('<script>','<script>window.messages=[];window.ReactNativeWebView={postMessage:x=>messages.push(JSON.parse(x))};');
+  const ready=()=>evaluate(`new Promise((resolve,reject)=>{let frames=0;function step(){if(messages.some(m=>m.type==='page'&&m.layoutReady))return resolve();if(++frames>600)return reject(Error('Cold layout unavailable'));requestAnimationFrame(step)}step()})`);
+  for(const size of [25,18]){
+   await send('Page.setDocumentContent',{frameId:frameTree.frame.id,html});await ready();
+   await evaluate(`window.goToPage(${beforePage});window.updateTypography(${JSON.stringify({...options,fontSize:size})})`);
+   await evaluate(`new Promise(resolve=>{function step(){if(messages.some(m=>m.type==='page'&&m.origin==='SETTINGS_LAYOUT'))return resolve();requestAnimationFrame(step)}step()})`);
+   const saved=await evaluate(`messages.filter(m=>m.type==='page').at(-1)`);
+   const encoded=load('src/domain/types/readerLocation.ts').encodeReaderLocation('epub',saved.readingAnchor||before.anchor);
+   const anchor=load('src/domain/types/readerLocation.ts').decodeReaderLocation(encoded,'epub');
+   await send('Page.setDocumentContent',{frameId:frameTree.frame.id,html:instrument(createEpubReaderDocument(chapters,{...options,fontSize:size,initialRestorePending:true}))});await ready();
+   await evaluate(`window.restoreReadingPosition?window.restoreReadingPosition({pageNumber:${saved.pageNumber},anchor:${JSON.stringify(anchor)}}):window.goToPage(${saved.pageNumber},0,'RESTORE')`);
+   await evaluate(`new Promise(resolve=>{function step(){if(messages.some(m=>m.type==='page'&&m.origin==='RESTORE'))return resolve();requestAnimationFrame(step)}step()})`);
+   const ack=await evaluate(`messages.filter(m=>m.type==='page').at(-1)`);
+   await evaluate(`window.dispatchEvent(new MessageEvent('message',{data:{type:'completeInitialRestore'}}));window.updateTypography(${JSON.stringify(options)})`);
+   await evaluate(`new Promise(resolve=>{function step(){if(messages.some(m=>m.type==='page'&&m.origin==='SETTINGS_LAYOUT'))return resolve();requestAnimationFrame(step)}step()})`);
+   const returned=await evaluate(`messages.filter(m=>m.type==='page').at(-1)`);
+   if(coldBaseline){assert.notEqual(returned.pageNumber,beforePage);console.log('REPRODUCED cold restart loses textual reading intent',JSON.stringify({size,beforePage,returnedPage:returned.pageNumber}));return;}
+   assert.equal(ack.anchorRestoreStatus,'exact');assert.deepEqual(returned.readingAnchor,anchor);assert.equal(returned.pageNumber,beforePage);
+   console.log('PASS fresh document restores persisted anchor before typography roundtrip',JSON.stringify({size,beforePage,returnedPage:returned.pageNumber,anchorStart:anchor.start}));
+  }
+  await send('Page.setDocumentContent',{frameId:frameTree.frame.id,html});await ready();await evaluate(`window.goToPage(${beforePage})`);
  }
  // Display/controls do not replace the document or move its logical location.
  const stable=await evaluate(`(()=>{window.readerToken={};window.savedToken=readerToken;window.savedContent=document.getElementById('reader-content');const start=messages.filter(m=>m.type==='page').at(-1).pageNumber;window.display();window.readerStudy({type:'studyCapture',id:3});return {same:readerToken===savedToken&&savedContent===document.getElementById('reader-content'),page:messages.filter(m=>m.type==='page').at(-1).pageNumber,start,anchor:messages.at(-1).anchor};})()`);

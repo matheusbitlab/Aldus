@@ -79,5 +79,20 @@ const flushTimers=async()=>act(async()=>{const due=[...timers.values()];timers.c
  await report(1,101,true);assert.equal(getDoc().props.epubPage,51);await report(51,101,true);await flushTimers();assert.equal(writes.at(-1).pageNumber,51);
  const surface=getDoc().parent.parent.props.style;assert.deepEqual(surface[1],{top:32,bottom:24,left:5,right:7});
  await act(async()=>renderer.unmount());
+ // A persisted textual anchor owns restoration until its dedicated ACK, not page-1/layout messages.
+ const anchor={version:1,kind:'epub-text',chapterId:'epub',start:0,end:4,quote:'Text',prefix:'',suffix:'',path:[0]};
+ const location=load('src/domain/types/readerLocation.ts').encodeReaderLocation('epub',anchor);
+ const oldOpen=dependencies.openBook.execute;dependencies.openBook.execute=async id=>{const item=await oldOpen(id);return {...item,progress:{...item.progress,cfiPosition:location}}};
+ writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'anchor-cold'}));});
+ await report(1,101,true);assert.deepEqual(getDoc().props.restoreTextAnchor,anchor);assert.equal(writes.length,0);assert.equal(getDoc().props.restoreTargetReady,true);
+ await act(async()=>getDoc().props.onEpubPageInfo({pageNumber:1,totalPages:101,chapterIndex:0,layoutReady:true,origin:'LAYOUT_RECALC',operationId:0}));assert.equal(writes.length,0);
+ const restored={pageNumber:37,totalPages:101,chapterIndex:0,layoutReady:true,origin:'RESTORE',operationId:0,readingAnchor:anchor,anchorRestoreStatus:'exact'};
+ await act(async()=>getDoc().props.onEpubPageInfo(restored));assert.equal(getDoc().props.epubPage,37);assert.equal(getDoc().props.initialRestorePending,false);assert.equal(writes.at(-1).cfiPosition,location);
+ const committed=writes.length;for(let i=0;i<4;i++)await act(async()=>getDoc().props.onEpubPageInfo({...restored,origin:'LAYOUT_RECALC'}));assert.equal(writes.length,committed);
+ await act(async()=>renderer.unmount());
+ writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'anchor-missing'}));});await report(1,101,true);
+ await act(async()=>getDoc().props.onEpubPageInfo({...restored,readingAnchor:null,anchorRestoreStatus:'missing',pageNumber:51}));assert.equal(writes.length,0);assert.match(renderer.root.findByType('StudyBookmarksPanel').props.feedback,/trecho salvo/);
+ await act(async()=>getDoc().props.onEpubPageInfo({...restored,pageNumber:52,operationId:1,origin:'TAP_NEXT',anchorRestoreStatus:null}));assert.equal(writes.at(-1).pageNumber,52);
+ await act(async()=>renderer.unmount());dependencies.openBook.execute=oldOpen;
  console.log('PASS ReaderScreen Reflow publication/restore/persistence, EPUB layout acknowledgement, controls/settings identity, real page-1 navigation, hardware Back + preserved Original progress, Native safe owner');
 })().catch(e=>{console.error(e);process.exitCode=1;});

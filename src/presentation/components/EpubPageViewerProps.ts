@@ -12,6 +12,8 @@ export interface EpubPageInfo {
   chapterIndex: number;
   chapterTitle: string;
   layoutReady?: boolean;
+  readingAnchor?: TextReadingAnchor | null;
+  anchorRestoreStatus?: "exact" | "relocated" | "missing" | "ambiguous" | null;
   operationId?: number;
   origin?: ReaderNavigationOrigin;
   currentPage?: number;
@@ -29,6 +31,7 @@ export interface EpubPageViewerProps {
   pageNumber: number;
   initialRestorePending?: boolean;
   restoreTargetReady?: boolean;
+  restoreTextAnchor?: TextReadingAnchor | null;
   navigationRequest?: EpubNavigationRequest | null;
   fontSize: number;
   fontFamily: string;

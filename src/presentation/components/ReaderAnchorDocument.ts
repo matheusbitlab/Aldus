@@ -41,14 +41,19 @@ export function readerAnchorDocumentScript(): string {
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(payload);
     if (window.parent !== window) window.parent.postMessage(payload, '*');
   }
+  var studyTextCache = null;
   function studyText(section) {
+    if (studyTextCache && studyTextCache.section === section) return studyTextCache.model;
     var walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
     var nodes = [], text = '', node;
     while ((node = walker.nextNode())) {
       if (node.parentElement.closest('style,script')) continue;
       nodes.push({node:node, start:text.length}); text += node.textContent;
     }
-    return {text:text,nodes:nodes};
+    var model = {text:text,nodes:nodes};
+    // The reader's text DOM is immutable; retain only the current chapter model.
+    studyTextCache = {section:section,model:model};
+    return model;
   }
   function studyRange(model, start, end) {
     var range=document.createRange(), first, last;
@@ -64,7 +69,9 @@ export function readerAnchorDocumentScript(): string {
     if(isAnimating || restorationPending || getPageWidth()<=0) throw new Error('Aguarde a página terminar de carregar.');
     var sections=content.querySelectorAll('.epub-chapter'), width=getPageWidth(), height=getPageHeight();
     for(var s=0;s<sections.length;s++) {
-      var section=sections[s], model=studyText(section);
+      var section=sections[s], bounds=section.getBoundingClientRect();
+      if (bounds.right<=0 || bounds.left>=width) continue;
+      var model=studyText(section);
       for(var n=0;n<model.nodes.length;n++) {
         var entry=model.nodes[n];if(!entry.node.textContent.trim()) continue;
         var full=document.createRange();full.selectNodeContents(entry.node);
