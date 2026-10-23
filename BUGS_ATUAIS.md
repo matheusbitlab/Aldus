@@ -1,6 +1,16 @@
 # Aldus Reader — Bugs Atuais
 
 
+## 23/10/2026 — validações adicionais sem Redmi
+
+PASS local: 86/86 críticas, typecheck/export, 128 layouts de categorias, 16 pares de concentração, biblioteca responsiva/1000 livros e regressões do documento EPUB/Reflow. Novos testes Chromium versionados em b3292b7: study/seleção DOM com dois capítulos, cache de texto alternado, grifos em cores, referências após novo documento, missing/ambiguous e cancelamento; PdfPageViewer Web com worker PDF.js real em dez cenários de navegação, zoom/rotação, modos, erro/recuperação, offline após carga e resposta tardia. Ambos passaram também no checkout limpo isolado. Evidências e escopos em PROJECT_CONTEXT.md e .expo/no-device-20261023; scripts npm test:reader:study:web e test:reader:pdf:web.
+
+Não foi confirmada nova regressão funcional. Dois ajustes do harness foram necessários e registrados: expectativa de capítulo único numa página compartilhada e espera do ACK de nova carga PDF. Código do aplicativo não mudou, portanto não houve nova compilação/distribuição APK ou novo deploy. Não confundir seleção DOM/props controladas com gestos/persistência no Android, nem navegação de PDF já carregado com recuperação offline a frio.
+
+BLOQUEADO físico continua: brilho/permissões, seleção/grifos, repetição PDF Original/Leitura Livre e interface Ciclo 2 na build atual do Redmi; restaurar heads_up_notifications_enabled de 0 para 1 na reconexão. A limitação de concorrência entre abas Web, o spinner de inicialização anterior inconclusivo e demais gates remotos não foram encerrados por estes testes. Sem alterações Supabase, contas, migrations, RLS, OAuth ou dados reais.
+
+
+
 ## 23/10/2026 — continuidade entre processos corrigida; fechamento físico ainda parcial
 
 CORRIGIDO E VALIDADO no Redmi (c382f99): EPUB 15→16→reinício offline→15 e 15→18→reinício offline→15 restauram página 3/13 e exatamente o recorte do corpo. Intenção textual agora persistida no campo existente de progresso, com envelope validado, restauração confirmada e proteção contra eventos iniciais; não depende só de memória. Margens após reinício, temas, quatro categorias, foco, navegação e reabertura passaram. Regressões SQLite em arquivo e Chromium EPUB/Reflow passaram. O FAIL histórico 2/13 permanece no registro anterior como baseline, não como estado atual da correção.
