@@ -30,6 +30,18 @@ export function journalOrganization(repository: LibraryOrganizationRepository, s
     const validated=parseOrganizationRecord(record);
     await sync.change('organization',record.bookId,record.bookId,organizationSyncPayload(validated),false,()=>repository.save(validated));
     libraryMutationEvents.notify();
+  },saveMany:async(records,beforeCommit)=>{
+    const run=scope.capture();
+    const validated=records.map(parseOrganizationRecord);
+    const check=(current?: import('@/src/domain/types/libraryOrganization').OrganizationRecords)=>{
+      try {run.check();}
+      catch {throw Object.assign(new Error('A conta mudou. Reabra a organização.'),{code:'LOCAL_MUTATION_CANCELLED'});}
+      if(current)beforeCommit?.(current);
+    };
+    await sync.batch('organization',async()=>{
+      check();return validated.map(record=>({id:record.bookId,bookId:record.bookId,payload:organizationSyncPayload(record)}));
+    },()=>repository.saveMany(validated,check));
+    run.check();libraryMutationEvents.notify();
   },merge:async(records,choice)=>{
     const run=scope.capture();
     const validated=Object.fromEntries(Object.entries(records).map(([id,record])=>[id,parseOrganizationRecord(record)]));

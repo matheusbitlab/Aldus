@@ -13,6 +13,19 @@ export class AccountOrganizationRepository implements LibraryOrganizationReposit
     if (!await this.books.findById(record.bookId)) throw new Error("Livro não disponível nesta conta.");
     run.check(); await this.storage.save(record); run.check();
   }
+  async saveMany(records: BookOrganization[], beforeCommit?: (current: OrganizationRecords) => void) {
+    const run = this.books.scope.capture();
+    const check = (current?: OrganizationRecords) => {
+      try { run.check(); }
+      catch { throw Object.assign(new Error("A conta mudou. Reabra a organização."), { code: "LOCAL_MUTATION_CANCELLED" }); }
+      if (current) beforeCommit?.(Object.fromEntries(Object.entries(current).filter(([id]) => ids.has(id))));
+    };
+    const ids = new Set((await this.books.listActive()).map(book => book.id));
+    check();
+    if (records.some(record => !ids.has(record.bookId))) throw new Error("A seleção contém livros fora desta conta.");
+    await this.storage.saveMany(records, check);
+    run.check();
+  }
   async merge(records: OrganizationRecords, conflicts: "keep-local" | "use-imported") {
     const run = this.books.scope.capture();
     for (const [id,record] of Object.entries(records)) if (id!==record.bookId || !await this.books.findById(id)) throw new Error("O backup contém livros fora desta conta.");

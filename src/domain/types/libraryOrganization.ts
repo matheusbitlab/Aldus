@@ -20,6 +20,7 @@ export type OrganizationRecords = Record<string, BookOrganization>;
 export interface LibraryOrganizationRepository {
   list(): Promise<OrganizationRecords>;
   save(record: BookOrganization): Promise<void>;
+  saveMany(records: BookOrganization[], beforeCommit?: (current: OrganizationRecords) => void): Promise<void>;
   merge(records: OrganizationRecords, conflicts: "keep-local" | "use-imported"): Promise<{ imported: number; conflicts: number }>;
 }
 export function inferredReadingStatus(book: LibraryBook, record?: BookOrganization): ReadingStatus {

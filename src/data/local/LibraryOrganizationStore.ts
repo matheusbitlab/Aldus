@@ -31,13 +31,22 @@ export class LibraryOrganizationStore implements LibraryOrganizationRepository {
     return job;
   }
   save(value: BookOrganization): Promise<void> {
-    const record = parseOrganizationRecord(value);
+    return this.saveMany([value]);
+  }
+  saveMany(values: BookOrganization[], beforeCommit?: (current: OrganizationRecords) => void): Promise<void> {
+    const validated = values.map(parseOrganizationRecord);
+    if (new Set(validated.map(record => record.bookId)).size !== validated.length) throw new Error("A seleção contém livros duplicados.");
     return this.enqueue(async () => {
       const records = await this.read();
-      const previous = records[record.bookId];
-      if (previous && previous.revision !== record.revision - 1) throw Object.assign(new Error("Este livro foi alterado em outra janela. Reabra a organização antes de salvar."),{code:'LOCAL_REVISION_CONFLICT'});
-      if (!previous && record.revision !== 1) throw Object.assign(new Error("A versão inicial deste registro é inválida."),{code:'LOCAL_REVISION_CONFLICT'});
-      records[record.bookId] = record;
+      beforeCommit?.(records);
+      for (const record of validated) {
+        const previous = records[record.bookId];
+        if (previous && previous.revision !== record.revision - 1) throw Object.assign(new Error("Este livro foi alterado em outra janela. Reabra a organização antes de salvar."),{code:'LOCAL_REVISION_CONFLICT'});
+        if (!previous && record.revision !== 1) throw Object.assign(new Error("A versão inicial deste registro é inválida."),{code:'LOCAL_REVISION_CONFLICT'});
+        records[record.bookId] = record;
+      }
+      // One durable write after every revision and account guard has passed.
+      if (!validated.length) return;
       await this.storage.setItem(LIBRARY_ORGANIZATION_KEY, JSON.stringify(Object.values(records)));
     });
   }

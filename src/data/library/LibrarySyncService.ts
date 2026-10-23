@@ -76,15 +76,33 @@ export class LibrarySyncService {
     const run=this.scope.capture();if(!run.userId)throw new Error('Entre na sua conta.');
     return this.exclusive(async()=>{
       run.check();const entries=await prepare();run.check();const operations=new Map<string,string>();
+      const prior=new Map<string,LibrarySyncEntry|undefined>();
       await this.persistence.mutate(run.userId!,state=>{
         for(const item of entries) {
           const key=syncKey(kind,item.id),old=state.entries[key];
           if(old?.shadow?.deleted_at)throw new Error('Item removido da biblioteca.');
           if(old?.ready&&!old.conflict&&!old.deleted&&equalSyncPayload(old.payload,item.payload))continue;
+          prior.set(key,old?JSON.parse(JSON.stringify(old)):undefined);
           const operationId=newLibraryId();operations.set(key,operationId);
           state.entries[key]={key,kind,id:item.id,bookId:item.bookId,payload:item.payload,deleted:false,dirty:true,ready:false,operationId,baseRevision:old?.shadow?.revision??0,shadow:old?.shadow};
         }
-      });run.check();const result=await write();run.check();
+      });
+      let result:T;
+      try {
+        try {run.check();}catch {throw Object.assign(new Error('A conta mudou. Reabra a operação.'),{code:'LOCAL_MUTATION_CANCELLED'});}
+        result=await write();
+      }
+      catch(error) {
+        // These errors guarantee that the atomic local write did not commit.
+        // Unknown I/O errors retain the write-ahead intent for normal recovery.
+        if(['LOCAL_REVISION_CONFLICT','LOCAL_MUTATION_CANCELLED'].includes((error as {code?:string})?.code??''))await this.persistence.mutate(run.userId!,state=>{
+          for(const [key,operationId] of operations)if(state.entries[key]?.operationId===operationId){
+            const old=prior.get(key);if(old)state.entries[key]=old;else delete state.entries[key];
+          }
+        });
+        throw error;
+      }
+      run.check();
       await this.persistence.mutate(run.userId!,state=>{for(const [key,operationId] of operations)if(state.entries[key]?.operationId===operationId)state.entries[key].ready=true;});
       await this.refreshStatus();return result;
     });
