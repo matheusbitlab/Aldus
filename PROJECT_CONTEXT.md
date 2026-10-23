@@ -1,5 +1,15 @@
 # Aldus Reader — Contexto do Projeto
 
+## Ciclo 1, incremento 2 — checkpoint de 23/10/2026
+
+PARCIAL: painel do Reader organizado em Aparência, Tipografia, Página e layout e Concentração e conforto; fechamento fixo fora do scroll. Controles e handlers existentes preservados; nenhuma alteração no armazenamento, documentos, ReaderScreen ou landing.
+Código: 29c2b87. Regressão de categorias: 8976ba8, incorporada à matriz crítica (84 entradas). Execução concluída: 83/83 suítes anteriores e nova suíte separada PASS; typecheck, export Web, ReaderScreen, paginação, persistência, concentração e 16 pares Chromium do rodapé PASS. Esses pares não comprovam o layout das novas categorias.
+Redmi reconectado via ADB, Aldus em primeiro plano; tela atual mostra 35 livros. Isso não é inventário total nem prova de perda em relação aos 40 históricos. Nenhuma instalação, limpeza ou exclusão realizada neste checkpoint. APK instalado beta.2/code3 ainda não contém este incremento.
+Compilação local exclusiva de homologação iniciada com device-rehearsal, sem publicação; log .expo/cycle1-increment2-android-build.log. Antes de instalar: conferir certificado contra pacote realmente instalado, package e versionCode. Não usar APK antigo como prova de JS novo.
+Pendentes: matriz visual das categorias em 320/390/430/768/1440, temas e escalas 100/130/160%; inspeção e instalação compatível da build; EPUB/PDF Original/Leitura Livre físicos, foco, tipografia, âncoras, reabertura e reinício. Homologação física do incremento NÃO EXECUTADA; não declarar conclusão nem iniciar Ciclo 2.
+Revisão auxiliar Astra não iniciou por limite de uso; implementação e testes acima executados pelo agente principal.
+
+
 Atualizado em 16/10/2026. Fonte única de contexto permanente para IA.
 Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md). Código: HEAD atual da branch,
 identificado pelo Git e pelo build-info.json do export, sem hash autorreferente inventado.
