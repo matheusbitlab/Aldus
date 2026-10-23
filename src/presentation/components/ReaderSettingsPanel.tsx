@@ -1,7 +1,7 @@
 import { MotionCuesControl } from "./MotionCuesControl";
 import { ReaderSettingsSlider as Slider } from "./ReaderSettingsSlider";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReaderSettings } from "@/src/presentation/contexts/ReaderSettingsContext";
 import { PdfReaderSettings, PdfReadingMode } from "@/src/domain/types/pdfReader";
@@ -64,6 +64,9 @@ export function ReaderSettingsPanel({
   onSearch,
   searchResult,
 }: Props) {
+  const [category, setCategory] = useState('appearance');
+  const scroll = useRef<ScrollView>(null);
+  const categories = [{ id: 'appearance', label: 'Aparência' }, { id: 'text', label: 'Tipografia' }, { id: 'layout', label: 'Página e layout' }, { id: 'focus', label: 'Concentração e conforto' }];
   const settings = useReaderSettings();
   const insets = useSafeAreaInsets();
   const [pageInput, setPageInput] = useState(String(pageNumber ?? 1));
@@ -82,28 +85,31 @@ export function ReaderSettingsPanel({
       <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 12), paddingBottom: Math.max(insets.bottom, 12) }]}>
         <Pressable accessibilityLabel="Fechar preferências" style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.panel, { backgroundColor: palette.panel }]}>
-          <ScrollView style={styles.panelScroll} contentContainerStyle={styles.panelContent} keyboardShouldPersistTaps="handled"
+          <View style={styles.panelHeader}>
+            <View style={styles.headerRow}>
+              <Text accessibilityRole="header" style={[styles.title, { color: palette.text }]}>{panelMode === 'contents' ? 'Sumário' : panelMode === 'search' ? 'Buscar no livro' : 'Ajustes de leitura'}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Fechar ajustes de leitura" onPress={onClose} style={styles.closeButton}><Text style={{color: palette.text, fontSize: 24}}>×</Text></Pressable>
+            </View>
+            {panelMode === 'appearance' ? <View style={styles.categories}>{categories.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{selected: category === item.id}} onPress={() => {setCategory(item.id); scroll.current?.scrollTo({y: 0, animated: false});}} style={[styles.category, {borderColor: category === item.id ? palette.accent : palette.separator, backgroundColor: category === item.id ? palette.accent : 'transparent'}]}><Text style={{color: category === item.id ? '#fff' : palette.text, fontSize: 13, textAlign: 'center'}}>{item.label}</Text></Pressable>)}</View> : null}
+          </View>
+          <ScrollView ref={scroll} style={styles.panelScroll} contentContainerStyle={styles.panelContent} keyboardShouldPersistTaps="handled"
             onLayout={event => readerUiDiagnostic("LAYOUT", "preferencesViewport", undefined, event.nativeEvent.layout)}
             onContentSizeChange={(width, height) => readerUiDiagnostic("LAYOUT", "preferencesContent", undefined, { x: 0, y: 0, width, height })}
             onScroll={event => readerUiDiagnostic("LAYOUT", "preferencesScroll", undefined, { x: event.nativeEvent.contentOffset.x, y: event.nativeEvent.contentOffset.y, width: event.nativeEvent.layoutMeasurement.width, height: event.nativeEvent.layoutMeasurement.height })}
           >
-          <View style={styles.handle} />
-          <Text style={[styles.title, { color: palette.text }]}>
-            {panelMode === "contents" ? "Sumário" : panelMode === "search" ? "Buscar no livro" : pdfSettings ? "Aparência do PDF" : "Aparência"}
-          </Text>
           {panelMode === "appearance" ? (
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: 10, display: category === "focus" ? "flex" : "none" }}>
               <Text accessibilityRole="header" style={[styles.label, { color: palette.secondaryText }]}>CONCENTRAÇÃO</Text>
               <View style={styles.inlineToggleRow}>
                 <Text style={{ color: palette.text, flex: 1 }}>Ocultar porcentagem e contagem de páginas</Text>
                 <Switch accessibilityLabel="Ocultar porcentagem e contagem de páginas" value={settings.hideReadingCounts} onValueChange={settings.setHideReadingCounts} />
               </View>
-              <Text style={{ color: palette.secondaryText }}>Para ler em foco, feche os ajustes e toque no centro da página para ocultar os controles. Toque novamente para voltar.</Text>
+              <Text style={{ color: palette.secondaryText }}>Toque no centro da página para ocultar ou recuperar os controles.</Text>
               <Text style={{ color: palette.secondaryText }}>Esta preferência vale neste dispositivo. A navegação continua disponível.</Text>
               {onReadInFocus ? <ActionButton label="Ler em foco" onPress={onReadInFocus} palette={palette} /> : null}
             </View>
           ) : null}
-          {panelMode === "appearance" && pdfSettings && onPdfModeChange ? (
+          {panelMode === "appearance" && category === "layout" && pdfSettings && onPdfModeChange ? (
             <>
               <Text style={[styles.label, { color: palette.secondaryText }]}>MODO</Text>
               <View style={styles.row}>
@@ -150,6 +156,7 @@ export function ReaderSettingsPanel({
           ) : null}
           {panelMode === "appearance" ? (
             <>
+              <View style={{display: category === "appearance" ? "flex" : "none"}}>
               <Text style={[styles.label, { color: palette.secondaryText }]}>{Platform.OS === "web" ? "LUMINOSIDADE DA PÁGINA" : "BRILHO"}</Text>
               {Platform.OS === "web" ? (
                 <View style={styles.row}>
@@ -171,7 +178,7 @@ export function ReaderSettingsPanel({
                 <>
                   <View style={styles.inlineToggleRow}>
                     <Text style={{ color: palette.text, flex: 1 }}>Usar brilho do aparelho</Text>
-                    <Switch value={settings.useSystemBrightness} onValueChange={settings.setUseSystemBrightness} thumbColor={settings.useSystemBrightness ? palette.accent : palette.panel} trackColor={{ false: palette.separator, true: palette.accent }} />
+                    <Switch accessibilityLabel="Usar brilho do aparelho" value={settings.useSystemBrightness} onValueChange={settings.setUseSystemBrightness} thumbColor={settings.useSystemBrightness ? palette.accent : palette.panel} trackColor={{ false: palette.separator, true: palette.accent }} />
                   </View>
                   {!settings.useSystemBrightness ? (
                     <View style={styles.row}>
@@ -192,9 +199,10 @@ export function ReaderSettingsPanel({
                   ) : null}
                 </>
               )}
+              </View>
             </>
           ) : null}
-          {panelMode === "appearance" && isOriginalPdf ? (
+          {panelMode === "appearance" && isOriginalPdf && category === "layout" ? (
             <>
               <Text style={[styles.label, { color: palette.secondaryText }]}>ZOOM</Text>
               <View style={styles.row}>
@@ -235,6 +243,7 @@ export function ReaderSettingsPanel({
 
           {panelMode === "appearance" && !isOriginalPdf ? (
             <>
+              <View style={{display: category === "appearance" ? "flex" : "none"}}>
               <Text style={[styles.label, { color: palette.secondaryText }]}>TELA</Text>
               <View style={styles.inlineToggleRow}>
                 <View style={styles.eReaderCopy}>
@@ -260,6 +269,8 @@ export function ReaderSettingsPanel({
               <Text style={[styles.label, { color: palette.secondaryText }]}>TEMA</Text>
               <View style={styles.row}>{themes.map((theme) => <Pressable key={theme.value} onPress={() => pdfSettings ? updatePdfSettings({ theme: theme.value as PdfReaderTheme }) : settings.setTheme(theme.value)} style={[styles.option, { borderColor: (pdfSettings ? pdfSettings.theme : settings.theme) === theme.value ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{theme.label}</Text></Pressable>)}</View>
 
+              </View>
+              <View style={{display: category === "text" ? "flex" : "none"}}>
               <Text style={[styles.label, { color: palette.secondaryText }]}>FONTE</Text>
               <View style={styles.row}>{fonts.map((font) => <Pressable key={font.value} onPress={() => pdfSettings ? updatePdfSettings({ font: font.value }) : settings.setFont(font.value)} style={[styles.option, { borderColor: (pdfSettings ? pdfSettings.font : settings.font) === font.value ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{font.label}</Text></Pressable>)}</View>
 
@@ -297,6 +308,8 @@ export function ReaderSettingsPanel({
                 onSelect={(value) => pdfSettings ? updatePdfSettings({ paragraphSpacing: Number(value) }) : settings.setParagraphSpacing(Number(value))}
               />
 
+              </View>
+              <View style={{display: category === "layout" ? "flex" : "none"}}>
               <Text style={[styles.label, { color: palette.secondaryText }]}>MARGENS E LARGURA</Text>
               <SegmentedControl
                 options={[{ label: "Estreita", value: 0 }, { label: "Normal", value: 1 }, { label: "Larga", value: 2 }]}
@@ -319,9 +332,11 @@ export function ReaderSettingsPanel({
                 }}
               />
               {pdfSettings ? <ModeButton label={pdfSettings.alignment === "justify" ? "Alinhamento: Justificado" : "Alinhamento: Esquerda"} selected={false} onPress={() => updatePdfSettings({ alignment: pdfSettings.alignment === "justify" ? "left" : "justify" })} palette={palette} /> : null}
+              </View>
             </>
           ) : null}
-          {panelMode === "appearance" ? <MotionCuesControl color={palette.text} /> : null}
+          {panelMode === "appearance" ? <View style={{display: category === 'focus' ? 'flex' : 'none'}}><MotionCuesControl color={palette.text} /></View> : null}
+          {panelMode === 'appearance' && isOriginalPdf && category === 'text' ? <Text style={{color: palette.secondaryText}}>O PDF Original preserva a tipografia do arquivo. Use Leitura Livre em Página e layout para ajustar o texto.</Text> : null}
           </ScrollView>
         </View>
       </View>
@@ -332,10 +347,15 @@ export function ReaderSettingsPanel({
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)", paddingHorizontal: 12, paddingBottom: 0 },
   panel: { width: "100%", maxWidth: 560, maxHeight: "90%", padding: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, alignSelf: "center" },
-  panelScroll: { maxHeight: "100%" },
-  panelContent: { padding: 24, paddingBottom: 40 },
+  panelHeader: {paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12},
+  headerRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  closeButton: {minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center'},
+  categories: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  category: {flexBasis: '46%', flexGrow: 1, minHeight: 44, padding: 10, borderWidth: 1, borderRadius: 10, justifyContent: 'center'},
+  panelScroll: { flexShrink: 1 },
+  panelContent: { padding: 20, paddingBottom: 32 },
   handle: { width: 42, height: 4, borderRadius: 3, backgroundColor: "#A7AAA2", alignSelf: "center", marginBottom: 22 },
-  title: { fontSize: 24, fontWeight: "700", marginBottom: 26 },
+  title: { flex: 1, fontSize: 22, fontWeight: "700", marginBottom: 12 },
   label: { fontSize: 10, letterSpacing: 1.5, fontWeight: "700", marginTop: 18, marginBottom: 10 },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 },
   inlineToggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
@@ -395,7 +415,7 @@ function SegmentedControl({
             onPress={() => onSelect(option.value)}
             style={[styles.segment, { backgroundColor: selected ? palette.accent : "transparent", borderColor: selected ? palette.accent : palette.separator }]}
           >
-            <Text numberOfLines={1} style={[styles.segmentText, { color: selected ? "#FFF" : palette.text }]}>{option.label}</Text>
+            <Text style={[styles.segmentText, { color: selected ? "#FFF" : palette.text }]}>{option.label}</Text>
           </Pressable>
         );
       })}
