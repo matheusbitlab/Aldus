@@ -107,6 +107,23 @@ npm run export:web
 npm run test:reader:settings:web
 ```
 
+Para complementar a homologação sem aparelho, com Chromium local e os mesmos
+componentes/documentos do projeto:
+
+```powershell
+npm run test:reader:study:web
+npm run test:reader:pdf:web
+npm run test:reader:epub:web
+npm run test:reader:reflow:web
+npm run test:library:bulk:web
+```
+
+O ensaio de estudo usa capítulos sintéticos, seleção DOM e CSS Highlight API. O de
+PDF usa o PdfPageViewer Web, worker PDF.js real e PDF sintético servido em loopback,
+com props controladas. Testam cancelamento, respostas tardias e restauração de
+referências/props; não comprovam gestos nativos, brilho físico ou persistência do
+ReaderScreen Android. Capturas/resultados ficam em `.expo`, fora do Git.
+
 O setup instala versões explícitas das ferramentas React, PGlite, IndexedDB, Yoga e
 esbuild fora do aplicativo. `.expo` é reconstruível. Os ensaios novos aceitam CHROME_PATH
 ou CHROMIUM_PATH e procuram Chrome/Edge no Windows/PATH, usando perfis isolados.

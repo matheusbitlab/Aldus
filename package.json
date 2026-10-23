@@ -31,6 +31,8 @@
     "test:reader:browser": "node scripts/run-reader-browser.cjs",
     "test:reader:epub:web": "node scripts/run-reader-browser.cjs --epub",
     "test:reader:reflow:web": "node scripts/run-reader-browser.cjs --reflow",
+    "test:reader:study:web": "node scripts/run-reader-browser.cjs --study",
+    "test:reader:pdf:web": "node scripts/test-pdf-viewer-browser.cjs",
     "test:saas": "node scripts/test-saas-schema.cjs && node scripts/test-saas-client.cjs && node scripts/test-saas-compatibility.cjs && node scripts/test-saas-experience.cjs && node scripts/test-saas-ui.cjs",
     "test:saas:web": "node scripts/test-saas-web.cjs",
     "test:admin": "node scripts/test-admin-security.cjs && node scripts/test-admin-client.cjs",
