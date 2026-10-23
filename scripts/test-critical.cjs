@@ -9,7 +9,7 @@ const tests = [
   'library-account', 'library-sync', 'library-remote', 'library-cancellation', 'library-files', 'library-reading-sync', 'library-coordinator', 'library-restart', 'library-rls', 'library-ui', 'library-organization',
   'google-drive', 'drive-tree', 'drive-download', 'source-catalog', 'source-library-actions', 'source-indexing', 'source-ownership', 'source-preparation', 'source-performance', 'source-ui', 'auth-native-pkce',
   'book-covers', 'cover-thumbnails', 'epub-resources', 'epub-native-read', 'epub-image-readiness', 'book-import', 'download-import', 'catalogs', 'reading-anchors', 'study-storage',
-  'settings-navigation', 'reader-navigation', 'reader-native', 'reader-bytecode', 'reader-screen', 'reader-settings', 'reader-concentration', 'reader-preferences-layout', 'reflow-native-scheduling', 'reflow-finalization', 'reflow-native-lifecycle', 'pdf-reflow',
+  'settings-navigation', 'reader-navigation', 'reader-native', 'reader-bytecode', 'reader-screen', 'reader-settings', 'reader-settings-categories', 'reader-concentration', 'reader-preferences-layout', 'reflow-native-scheduling', 'reflow-finalization', 'reflow-native-lifecycle', 'pdf-reflow',
   'community-domain', 'community-data', 'community-provider', 'community-ui', 'community-schema', 'legal', 'web-build', 'android-build-command',
 ];
 let failures = 0;
