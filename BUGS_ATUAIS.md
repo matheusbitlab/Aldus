@@ -1,5 +1,21 @@
 # Aldus Reader — Bugs Atuais
 
+
+## 23/10/2026 — continuidade entre processos corrigida; fechamento físico ainda parcial
+
+CORRIGIDO E VALIDADO no Redmi (c382f99): EPUB 15→16→reinício offline→15 e 15→18→reinício offline→15 restauram página 3/13 e exatamente o recorte do corpo. Intenção textual agora persistida no campo existente de progresso, com envelope validado, restauração confirmada e proteção contra eventos iniciais; não depende só de memória. Margens após reinício, temas, quatro categorias, foco, navegação e reabertura passaram. Regressões SQLite em arquivo e Chromium EPUB/Reflow passaram. O FAIL histórico 2/13 permanece no registro anterior como baseline, não como estado atual da correção.
+
+BLOQUEADO por ausência USB do Redmi: repetição atual de PDF Original/Leitura Livre, brilho, seleção/grifos afetados e UI Ciclo 2. A build instalada e exercitada era c382f99; não apresentar PDF testado em 53b4e32 ou emulador como prova física atual. Nenhuma desinstalação, limpeza ou adoção dos livros QA A/Amêndoas. Configuração temporária heads_up_notifications_enabled deve voltar de 0 para 1 quando o aparelho reconectar; Wi-Fi/dados restaurados 1/1, font_scale 1.0, keep-awake originalmente 3. Episódio de spinner no início do app recuperou após rede/reabertura, causa INCONCLUSIVA; UIAutomator 137 preservado como falha de ensaio.
+
+CORRIGIDO no incremento Ciclo 2: seleção acessível por teclado (Space/Enter) e saída do filtro quando o último livro deixa uma coleção. Organização coletiva reutiliza modelo/Sync/outbox; CAS/guarda de conta em escrita local única impedem parcial conhecida e publicação tardia A→B→A. Renomeação inclui todos os membros e detecta alterações concorrentes. I/O de resultado indeterminado mantém write-ahead; Sync remoto continua por livro. Concorrência entre abas Web separadas não foi comprovada como atômica. Criação de coleção exige um livro no modelo existente, sem nova entidade vazia.
+
+VALIDADO: 86/86 críticas, typecheck/export Web, regressões de Reader/organização/Sync e Chromium real dos componentes da biblioteca (8 layouts claro/escuro, mouse/toque/teclado, escala CSS, 1000 livros virtualizados). Checkout limpo com npm ci/setup e gates finais PASS. Preview 254d4b1 confirmado com sessão QA existente e EPUB sintético offline realmente renderizado; primeira captura ainda com loader foi mantida/reclassificada e repetida com ACK layoutReady. Novo login por senha e callbacks OAuth/recovery nesse origin não foram comprovados/alterados.
+
+APK universal Beta 254d4b1 compilado, assinatura privada e bundle/source map verificados; instalação/hash e inicialização offline no emulador isolado passaram. APK ARM anterior falhou no AVD x86_64 por ABI/libreactnative.so, não por login; universal inclui x86_64. Certificado Beta não corresponde ao Redmi pessoal: não instalar por cima, não desinstalar para contornar. Entrega privada em partes + reconstrução SHA-256 testada; metadados remotos privados conferidos. Ver PROJECT_CONTEXT.md para hashes, caminhos, limites e evidências. Homologação integral física continua PARCIAL/BLOQUEADA até reconexão. Nenhuma migration/deploy de produção ou alteração de permissões.
+
+Limite do emulador: o ensaio inicial 1080×2400 sofreu ANRs do Pixel Launcher e da System UI por pressão de memória do ambiente. Capturas mantidas; as duas inicializações offline foram repetidas em 540×1200/density 210, com Aldus em primeiro plano e login renderizado. Não é prova de desempenho físico ou autenticação.
+
+
 ## Ciclo 1, incremento 2 — homologação física de 23/10/2026
 
 Continuação do checkpoint 225f9d1, sem refazer o painel. Implementados: seleção acessível das quatro categorias, valor numérico da fonte, slider Web por teclado e ponteiro (ef8f8c8, 53b4e32). Corrigida a deriva cumulativa da âncora em mudanças sucessivas de tipografia no documento EPUB/Leitura Livre (4872238): captura de intenção mantida até navegação explícita, sem novo armazenamento nem alteração de ReaderScreen, Sync, Auth ou landing.

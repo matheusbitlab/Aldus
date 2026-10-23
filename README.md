@@ -126,6 +126,24 @@ O caminho padrão do SDK no Windows é `$env:LOCALAPPDATA\Android\Sdk`; não reu
 um `android/local.properties` com o caminho de outro usuário. Os dois módulos nativos
 `aldus-drive-auth` e `aldus-pdf-ocr` estão versionados e não precisam ser obtidos à parte.
 
+O ambiente Android verificado usa SDK/target 36, build-tools 36.0.0 e NDK
+27.1.12297006. Para incluir o emulador x86_64 além dos aparelhos ARM, a variável
+abaixo controla as ABIs pelo pipeline existente (com as credenciais de assinatura
+já disponibilizadas por mecanismo protegido):
+
+```powershell
+$env:ORG_GRADLE_PROJECT_reactNativeArchitectures = "armeabi-v7a,arm64-v8a,x86_64"
+npm run build:apk:archive
+Remove-Item Env:ORG_GRADLE_PROJECT_reactNativeArchitectures
+```
+
+Use a opção `-- --allow-context-only-dirty` somente quando todas as diferenças
+versionadas forem os três arquivos oficiais permitidos pelo script, já inspecionados.
+O APK ARM não comprova inicialização em um emulador x86_64. Antes de instalar uma
+atualização, compare package, versionCode e certificado com a instalação de destino;
+não desinstale ou limpe dados para contornar incompatibilidade. O APK Beta privado
+e o derivado de homologação com assinatura antiga têm finalidades distintas.
+
 ```powershell
 node --version
 npm --version
