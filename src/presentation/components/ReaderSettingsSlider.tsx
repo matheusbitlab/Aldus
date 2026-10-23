@@ -61,7 +61,11 @@ export function ReaderSettingsSlider(props: Props) {
         } } : {})}
         accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
         onAccessibilityAction={event => p.onValueChange(quantize(p.value + (event.nativeEvent.actionName === "increment" ? p.step : -p.step)))}
-        onPress={event => { if (Number.isFinite(event.nativeEvent.locationX)) p.onValueChange(quantize(p.minimumValue + Math.max(0, event.nativeEvent.locationX - 12) / Math.max(1, width.current - 24) * (p.maximumValue - p.minimumValue))); }}
+        onPress={event => {
+          const native = event.nativeEvent as typeof event.nativeEvent & { offsetX?: number; detail?: number };
+          const location = Number.isFinite(native.locationX) ? native.locationX : Platform.OS === "web" && (native.detail ?? 0) > 0 ? native.offsetX : undefined;
+          if (typeof location === "number" && Number.isFinite(location)) p.onValueChange(quantize(p.minimumValue + Math.max(0, location - 12) / Math.max(1, width.current - 24) * (p.maximumValue - p.minimumValue)));
+        }}
         style={styles.touchArea}
       >
         <View pointerEvents="none" style={[styles.track, { backgroundColor: props.maximumTrackTintColor }]}>

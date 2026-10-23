@@ -23,5 +23,9 @@ new Function('require','exports',code)(name=>name==='react'?React:name==='react/
  platform.OS='web';await act(async()=>r.update(React.createElement(exportsForSlider.ReaderSettingsSlider,{...props,value:23})));
  assert.equal(area().props['aria-valuenow'],23);let prevented=0;
  for(const[key,expected]of [['ArrowRight',24],['ArrowLeft',22],['Home',14],['End',26]]){await act(async()=>area().props.onKeyDown({key,preventDefault(){prevented++},stopPropagation(){}}));assert.equal(commits.at(-1),expected);}
- assert.equal(prevented,4);await act(async()=>r.unmount());console.log('PASS preferences vertical gesture ownership, horizontal preview/single commit, cancellation, bounds, tap, Web keyboard/ARIA and invalid pointer protection');
+ assert.equal(prevented,4);
+ await act(async()=>area().props.onPress({nativeEvent:{offsetX:50,detail:1}}));assert.equal(commits.at(-1),16,'Web mouse offsets are normalized when locationX is absent');
+ const beforeSynthetic=commits.length;await act(async()=>area().props.onPress({nativeEvent:{offsetX:0,detail:0}}));assert.equal(commits.length,beforeSynthetic,'Keyboard synthesized clicks cannot reset the slider');
+ platform.OS='android';await act(async()=>r.update(React.createElement(exportsForSlider.ReaderSettingsSlider,{...props,value:23})));await act(async()=>area().props.onPress({nativeEvent:{offsetX:50,detail:1}}));assert.equal(commits.length,beforeSynthetic,'The Web offset fallback does not change Native behavior');
+ await act(async()=>r.unmount());console.log('PASS preferences vertical gesture ownership, horizontal preview/single commit, cancellation, bounds, tap, Web keyboard/ARIA and invalid pointer protection');
 })().catch(e=>{console.error(e);process.exitCode=1;});
