@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -25,6 +25,8 @@ import { markEpubLibraryReady, startEpubOpenTrace } from "@/src/utils/epubOpenMe
 import { useBookImport } from "@/src/presentation/hooks/useBookImport";
 import { BookImportModal } from "@/src/presentation/components/BookImportModal";
 import { BookCloudControls } from '@/src/presentation/components/LibrarySyncControls';
+import { libraryAccountScope } from '@/src/data/library/LibraryAccountScope';
+import { LibraryBulkModal } from '@/src/presentation/components/LibraryBulkModal';
 
 type BookFilter = "all" | "reading" | "completed" | "unread" | "interrupted" | "favorites";
 type BookSort = "recent" | "title" | "author" | "progress" | "series";
@@ -55,6 +57,11 @@ const mockBooksByFileName = new Map(
 );
 
 export default function Library() {
+  const generation = useSyncExternalStore(listener => libraryAccountScope.subscribe(listener), () => libraryAccountScope.generation, () => 0);
+  return <LibraryContent key={generation} />;
+}
+
+function LibraryContent() {
   const insets = useSafeAreaInsets();
   const { books, status, error, reload } = useLibrary();
   const { palette, resolvedTheme, setMode } = useAppTheme();
@@ -67,16 +74,36 @@ export default function Library() {
   const [organizationError, setOrganizationError] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState<LibraryBook | null>(null);
   const [collection, setCollection] = useState("");
-  const loadOrganization = async () => {
-    try { setOrganization(await libraryOrganization.list()); setOrganizationError(null); }
-    catch (failure) { setOrganizationError(failure instanceof Error ? failure.message : "Não foi possível carregar a organização."); }
-  };
+  const [selecting, setSelecting] = useState(false);
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [rename, setRename] = useState<string | null>(null);
+  const [manageCollections, setManageCollections] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [layoutWidth, setLayoutWidth] = useState(360);
+  const requests = useRef(0);
+  const columns = Math.max(1, Math.min(6, Math.floor((layoutWidth + 14) / 170)));
+  const cellWidth = (layoutWidth - 32 - (columns - 1) * 14) / columns;
+  const loadOrganization = useCallback(async () => {
+    const request = ++requests.current, scope = libraryAccountScope.capture();
+    try {
+      const records = await libraryOrganization.list(); scope.check();
+      if (request !== requests.current) return;
+      setOrganization(records); setOrganizationError(null);
+    } catch (failure) {
+      if (request !== requests.current) return;
+      try { scope.check(); } catch { return; }
+      setOrganizationError(failure instanceof Error ? failure.message : "Não foi possível carregar a organização.");
+      throw failure;
+    }
+  }, []);
   const refreshOrganization = async () => {
-    setOrganization(await libraryOrganization.list()); setOrganizationError(null); await reload();
+    await loadOrganization(); await reload();
   };
-  useEffect(() => { void loadOrganization(); }, [books]);
+  useEffect(() => { void loadOrganization().catch(() => undefined); return () => { requests.current++; }; }, [books, loadOrganization]);
   const collections = useMemo(() => [...new Set(books.flatMap(book => organization[book.id]?.collections ?? []))].sort((a, b) => a.localeCompare(b, "pt-BR")), [books, organization]);
-  useEffect(() => { if (collection && !collections.includes(collection)) setCollection(""); }, [collection, collections]);
+  const toggleSelection = (id: string) => setSelection(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const selectedIds = useMemo(() => books.filter(book => selection.has(book.id)).map(book => book.id), [books, selection]);
 
   useEffect(() => {
     if (status === "success") markEpubLibraryReady();
@@ -121,6 +148,7 @@ export default function Library() {
 
   return (
     <View
+      onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)}
       style={[
         styles.screen,
         { backgroundColor: palette.background, paddingTop },
@@ -239,6 +267,26 @@ export default function Library() {
         </Pressable>
       </View>
 
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        {([['reading', 'Lendo'], ['favorites', 'Favoritos']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(filter === value ? 'all' : value)} style={[styles.collectionChip, { borderColor: filter === value ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{label}</Text></Pressable>)}
+        <Pressable accessibilityRole="button" accessibilityLabel={selecting ? "Encerrar seleção" : "Selecionar livros"} onPress={() => { setSelecting(!selecting); setSelection(new Set()); setNotice(null); }} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text }}>{selecting ? "Cancelar seleção" : "Selecionar"}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: manageCollections }} onPress={() => setManageCollections(!manageCollections)} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text }}>Coleções</Text></Pressable>
+      </View>
+      {manageCollections ? <View style={{ gap: 10, marginBottom: 12, padding: 12, borderRadius: 10, backgroundColor: palette.panel }}>
+        <Text accessibilityRole="header" style={{ color: palette.text, fontWeight: "600" }}>Suas coleções</Text>
+        {collections.map(name => <View key={name} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Abrir coleção ${name}`} onPress={() => setCollection(name)} style={{ flex: 1, minHeight: 44, justifyContent: 'center' }}><Text style={{ color: palette.text }}>{name} · {books.filter(book => organization[book.id]?.collections.includes(name)).length}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Renomear coleção ${name}`} disabled={!!organizationError} onPress={() => setRename(name)} style={styles.collectionChip}><Text style={{ color: palette.accent }}>Renomear</Text></Pressable>
+        </View>)}
+        <Pressable accessibilityRole="button" onPress={() => { setSelecting(true); setSelection(new Set()); setNotice('Selecione os livros e toque em Organizar seleção para criar uma coleção. Uma coleção reúne pelo menos um livro.'); setManageCollections(false); }} style={styles.collectionChip}><Text style={{ color: palette.accent }}>Criar coleção com livros</Text></Pressable>
+      </View> : null}
+      {selecting ? <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{selectedIds.length} selecionados</Text>
+        <Pressable accessibilityRole="button" onPress={() => setSelection(new Set(visibleBooks.map(book => book.id)))} style={styles.collectionChip}><Text style={{ color: palette.text }}>Selecionar resultados</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={!selectedIds.length || !!organizationError} onPress={() => setBulkOpen(true)} style={[styles.collectionChip, { backgroundColor: palette.accent, opacity: selectedIds.length ? 1 : .5 }]}><Text style={{ color: 'white' }}>Organizar seleção</Text></Pressable>
+      </View> : null}
+      {notice ? <Text accessibilityLiveRegion="polite" style={{ color: palette.secondaryText, marginBottom: 12 }}>{notice}</Text> : null}
+
       {openMenu === "filter" ? (
         <View
           style={[
@@ -291,7 +339,7 @@ export default function Library() {
       <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }} contentContainerStyle={{ gap: 8 }}>
         {collections.length ? ["", ...collections].map(name => <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected: collection === name }} onPress={() => setCollection(name)} style={[styles.collectionChip, { borderColor: collection === name ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{name || "Todas as coleções"}</Text></Pressable>) : null}
       </ScrollView>
-      {organizationError ? <View><Text accessibilityRole="alert" style={{ color: palette.accent }}>{organizationError}</Text><Pressable onPress={() => void loadOrganization()}><Text style={{ color: palette.text }}>Recarregar organização</Text></Pressable></View> : null}
+      {organizationError ? <View><Text accessibilityRole="alert" style={{ color: palette.accent }}>{organizationError}</Text><Pressable accessibilityRole="button" onPress={() => void loadOrganization().catch(() => undefined)}><Text style={{ color: palette.text }}>Recarregar organização</Text></Pressable></View> : null}
       {(status === "loading" || status === "idle") && books.length === 0 ? (
         <View style={styles.loading}>
           <ActivityIndicator color={palette.accent} />
@@ -318,13 +366,15 @@ export default function Library() {
       {status !== "error" && (status === "success" || books.length > 0) ? (
         <FlatList
           data={visibleBooks}
-          numColumns={2}
+          key={`columns-${columns}`}
+          numColumns={columns}
           keyExtractor={(book) => book.id}
           renderItem={({ item }) => (
-            <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+            <View style={{ width: cellWidth, minWidth: 0, gap: 6 }}>
+            {selecting ? <SharedBookCard book={toCardBook(item, Boolean(organization[item.id]))} themeMode={resolvedTheme} colors={palette} selection={selection.has(item.id)} onPress={() => toggleSelection(item.id)} /> : <>
             <SharedBookCard
               book={toCardBook(item, Boolean(organization[item.id]))}
-              themeMode={resolvedTheme}
+              themeMode={resolvedTheme} colors={palette}
               onPress={() => {
                 if (
                   item.mimeType === "application/epub+zip" &&
@@ -344,10 +394,14 @@ export default function Library() {
             <Text numberOfLines={1} style={{ color: palette.secondaryText, fontSize: 12 }}>{organization[item.id]?.favorite ? "★ · " : ""}{readingStatusLabels[inferredReadingStatus(item, organization[item.id])]}{organization[item.id]?.series ? ` · ${organization[item.id].series}${organization[item.id].volume ? ` ${organization[item.id].volume}` : ""}` : ""}</Text>
             <BookCloudControls book={item}/>
             <Pressable accessibilityRole="button" accessibilityLabel={`Organizar ${toCardBook(item, Boolean(organization[item.id])).title}`} disabled={Boolean(organizationError)} onPress={() => { const displayed = toCardBook(item, Boolean(organization[item.id])); setOrganizing({ ...item, title: displayed.title, author: displayed.author }); }} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text, textAlign: "center" }}>Organizar</Text></Pressable>
+            </>}
             </View>
           )}
           contentContainerStyle={styles.list}
-          columnWrapperStyle={styles.gridRow}
+          columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={7}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
@@ -367,6 +421,11 @@ export default function Library() {
         />
       ) : null}
       {organizing ? <BookOrganizationModal book={organizing} record={organization[organizing.id]} onClose={() => setOrganizing(null)} onSaved={refreshOrganization} /> : null}
+      {bulkOpen || rename ? <LibraryBulkModal bookIds={rename ? books.filter(book => organization[book.id]?.collections.includes(rename)).map(book => book.id) : selectedIds} collections={collections} rename={rename ?? undefined} onClose={() => { setBulkOpen(false); setRename(null); }} onSaved={async (count, replacement) => {
+        await refreshOrganization(); if (rename && collection === rename && replacement) setCollection(replacement);
+        setNotice(`${count} ${count === 1 ? 'livro atualizado' : 'livros atualizados'}. ${count ? 'As alterações estão salvas no dispositivo.' : 'A organização já estava atualizada.'}`);
+        setSelecting(false); setSelection(new Set());
+      }} /> : null}
       <BookImportModal
         state={bookImport.state}
         onCancel={bookImport.cancel}

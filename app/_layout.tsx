@@ -46,7 +46,7 @@ function AppShell() {
   const { palette, resolvedTheme } = useAppTheme();
   const { loading, session, profile } = useAuth();
   const publicLanding = Platform.OS === 'web' && (!segments.length || String(segments[0]) === 'index');
-  const usePhoneFrame = Platform.OS === "web" && width > 480 && !publicLanding && !['admin','plan'].includes(String(segments[0]));
+  const usePhoneFrame = Platform.OS === "web" && width > 480 && !publicLanding && !['admin','plan','(tabs)'].includes(String(segments[0]));
   const appReady = !loading && !!session && !!profile?.username && profile.account_status === "active";
   useEffect(()=>{
     if(!appReady||publicLanding)return;

@@ -43,6 +43,8 @@
     "test:library:sync": "node scripts/test-library-sync.cjs",
     "test:library:files": "node scripts/test-library-files.cjs",
     "test:library:reading": "node scripts/test-library-reading-sync.cjs",
+    "test:library:bulk": "node scripts/test-library-bulk.cjs",
+    "test:library:bulk:web": "node scripts/test-library-bulk-web.cjs",
     "test:library:coordinator": "node scripts/test-library-coordinator.cjs",
     "test:library:restart": "node scripts/test-library-restart.cjs",
     "test:library:web": "node scripts/test-library-web.cjs",
