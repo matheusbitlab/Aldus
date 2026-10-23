@@ -50,7 +50,8 @@
     "test:saas:setup": "node scripts/setup-saas-homologation.cjs",
     "test:saas:postgres": "node scripts/test-saas-postgres.cjs",
     "test:saas:totp": "node scripts/saas-test-totp.cjs",
-    "saas:deployment:plan": "node scripts/saas-deployment-preflight.cjs"
+    "saas:deployment:plan": "node scripts/saas-deployment-preflight.cjs",
+    "setup:test-tools": "node scripts/setup-test-tools.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

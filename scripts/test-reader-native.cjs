@@ -10,18 +10,18 @@ new Function('require','exports',source)(name=>{if(name==='react')return React;i
 (async()=>{
  const {EpubPageViewer}=load('src/presentation/components/EpubPageViewer.native.tsx');
  const chapters=[{id:'chapter',title:'Teste',html:'<p>Texto local.</p>'}],reports=[];
- const props={chapters,pageNumber:1,initialRestorePending:true,restoreTargetReady:false,fontSize:16,fontFamily:'Georgia',marginSize:24,textColor:'#222222',backgroundColor:'#ffffff',onPageInfo:x=>reports.push(x)};
+ const props={chapters,pageNumber:1,initialRestorePending:true,restoreTargetReady:false,restoreTextAnchor:{version:1,kind:'epub-text',chapterId:'chapter',start:0,end:5,quote:'Texto',prefix:'',suffix:'',path:[0]},fontSize:16,fontFamily:'Georgia',marginSize:24,textColor:'#222222',backgroundColor:'#ffffff',onPageInfo:x=>reports.push(x)};
  let renderer;await act(async()=>{renderer=create(React.createElement(EpubPageViewer,props));});
  let view=renderer.root.findByType('WebView');const source=view.props.source;
  if(baseline){assert.match(source.html,/var restorationPending = false/);assert.ok(injections.some(x=>/goToPage/.test(x)));console.log('REPRODUCED Native ignores restore protocol and injects page before load');await act(async()=>renderer.unmount());return;}
  assert.match(source.html,/var restorationPending = true/);assert.equal(injections.length,0);
  await act(async()=>view.props.onLoadEnd());
- assert.ok(injections.some(x=>/beginInitialRestore/.test(x)));assert.equal(injections.some(x=>/goToPage/.test(x)),false);
+ assert.ok(injections.some(x=>/beginInitialRestore/.test(x)));assert.equal(injections.some(x=>/goToPage|restoreReadingPosition/.test(x)),false);
  const emit=(page,ready)=>renderer.root.findByType('WebView').props.onMessage({nativeEvent:{data:JSON.stringify({type:'page',pageNumber:page,totalPages:100,layoutReady:ready})}});
- await act(async()=>emit(1,false));assert.equal(injections.some(x=>/goToPage/.test(x)),false);
- await act(async()=>emit(1,true));assert.equal(injections.some(x=>/goToPage/.test(x)),false);
+ await act(async()=>emit(1,false));assert.equal(injections.some(x=>/goToPage|restoreReadingPosition/.test(x)),false);
+ await act(async()=>emit(1,true));assert.equal(injections.some(x=>/goToPage|restoreReadingPosition/.test(x)),false);
  await act(async()=>renderer.update(React.createElement(EpubPageViewer,{...props,pageNumber:37,restoreTargetReady:true})));
- assert.ok(injections.some(x=>/restoreReadingPosition/.test(x)&&/"pageNumber":37/.test(x)));
+ assert.ok(injections.some(x=>/restoreReadingPosition/.test(x)&&/"pageNumber":37/.test(x)&&x.includes(JSON.stringify(props.restoreTextAnchor))));
  await act(async()=>emit(37,true));
  await act(async()=>renderer.update(React.createElement(EpubPageViewer,{...props,pageNumber:37,initialRestorePending:false,fontSize:22,textColor:'#eeeeee',backgroundColor:'#111111'})));
  assert.strictEqual(renderer.root.findByType('WebView').props.source,source);assert.ok(injections.some(x=>/completeInitialRestore/.test(x)));
