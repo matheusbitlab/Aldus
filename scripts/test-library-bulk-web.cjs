@@ -35,10 +35,14 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   records=await evaluate('window.fixture.records()');assert.equal(Object.values(records).filter(r=>r.collections.includes('Leituras')).length,2);assert.equal(Object.values(records).some(r=>r.collections.includes('Pesquisa')),false);
   await evaluate(`window.fixture.switchAccount('B')`);await wait(200);assert.equal(await evaluate(`document.body.textContent.includes('Leituras')`),false);assert.deepEqual(await evaluate('window.fixture.records()'),{});
   await evaluate(`window.fixture.switchAccount('A')`);await wait(200);assert.equal(Object.keys(await evaluate('window.fixture.records()')).length,2);
+  await click('Leituras');await click('Selecionar livros');await click('Selecionar resultados');await click('Organizar seleção');
+  await click('Remover da coleção');await input('Nome da coleção','Leituras');await click('Aplicar à seleção');await wait(200);
+  assert(Object.values(await evaluate('window.fixture.records()')).every(record=>record.collections.length===0));
+  assert.equal(await evaluate(`document.body.textContent.includes('Nenhum livro encontrado')`),false,'removing final collection member resets the obsolete filter');
   await send('Page.reload');await wait(500);assert.equal(Object.keys(await evaluate('window.fixture.records()')).length,2,'actual localStorage survives reopen');
   await evaluate('window.fixture.resize(1000)');await wait(250);const rendered=await evaluate(`document.querySelectorAll('[aria-label^="Abrir Livro sintético"]').length`);assert(rendered<200,'virtualization must not render all 1000 books');
   await click('Selecionar livros');await evaluate(`document.querySelector('[role="checkbox"]').focus()`);await send('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',text:' ',windowsVirtualKeyCode:32});await send('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});await wait(100);assert.equal(await evaluate(`document.querySelectorAll('[role="checkbox"][aria-checked="true"]').length`),1,'keyboard selects');
-  await evaluate(`document.documentElement.style.fontSize='130%'`);await screenshot('bulk-large-text');assert.deepEqual(errors,[]);
+  await evaluate(`document.querySelectorAll('#root [dir="auto"]').forEach(e=>{e.style.fontSize=(parseFloat(getComputedStyle(e).fontSize)*1.3)+'px'})`);await screenshot('bulk-large-text');assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);assert.deepEqual(errors,[]);
   fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({scope:'Real Library/modal/card and repositories, synthetic metadata and Auth boundaries; no remote service or Android claim',layouts:results,mouse:true,touch:true,keyboard:true,collections:true,accountIsolation:true,reopen:true,largeLibraryRendered:rendered},null,2));console.log('PASS Library Chromium: 8 responsive/theme layouts, actual mouse/touch/keyboard, bulk create/rename, A/B isolation, reopen and 1000-book virtualization.');
  }finally{ws?.close();chrome.kill();server.closeAllConnections();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1});

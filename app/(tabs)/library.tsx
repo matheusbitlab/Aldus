@@ -102,6 +102,7 @@ function LibraryContent() {
   };
   useEffect(() => { void loadOrganization().catch(() => undefined); return () => { requests.current++; }; }, [books, loadOrganization]);
   const collections = useMemo(() => [...new Set(books.flatMap(book => organization[book.id]?.collections ?? []))].sort((a, b) => a.localeCompare(b, "pt-BR")), [books, organization]);
+  useEffect(() => { if (collection && !collections.includes(collection)) setCollection(""); }, [collection, collections]);
   const toggleSelection = (id: string) => setSelection(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const selectedIds = useMemo(() => books.filter(book => selection.has(book.id)).map(book => book.id), [books, selection]);
 
