@@ -257,6 +257,9 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
   var initialLayoutReadinessScheduled = false;
   var restorationPending = ${options.initialRestorePending ? "true" : "false"};
   var typographyPending = false, typographyAnchor = null, typographyGeneration = 0, pendingTypographyOptions = null;
+  // Page boundaries change with typography. Keep the reading intent across a
+  // settings session instead of repeatedly capturing an earlier page start.
+  var typographyLogicalAnchor = null;
   var activeOperationId = 0, activeOrigin = 'RESTORE';
   var navigationDiagnostics = ${process.env.EXPO_PUBLIC_READER_NAVIGATION_DIAGNOSTICS === "1" ? "true" : "false"};
   function navigationDiagnostic(origin, requestedPage) {
@@ -385,6 +388,7 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
   }
 
   window.goToPage = function(page, operationId, origin) {
+    if (origin !== 'SETTINGS_LAYOUT' && origin !== 'LAYOUT_RECALC') typographyLogicalAnchor = null;
     if (typographyPending) typographyAnchor = null; // An explicit navigation supersedes the old anchor.
     totalPages = calculateTotalPages();
     var requestedPage = Math.max(1, Math.min(totalPages, page));
@@ -437,6 +441,8 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
 
   window.navigatePage = function(direction, operationId, origin) {
     if (direction !== -1 && direction !== 1) return;
+    typographyLogicalAnchor = null;
+    if (typographyPending) typographyAnchor = null;
     if (isAnimating) {
       deferredPage = { page: Math.max(1, Math.min(totalPages, targetPage + direction)), operationId: operationId, origin: origin };
       return;
@@ -473,7 +479,7 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     }
     syncPageDimensions();
     totalPages = calculateTotalPages();
-    window.goToPage(currentPage);
+    window.goToPage(currentPage, undefined, 'LAYOUT_RECALC');
   };
 
   window.searchText = function(query) {
@@ -495,7 +501,10 @@ export function createEpubReaderDocument(chapters: StoredChapter[], options: Rea
     if (!options) return;
     if (isAnimating) { pendingTypographyOptions = options; return; }
     if (!typographyPending && !restorationPending) {
-      try { typographyAnchor = studyVisibleAnchor(); } catch (error) { typographyAnchor = null; }
+      try {
+        if (!typographyLogicalAnchor) typographyLogicalAnchor = studyVisibleAnchor();
+        typographyAnchor = typographyLogicalAnchor;
+      } catch (error) { typographyAnchor = null; typographyLogicalAnchor = null; }
     }
     typographyPending = true;
     var generation = ++typographyGeneration;
