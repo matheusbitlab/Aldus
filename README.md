@@ -113,6 +113,7 @@ componentes/documentos do projeto:
 ```powershell
 npm run test:reader:study:web
 npm run test:reader:pdf:web
+npm run test:reader:markings:web
 npm run test:reader:epub:web
 npm run test:reader:reflow:web
 npm run test:library:bulk:web

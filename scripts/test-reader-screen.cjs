@@ -89,6 +89,18 @@ const flushTimers=async()=>act(async()=>{const due=[...timers.values()];timers.c
  const restored={pageNumber:37,totalPages:101,chapterIndex:0,layoutReady:true,origin:'RESTORE',operationId:0,readingAnchor:anchor,anchorRestoreStatus:'exact'};
  await act(async()=>getDoc().props.onEpubPageInfo(restored));assert.equal(getDoc().props.epubPage,37);assert.equal(getDoc().props.initialRestorePending,false);assert.equal(writes.at(-1).cfiPosition,location);
  const committed=writes.length;for(let i=0;i<4;i++)await act(async()=>getDoc().props.onEpubPageInfo({...restored,origin:'LAYOUT_RECALC'}));assert.equal(writes.length,committed);
+ // Only an explicit selection opens the highlight composer; capturing a marker is separate.
+ await act(async()=>renderer.root.findByType('ReaderControls').props.onStudy());
+ let panel=()=>renderer.root.findByType('StudyBookmarksPanel');
+ assert.equal(panel().props.selectionCaptured,false);
+ await act(async()=>panel().props.onCapture());let request=getDoc().props.studyRequest;
+ await act(async()=>getDoc().props.onStudyResult({id:request.id,status:'captured',anchor}));assert.equal(panel().props.selectionCaptured,false);
+ await act(async()=>panel().props.onSelectText());request=getDoc().props.studyRequest;assert.equal(request.type,'studySelection');assert.equal(request.enabled,true);
+ assert.equal(renderer.root.findAllByType('StudyBookmarksPanel').length,0);
+ await act(async()=>getDoc().props.onStudyResult({id:request.id-1,status:'captured',anchor}));assert.equal(renderer.root.findAllByType('StudyBookmarksPanel').length,0,'Old selection result ignored');
+ await act(async()=>getDoc().props.onStudyResult({id:request.id,status:'captured',anchor}));assert.equal(panel().props.selectionCaptured,true);
+ await act(async()=>panel().props.onCaptureConsumed());assert.equal(panel().props.selectionCaptured,false);assert.equal(panel().props.capture,null);
+ assert.equal(getDoc().props.epubPage,37);assert.equal(writes.length,committed,'Opening and saving panel state cannot write reading progress');
  await act(async()=>renderer.unmount());
  writes.length=0;await act(async()=>{renderer=create(React.createElement(ReaderScreen,{bookId:'anchor-missing'}));});await report(1,101,true);
  await act(async()=>getDoc().props.onEpubPageInfo({...restored,readingAnchor:null,anchorRestoreStatus:'missing',pageNumber:51}));assert.equal(writes.length,0);assert.match(renderer.root.findByType('StudyBookmarksPanel').props.feedback,/trecho salvo/);

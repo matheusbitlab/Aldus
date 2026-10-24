@@ -84,12 +84,14 @@ export function ReaderScreen({ bookId }: Props) {
   const [studyLoading, setStudyLoading] = useState(false);
   const [studyFeedback, setStudyFeedback] = useState<string | null>(null);
   const [studySelecting, setStudySelecting] = useState(false);
+  const studySelectionIntent = useRef(false);
+  const [studySelectionCaptured, setStudySelectionCaptured] = useState(false);
   const [studyHighlights, setStudyHighlights] = useState<Highlight[]>([]);
   const [studyRenderFeedback, setStudyRenderFeedback] = useState<string | null>(null);
   const [studyStorageError, setStudyStorageError] = useState<string | null>(null);
   const reloadHighlights = useCallback(async () => { setStudyHighlights(await appDependencies.highlightRepository.listByBookId(bookId)); setStudyStorageError(null); }, [bookId]);
   useEffect(() => { let active = true; setStudyHighlights([]); appDependencies.highlightRepository.listByBookId(bookId).then(values => { if (active) { setStudyHighlights(values); setStudyStorageError(null); } }).catch(e => { if (active) setStudyStorageError(e.message); }); return () => { active = false; }; }, [bookId]);
-  useEffect(() => { studySequence.current++; setStudyAnchor(null); setStudyRequest(null); setStudyVisible(false); setStudySelecting(false); setStudyLoading(false); setStudyFeedback(null); setStudyRenderFeedback(null); }, [bookId]);
+  useEffect(() => { studySequence.current++; studySelectionIntent.current = false; setStudySelectionCaptured(false); setStudyAnchor(null); setStudyRequest(null); setStudyVisible(false); setStudySelecting(false); setStudyLoading(false); setStudyFeedback(null); setStudyRenderFeedback(null); }, [bookId]);
   const studySequence = useRef(0);
   const handleStudyResult = useCallback((result: ReaderStudyResult) => {
     if (result.id === -1) {
@@ -99,7 +101,7 @@ export function ReaderScreen({ bookId }: Props) {
     if (result.id !== studySequence.current) return;
     setStudyLoading(false);
     if (result.status === "captured" && result.anchor) {
-      try { setStudyAnchor(parseReadingAnchor(result.anchor)); setStudyFeedback(null); setStudySelecting(false); setStudyVisible(true); setStudyRequest({ id: result.id, type: "studySelection", enabled: false }); }
+      try { setStudyAnchor(parseReadingAnchor(result.anchor)); setStudySelectionCaptured(studySelectionIntent.current); setStudyFeedback(null); setStudySelecting(false); setStudyVisible(true); setStudyRequest({ id: result.id, type: "studySelection", enabled: false }); }
       catch { setStudyFeedback("A localização recebida não é válida. Capture novamente."); }
     } else if (result.status === "exact" || result.status === "relocated") {
       setStudyVisible(false); setStudyFeedback(null);
@@ -1019,7 +1021,7 @@ export function ReaderScreen({ bookId }: Props) {
     onHeaderHeight: setHeaderHeight,
     onSearch: isEpub || isReflowPdf ? () => setReaderPanel("search") : undefined,
     onContents: readerChapterItems.length > 0 ? () => setReaderPanel("contents") : undefined,
-    onStudy: !isReflowPdf && (isEpub || isPdf) ? () => { setStudyVisible(true); setStudyAnchor(null); setStudyFeedback(null); } : undefined,
+    onStudy: !isReflowPdf && (isEpub || isPdf) ? () => { studySelectionIntent.current = false; setStudySelectionCaptured(false); setStudyVisible(true); setStudyAnchor(null); setStudyFeedback(null); } : undefined,
     onProgressChange: handleProgress,
     onPagePrevious: () => changePage(pageNumber - 1),
     onPageNext: () => changePage(pageNumber + 1),
@@ -1051,12 +1053,13 @@ export function ReaderScreen({ bookId }: Props) {
         )}
 
         <MotionCuesOverlay color={activePalette.text} />
-        {studySelecting ? <View style={{ position: "absolute", bottom: Math.max(insets.bottom, 12) + 64, left: 16, right: 16, zIndex: 30, backgroundColor: activePalette.panel, padding: 12, borderRadius: 8 }}><Text style={{ color: activePalette.text }}>Selecione o trecho para grifar. As áreas de virar página estão desativadas.</Text>{studyFeedback ? <Text accessibilityRole="alert" style={{ color: activePalette.text }}>{studyFeedback}</Text> : null}<Pressable accessibilityRole="button" onPress={() => { setStudySelecting(false); setStudyVisible(true); setStudyRequest({ id: ++studySequence.current, type: "studySelection", enabled: false }); }}><Text style={{ color: activePalette.accent, paddingVertical: 10 }}>Cancelar seleção</Text></Pressable></View> : null}
+        {studySelecting ? <View style={{ position: "absolute", bottom: Math.max(insets.bottom, 12) + 64, left: 16, right: 16, zIndex: 30, backgroundColor: activePalette.panel, padding: 12, borderRadius: 8 }}><Text style={{ color: activePalette.text }}>{Platform.OS === "web" ? "Arraste sobre o texto. Solte para escolher a cor." : "Toque e segure uma palavra. Ajuste a seleção e solte para escolher a cor."}</Text>{studyFeedback ? <Text accessibilityRole="alert" style={{ color: activePalette.text }}>{studyFeedback}</Text> : null}<Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: "center" }} onPress={() => { studySelectionIntent.current = false; setStudySelectionCaptured(false); setStudySelecting(false); setStudyVisible(true); setStudyRequest({ id: ++studySequence.current, type: "studySelection", enabled: false }); }}><Text style={{ color: activePalette.accent, paddingVertical: 10 }}>Cancelar seleção</Text></Pressable></View> : null}
         {studyVisible && currentBook ? <StudyBookmarksPanel book={currentBook} capture={studyAnchor} chapterTitle={chapterTitle} loading={studyLoading} feedback={studyStorageError ?? studyFeedback ?? studyRenderFeedback}
           highlights={isEpub ? studyHighlights : undefined} onHighlightsSaved={reloadHighlights}
-          onSelectText={isEpub ? () => { setStudyVisible(false); setStudySelecting(true); setStudyFeedback(null); setStudyAnchor(null); setStudyRequest({ id: ++studySequence.current, type: "studySelection", enabled: true }); } : undefined}
+          selectionCaptured={studySelectionCaptured} onCaptureConsumed={() => { setStudySelectionCaptured(false); setStudyAnchor(null); }}
+          onSelectText={isEpub ? () => { studySelectionIntent.current = true; setStudySelectionCaptured(false); setStudyVisible(false); setStudySelecting(true); setStudyFeedback(null); setStudyAnchor(null); setStudyRequest({ id: ++studySequence.current, type: "studySelection", enabled: true }); } : undefined}
           onCapture={() => {
-            setStudyAnchor(null); setStudyFeedback(null);
+            studySelectionIntent.current = false; setStudySelectionCaptured(false); setStudyAnchor(null); setStudyFeedback(null);
             if (isPdf && !isReflowPdf) { setStudyAnchor({ version: 1, kind: "pdf-page", sourcePage: pdfPage }); return; }
             setStudyLoading(true); setStudyRequest({ id: ++studySequence.current, type: "studyCapture" });
           }}
