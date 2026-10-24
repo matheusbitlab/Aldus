@@ -1,6 +1,16 @@
 # Aldus Reader — Bugs Atuais
 
 
+## 24/10/2026 — UX das marcações corrigida; Android físico pendente
+
+IMPLEMENTADO em 00b6e4d: a interface anterior misturava formulário de marcador e exportação/JSON com a ação de grifar. Agora Marcações possui abas Grifos/Marcadores; Grifar um trecho inicia seleção explícita, seguida de cor, nota opcional e salvar. JSON restrito à restauração avançada, saída fixa, exclusão confirmada e ações secundárias recolhidas. Dados/IDs e backups anteriores preservados. Corrigida também ativação das cores por Enter na Web. Captura de marcador não é tratada como seleção de grifo.
+
+VALIDADO local: typecheck, export Web, 86/86 críticas e Chromium em oito layouts/temas com IndexedDB real, gravação/erro/retry, edição sem trocar ID, importação segura, reabertura, marcador PDF e teclado. c0536b4 ajusta somente espera do documento no harness de reload. Evidências e escopos em PROJECT_CONTEXT.md e .expo/study-redesign. Preview e APK privados atualizados para o código funcional 00b6e4d; integridade/assinatura conferidas, sem alegar login autenticado no preview ou testes físicos atuais.
+
+BLOQUEADO: emulador isolado sem serviço phone falhou antes da instalação do APK novo; VM encerrada, inicialização nova não comprovada. Redmi indisponível e dados intactos. Restam os ensaios físicos de grifos, PDF Original/Leitura Livre e concentração/posição, além de restaurar heads_up_notifications_enabled para 1 na reconexão. A limitação entre abas e spinner anterior inconclusivo não foram encerrados. APK Beta privado não pode substituir a assinatura pessoal; derivado compatível existe somente local, sem instalação. Sem mudanças remotas Supabase/Auth/OAuth ou produção nesta rodada.
+
+
+
 ## 23/10/2026 — validações adicionais sem Redmi
 
 PASS local: 86/86 críticas, typecheck/export, 128 layouts de categorias, 16 pares de concentração, biblioteca responsiva/1000 livros e regressões do documento EPUB/Reflow. Novos testes Chromium versionados em b3292b7: study/seleção DOM com dois capítulos, cache de texto alternado, grifos em cores, referências após novo documento, missing/ambiguous e cancelamento; PdfPageViewer Web com worker PDF.js real em dez cenários de navegação, zoom/rotação, modos, erro/recuperação, offline após carga e resposta tardia. Ambos passaram também no checkout limpo isolado. Evidências e escopos em PROJECT_CONTEXT.md e .expo/no-device-20261023; scripts npm test:reader:study:web e test:reader:pdf:web.
