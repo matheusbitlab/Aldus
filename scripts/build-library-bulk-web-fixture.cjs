@@ -15,7 +15,7 @@ const mocks={
  '@/src/utils/epubOpenMetrics':`export const markEpubLibraryReady=()=>{};export const startEpubOpenTrace=()=>{};`,
  '@/src/presentation/services/dependencies':`import{LibraryOrganizationStore}from'@/src/data/local/LibraryOrganizationStore';import{AccountOrganizationRepository}from'@/src/data/library/AccountOrganizationRepository';import{libraryAccountScope as scope}from'@/src/data/library/LibraryAccountScope';
  scope.set('A');window.fixture={route:null,dark:false,count:60};
- const books=()=>Array.from({length:window.fixture.count},(_,i)=>({id:scope.userId+'-'+i,title:'Livro sintético '+String(i+1).padStart(4,'0'),author:'Aldus QA',fileName:'qa.epub',filePath:'file:///qa.epub',mimeType:'application/epub+zip',progress:i%3===0?.25:0,addedDate:i}));
+ const books=()=>Array.from({length:window.fixture.count},(_,i)=>({id:scope.userId+'-'+i,title:'Livro sintético '+String(i+1).padStart(4,'0'),author:'Aldus QA',fileName:'qa.epub',filePath:'file:///qa.epub',mimeType:'application/epub+zip',progress:i%3===0?.25:0,lastOpenedDate:i===0?1760000000000:null,addedDate:i}));
  window.fixture.books=books;window.fixture.switchAccount=id=>{scope.set(id);window.dispatchEvent(new Event('fixture-change'))};window.fixture.resize=count=>{window.fixture.count=count;window.dispatchEvent(new Event('fixture-change'))};
  const raw=new LibraryOrganizationStore({getItem:async key=>localStorage.getItem(key),setItem:async(key,v)=>localStorage.setItem(key,v)});
  export const libraryOrganization=new AccountOrganizationRepository(raw,{scope,listActive:async()=>books(),findById:async id=>books().find(b=>b.id===id)??null});

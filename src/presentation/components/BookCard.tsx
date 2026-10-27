@@ -39,7 +39,7 @@ export const BookCard: React.FC<BookCardProps> = ({
         if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (!event.repeat) onPress(book); }
       } } : {})}
       accessibilityLabel={selection === undefined ? `Abrir ${book.title}, de ${book.author}` : `Selecionar ${book.title}`}
-      style={[styles.card, layout === "list" && styles.listCard, { backgroundColor: theme.uiBackground, borderColor: selection ? theme.accent : theme.border, borderWidth: selection ? 2 : 1 }]}
+      style={[styles.card, layout === "list" && styles.listCard, { borderColor: selection ? theme.accent : 'transparent', borderWidth: 2 }]}
       onPress={() => onPress(book)}
     >
       <View style={[styles.cover, layout === "list" && styles.listCover, { backgroundColor: theme.accent }]}>
@@ -53,8 +53,8 @@ export const BookCard: React.FC<BookCardProps> = ({
         <Text style={[styles.author, { color: theme.uiText }]} numberOfLines={1}>
           {book.author}
         </Text>
-        <View style={[styles.formatBadge, colors && { backgroundColor: colors.accent }]}>
-          <Text style={styles.formatText}>{book.format.toUpperCase()}</Text>
+        <View style={styles.formatBadge}>
+          <Text style={[styles.formatText, { color: theme.uiText }]}>{book.format.toUpperCase()}</Text>
         </View>
         {statusLabel ? <Text style={{ color: theme.uiText, fontSize: 11 }} numberOfLines={1}>{statusLabel}</Text> : null}
         {showProgress ? <View style={styles.progressTrack}>
@@ -74,43 +74,37 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   cover: {
     width: '100%',
     aspectRatio: 2 / 3,
     justifyContent: 'center',
     overflow: 'hidden',
+    borderRadius: 5,
   },
   infoContainer: {
     padding: 8,
     gap: 5,
   },
   title: {
-    fontSize: 13,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
     marginBottom: 2,
   },
   author: {
-    fontSize: 11,
-    opacity: 0.8,
-    marginBottom: 6,
+    fontSize: 13,
+    marginBottom: 2,
   },
   formatBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#0066CC',
-    paddingHorizontal: 6,
+    paddingHorizontal: 0,
     paddingVertical: 2,
     borderRadius: 4,
   },
   formatText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: 'bold',
+    fontSize: 11,
+    letterSpacing: .6,
+    fontWeight: '600',
   },
   progressTrack: {
     height: 3,

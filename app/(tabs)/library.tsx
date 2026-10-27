@@ -27,6 +27,8 @@ import { BookImportModal } from "@/src/presentation/components/BookImportModal";
 import { BookCloudControls } from '@/src/presentation/components/LibrarySyncControls';
 import { libraryAccountScope } from '@/src/data/library/LibraryAccountScope';
 import { LibraryBulkModal } from '@/src/presentation/components/LibraryBulkModal';
+import { AppAction, AppEmptyState } from '@/src/presentation/components/AppUi';
+import { appUi } from '@/src/theme/appUi';
 
 type BookFilter = "all" | "reading" | "completed" | "unread" | "interrupted" | "favorites";
 type BookSort = "recent" | "title" | "author" | "progress" | "series";
@@ -81,8 +83,10 @@ function LibraryContent() {
   const [manageCollections, setManageCollections] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [layoutWidth, setLayoutWidth] = useState(360);
+  const [format, setFormat] = useState<'all' | 'epub' | 'pdf'>('all');
+  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const requests = useRef(0);
-  const columns = Math.max(1, Math.min(6, Math.floor((layoutWidth + 14) / 170)));
+  const columns = layout === 'list' ? 1 : Math.max(1, Math.min(6, Math.floor((layoutWidth + 14) / 170)));
   const cellWidth = (layoutWidth - 32 - (columns - 1) * 14) / columns;
   const loadOrganization = useCallback(async () => {
     const request = ++requests.current, scope = libraryAccountScope.capture();
@@ -121,7 +125,8 @@ function LibraryContent() {
       const matchesFilter =
         filter === "all" ||
         (filter === "favorites" ? record?.favorite : filter === readingStatus);
-      return matchesQuery && matchesFilter && (!collection || record?.collections.includes(collection));
+      const matchesFormat = format === 'all' || book.mimeType === (format === 'pdf' ? 'application/pdf' : 'application/epub+zip');
+      return matchesQuery && matchesFilter && matchesFormat && (!collection || record?.collections.includes(collection));
     });
 
     return filtered.sort((first, second) => {
@@ -137,7 +142,10 @@ function LibraryContent() {
       if (sort === "series") return (organization[first.id]?.series ?? "").localeCompare(organization[second.id]?.series ?? "", "pt-BR") || (organization[first.id]?.volume ?? Infinity) - (organization[second.id]?.volume ?? Infinity) || first.title.localeCompare(second.title, "pt-BR");
       return second.addedDate - first.addedDate;
     });
-  }, [books, filter, query, sort, organization, collection]);
+  }, [books, filter, query, sort, organization, collection, format]);
+
+  const continueBook = useMemo(() => books.filter(book => Number.isFinite(book.lastOpenedDate) && (book.lastOpenedDate ?? 0) > 0 && inferredReadingStatus(book, organization[book.id]) !== 'completed')
+    .reduce<LibraryBook | null>((latest, book) => !latest || book.lastOpenedDate! > latest.lastOpenedDate! ? book : latest, null), [books, organization]);
 
   const selectedFilter =
     filters.find((item) => item.value === filter)?.label ?? "Todos";
@@ -157,13 +165,13 @@ function LibraryContent() {
     >
       <View style={styles.header}>
         <View style={styles.heading}>
-          <Text style={[styles.title, { color: palette.text }]}>
+          <Text accessibilityRole="header" style={[appUi.title, { color: palette.text }]}>
             Sua Biblioteca
           </Text>
           <Text style={[styles.bookCount, { color: palette.secondaryText }]}>
             {books.length} {books.length === 1 ? "livro" : "livros"}
           </Text>
-        </View>
+           </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={resolvedTheme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
@@ -177,6 +185,9 @@ function LibraryContent() {
             color={palette.text}
           />
         </Pressable>
+   </View>
+
+      <View style={styles.entryActions}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Importar livro"
@@ -190,11 +201,14 @@ function LibraryContent() {
             <Ionicons name="add" size={21} color="#FFFFFF" />
           )}
           <Text style={styles.importLabel}>
-            {bookImport.selecting ? "Selecionando" : bookImport.busy ? "Importando" : "Importar"}
+            {bookImport.selecting ? "Selecionando" : bookImport.busy ? "Importando" : "Importar livro"}
           </Text>
         </Pressable>
+        <AppAction label="Adicionar fonte" icon="add-outline" onPress={() => router.push('/sources?add=1' as never)} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Minhas fontes" onPress={() => router.push('/sources' as never)} style={styles.textAction}>
+          <Text style={{ color: palette.text, fontSize: 14 }}>Minhas fontes</Text><Ionicons name="chevron-forward" size={16} color={palette.secondaryText} />
+        </Pressable>
       </View>
-
       <View
         style={[
           styles.searchBox,
@@ -212,7 +226,7 @@ function LibraryContent() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Título, autor, série, tag ou coleção"
+          placeholder="Buscar na sua biblioteca"
           placeholderTextColor={palette.secondaryText}
           style={[styles.searchInput, { color: palette.text }]}
           returnKeyType="search"
@@ -235,7 +249,7 @@ function LibraryContent() {
             numberOfLines={1}
             style={[styles.toolbarLabel, { color: palette.text }]}
           >
-            {selectedFilter}
+            {selectedFilter}{format !== 'all' ? ` · ${format.toUpperCase()}` : ''}
           </Text>
           <Ionicons
             name="chevron-down"
@@ -269,7 +283,9 @@ function LibraryContent() {
       </View>
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        {([['reading', 'Lendo'], ['favorites', 'Favoritos']] as const).map(([value, label]) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => setFilter(filter === value ? 'all' : value)} style={[styles.collectionChip, { borderColor: filter === value ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{label}</Text></Pressable>)}
+        <Pressable accessibilityRole="button" accessibilityLabel={layout === 'grid' ? 'Exibir em lista' : 'Exibir em grade'} onPress={() => setLayout(layout === 'grid' ? 'list' : 'grid')} style={styles.viewButton}>
+          <Ionicons name={layout === 'grid' ? 'list-outline' : 'grid-outline'} size={21} color={palette.text} />
+        </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={selecting ? "Encerrar seleção" : "Selecionar livros"} onPress={() => { setSelecting(!selecting); setSelection(new Set()); setNotice(null); }} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text }}>{selecting ? "Cancelar seleção" : "Selecionar"}</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: manageCollections }} onPress={() => setManageCollections(!manageCollections)} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text }}>Coleções</Text></Pressable>
       </View>
@@ -289,7 +305,7 @@ function LibraryContent() {
       {notice ? <Text accessibilityLiveRegion="polite" style={{ color: palette.secondaryText, marginBottom: 12 }}>{notice}</Text> : null}
 
       {openMenu === "filter" ? (
-        <View
+        <ScrollView keyboardShouldPersistTaps="handled"
           style={[
             styles.dropdown,
             {
@@ -310,7 +326,11 @@ function LibraryContent() {
               }}
             />
           ))}
-        </View>
+          <View style={{ borderTopWidth: 1, borderColor: palette.separator, paddingTop: 8 }}>
+            <Text style={{ color: palette.secondaryText, paddingHorizontal: 14, fontSize: 13 }}>Formato</Text>
+            {(['all', 'epub', 'pdf'] as const).map(value => <MenuOption key={value} label={value === 'all' ? 'Todos os formatos' : value.toUpperCase()} selected={format === value} palette={palette} onPress={() => { setFormat(value); setOpenMenu(null); }} />)}
+          </View>
+        </ScrollView>
       ) : null}
       {openMenu === "sort" ? (
         <View
@@ -367,13 +387,14 @@ function LibraryContent() {
       {status !== "error" && (status === "success" || books.length > 0) ? (
         <FlatList
           data={visibleBooks}
-          key={`columns-${columns}`}
+          key={`columns-${columns}-${layout}`}
           numColumns={columns}
           keyExtractor={(book) => book.id}
           renderItem={({ item }) => (
-            <View style={{ width: cellWidth, minWidth: 0, gap: 6 }}>
-            {selecting ? <SharedBookCard book={toCardBook(item, Boolean(organization[item.id]))} themeMode={resolvedTheme} colors={palette} selection={selection.has(item.id)} onPress={() => toggleSelection(item.id)} /> : <>
+            <View style={{ width: cellWidth, minWidth: 0, gap: 6, marginBottom: 16 }}>
+            {selecting ? <SharedBookCard layout={layout} book={toCardBook(item, Boolean(organization[item.id]))} themeMode={resolvedTheme} colors={palette} selection={selection.has(item.id)} onPress={() => toggleSelection(item.id)} /> : <>
             <SharedBookCard
+              layout={layout}
               book={toCardBook(item, Boolean(organization[item.id]))}
               themeMode={resolvedTheme} colors={palette}
               onPress={() => {
@@ -405,19 +426,14 @@ function LibraryContent() {
           windowSize={7}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={!selecting && !query && filter === 'all' && format === 'all' && !collection && continueBook ? <Pressable accessibilityRole="button" accessibilityLabel={`Continuar lendo ${continueBook.title}`} onPress={() => router.push({ pathname: '/reader/[bookId]', params: { bookId: continueBook.id } })} style={[styles.continueReading, { borderColor: palette.separator }]}>
+            <View style={{ flex: 1, gap: 4 }}><Text style={{ color: palette.secondaryText, fontSize: 12 }}>Continue lendo</Text><Text numberOfLines={1} style={{ color: palette.text, fontSize: 18, fontWeight: '600' }}>{continueBook.title}</Text></View>
+            <Ionicons name="arrow-forward" size={22} color={palette.text} />
+          </Pressable> : null}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={[styles.emptyTitle, { color: palette.text }]}>
-                {books.length === 0
-                  ? "Sua estante está vazia"
-                  : "Nenhum livro encontrado"}
-              </Text>
-              <Text style={[styles.emptyHint, { color: palette.secondaryText }]}>
-                {books.length === 0
-                  ? "Importe um EPUB ou PDF para começar."
-                  : "Tente outro termo, filtro ou ordenação."}
-              </Text>
-            </View>
+            <AppEmptyState title={books.length === 0 ? 'Sua estante começa aqui' : 'Nenhum livro encontrado'} description={books.length === 0 ? 'Importe um EPUB ou PDF do dispositivo ou conecte uma fonte de livros pelos botões acima.' : 'Tente outro termo ou remova os filtros.'}>
+              {books.length ? <AppAction label="Limpar filtros" onPress={() => { setQuery(''); setFilter('all'); setFormat('all'); setCollection(''); }} /> : null}
+            </AppEmptyState>
           }
         />
       ) : null}
@@ -456,6 +472,7 @@ function MenuOption({
   return (
     <Pressable
       accessibilityRole="menuitem"
+      accessibilityLabel={label}
       accessibilityState={{ selected }}
       style={styles.menuOption}
       onPress={onPress}
@@ -500,7 +517,11 @@ function normalizeBookTitle(title: string): string {
 }
 
 const styles = StyleSheet.create({
-  collectionChip: { paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderRadius: 6, minHeight: 36 },
+  entryActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 16 },
+  textAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  viewButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  continueReading: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, borderBottomWidth: 1, marginBottom: 18 },
+  collectionChip: { paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderRadius: 6, minHeight: 44, justifyContent: 'center' },
   screen: {
     flex: 1,
     paddingHorizontal: 16,
@@ -511,7 +532,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 8,
     marginBottom: 16,
   },
   heading: {
@@ -519,8 +540,8 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   themeButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
@@ -534,7 +555,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   importButton: {
-    minHeight: 40,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -571,7 +592,7 @@ const styles = StyleSheet.create({
   toolbarButton: {
     flex: 1,
     minWidth: 0,
-    height: 38,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
@@ -584,18 +605,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   dropdown: {
-    position: "absolute",
-    top: 174,
-    left: 16,
-    right: 16,
-    zIndex: 20,
+    maxHeight: 240,
+    flexGrow: 0,
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 4,
-    elevation: 8,
+    marginBottom: 12,
   },
   menuOption: {
-    minHeight: 42,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

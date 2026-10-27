@@ -22,6 +22,13 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
    const state=await evaluate(`({overflow:document.documentElement.scrollWidth>innerWidth,cards:document.querySelectorAll('[aria-label^="Abrir Livro sintético"]').length,first:document.querySelector('[aria-label^="Abrir Livro sintético"]')?.getBoundingClientRect().width})`);
    assert.equal(state.overflow,false);assert(state.cards>0);assert(state.first>120&&state.first<400);results.push({width,dark,...state});await screenshot('library-'+width+'-'+(dark?'dark':'light'));
   }
+  await click('Continuar lendo Livro sintético 0001');assert.equal((await evaluate('window.fixture.route')).params.bookId,'A-0');
+  await click('Adicionar fonte');assert.equal(await evaluate('window.fixture.route'),'/sources?add=1');
+  await click('Minhas fontes');assert.equal(await evaluate('window.fixture.route'),'/sources');
+  await click('Exibir em lista');assert(await evaluate(`document.querySelector('[aria-label^="Abrir Livro sintético"]').getBoundingClientRect().width>600`));
+  await click('Exibir em grade');
+  await click('Filtrar livros: Todos');await evaluate(`document.querySelector('[role="menuitem"][aria-label="PDF"]').click()`);await wait(100);assert(await evaluate(`document.body.textContent.includes('Nenhum livro encontrado')`));
+  await click('Limpar filtros');assert(await evaluate(`document.querySelectorAll('[aria-label^="Abrir Livro sintético"]').length>0`));
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});await send('Emulation.setTouchEmulationEnabled',{enabled:true});await wait(200);await click('Selecionar livros');
   let labels=await evaluate(`[...document.querySelectorAll('[role="checkbox"]')].slice(0,2).map(e=>e.getAttribute('aria-label'))`);assert.equal(labels.length,2);
   // Real mouse then touch input on the rendered checkbox controls.
