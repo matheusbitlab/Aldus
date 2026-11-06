@@ -23,8 +23,9 @@ estas convenções; documentos antigos não ampliam o escopo autorizado.
 
 ## Fontes e manutenção do conhecimento
 
-- `PROJECT_CONTEXT.md`: protocolo, estado atual, arquitetura resumida, mapa, pendências e log
-  curto (máx. 5 entradas). `docs/context/*.md`: referência por área; `docs/context/historico/`: cronologia antiga.
+- `PROJECT_CONTEXT.md`: protocolo, estado atual, arquitetura, matriz de recursos (§5), mapa (§6), pendências, regras de proteção e log
+  curto (máx. 5 entradas). `docs/context/*.md`: referência por área; `docs/context/historico/`: cronologia antiga;
+  `docs/context/referencias/`: handoffs do ChatGPT e requisitos (hipótese, não prova).
 - `BUGS_ATUAIS.md`: problemas ativos, reprodução, limites de validação e bloqueios.
 - `README.md`: instalação/execução; `package.json`: comandos reais; código e Git: estado real.
 - `AGENTS.md` e `.agents/skills/`: procedimentos reutilizáveis, sem histórico paralelo.
@@ -32,7 +33,7 @@ estas convenções; documentos antigos não ampliam o escopo autorizado.
   cenário. Os módulos e o histórico em `docs/context/` preservam texto antigo: são hipótese a confirmar no código.
 - Não crie novos arquivos de contexto, diagnóstico, handoff ou checkpoint. Atualize os
   documentos oficiais (PROJECT_CONTEXT.md, BUGS_ATUAIS.md e, para decisões permanentes de uma
-  área, o módulo em `docs/context/`). Ao fechar, aplique o protocolo da seção 1 de PROJECT_CONTEXT.md
+  área, o módulo em `docs/context/`). Ao fechar, aplique o protocolo do §1 de PROJECT_CONTEXT.md
   (estado, pendências, log, rolamento para `docs/context/historico/`). Use o [modelo de registro](.agents/skills/aldus-project-continuity/references/session-record.md)
   dentro deles; o modelo vazio não é uma terceira fonte de estado.
 - `.expo`, `dist` e `artifacts` são regeneráveis/ignorados. Se uma evidência local sumiu,

@@ -6,7 +6,8 @@ description: "Corrigir ou evoluir o Reader Aldus em EPUB, PDF Original/Reflow, p
 # Reader: posição e documento estáveis
 
 Leia [PROJECT_CONTEXT.md](../../../PROJECT_CONTEXT.md) e o módulo
-[reader](../../../docs/context/reader.md) (histórico de concentração/continuidade/marcações em
+[reader](../../../docs/context/reader.md) e, para reset de controles/restauração de posição, a
+[síntese dos bugs](../../../docs/context/referencias/bugs-epub-center-reset-e-restore.md) (histórico de concentração/continuidade/marcações em
 `docs/context/historico/`), além do bug pertinente. Comece por
 `ReaderScreen`, `DocumentReaderAdapter`, viewer `.web`/`.native`, documento gerado,
 `UpdateReadingProgressUseCase` e contratos de âncora; não deduza o fluxo só pela UI.

@@ -1,6 +1,6 @@
 # Mapa para localizar o código
 
-Este índice aponta entradas (o mapa tarefa→arquivos validado está em PROJECT_CONTEXT.md §5); o estado e as decisões atuais continuam no
+Este índice aponta entradas (o mapa tarefa→arquivos validado está em PROJECT_CONTEXT.md §6; a classificação de cada recurso, na matriz §5); o estado e as decisões atuais continuam no
 [PROJECT_CONTEXT.md](../../../../PROJECT_CONTEXT.md). Não mantenha uma cópia de status aqui.
 
 | Área | Entradas para inspeção | Módulo em docs/context/ |
@@ -19,10 +19,10 @@ Este índice aponta entradas (o mapa tarefa→arquivos validado está em PROJECT
 | Community | `src/community/{domain,application,data,adapters,presentation}/` | community-estudo.md |
 | SaaS/Admin | `src/domain/saas/`, `src/data/saas/`, `src/admin/`, `app/plan/`, `app/admin/` | biblioteca-sync.md (6.1/6.2) |
 | Flashcards/Battle | `src/data/local/FlashcardRepository.ts`, `src/data/remote/FlashcardBattleRepository.ts`, `app/study/`, `app/battle.tsx` | community-estudo.md |
-| Temas e UI | `src/theme/`, `src/presentation/contexts/AppThemeContext.tsx`, `ReaderSettingsContext.tsx` | PROJECT_CONTEXT §3 (UX/UI em curso) |
+| Temas e UI | `src/theme/`, `src/presentation/contexts/AppThemeContext.tsx`, `ReaderSettingsContext.tsx` | PROJECT_CONTEXT §5 e §8 (UX/UI) |
 | Landing/legal | `src/marketing/`, `src/legal/`, `app/legal/`, `public/` | legal-build-git.md |
 | Backend | `supabase/migrations/`, `supabase/functions/`, `supabase/audit/` | auth.md; biblioteca-sync.md; BUGS_ATUAIS.md |
-| Qualidade/entrega | `scripts/`, `package.json`, `.github/workflows/validate.yml`, `android/`, `eas.json`, `vercel.json` | legal-build-git.md; PROJECT_CONTEXT §6 |
+| Qualidade/entrega | `scripts/`, `package.json`, `.github/workflows/validate.yml`, `android/`, `eas.json`, `vercel.json` | legal-build-git.md; PROJECT_CONTEXT §7 |
 
 Leia implementações `.web` e `.native` pertinentes. Não presuma paridade iOS. Antes de
 abrir arquivos enormes, use `rg -n` por símbolo e leia o bloco completo correspondente.

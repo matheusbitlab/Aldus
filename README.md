@@ -31,7 +31,7 @@ Prompt pronto para uma nova conversa:
 ```text
 Leia AGENTS.md na raiz do Aldus e siga a skill aldus-project-continuity.
 Execute o preflight, confira Git e leia PROJECT_CONTEXT.md (única leitura obrigatória;
-módulos de docs/context/ só quando o mapa indicar) e a entrada pertinente de BUGS_ATUAIS.md. Preserve as alterações locais. Retome o último passo autorizado
+módulos de docs/context/ só quando o mapa §6 indicar) e a entrada pertinente de BUGS_ATUAIS.md. Preserve as alterações locais. Retome o último passo autorizado
 ainda pendente e valide no ambiente pertinente, sem tratar build/Web como prova
 física ou remota. Ao concluir, registre resultado, limites e próximo passo nos
 documentos oficiais. Se o objetivo não estiver claro, informe a lacuna antes de editar.

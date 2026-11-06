@@ -6,7 +6,8 @@ description: "Trabalhar em estudo, decks, Flashcards, SRS ou Battle do Aldus, pr
 # Estudo e Battle: contratos separados
 
 Use somente quando o pedido incluir esta área. Leia o [contexto](../../../PROJECT_CONTEXT.md) e o módulo
-[community-estudo](../../../docs/context/community-estudo.md) (Flashcards/Battle), `src/domain/study/`, repositório/armazenamento
+[community-estudo](../../../docs/context/community-estudo.md) (Flashcards/Battle), os
+[requisitos × código](../../../docs/context/referencias/requisitos-flashcards-batalha-geracao.md) (geração por livro é só local; IA exige consentimento explícito), `src/domain/study/`, repositório/armazenamento
 local e o adapter de Battle pertinente. Reader/APK não torna Flashcards parte da tarefa.
 
 ## Estudo individual

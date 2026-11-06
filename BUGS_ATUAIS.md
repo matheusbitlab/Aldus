@@ -1,5 +1,18 @@
 # Aldus Reader — Bugs Atuais
 
+## 06/11/2026 — EPUB/Reflow: reset ao abrir controles e restauração de posição (registro retroativo)
+
+Origem: dossiês de 02/10 (`BUG_CONTEXT_EPUB_CENTER_RESET.md`, `BUG_CONTEXT_EPUB_PROGRESS_RESTORE.md`, apagados em 7f50a90). Síntese verificada com o código atual em
+`docs/context/referencias/bugs-epub-center-reset-e-restore.md`.
+
+- Reset ao tocar no centro: RELATO do usuário no EPUB Web; NÃO reproduzido no EPUB (Chromium headless e browser integrado); REPRODUZIDO só no PDF Reflow.
+  Causa CONFIRMADA no Reflow (troca de ancestralidade do documento por `controlsVisible` → remount do iframe → `epubPage 15→1`); corrigida estruturalmente
+  (`ReaderScreen.tsx` ≈L1043-1052, overlay estável). Cobertura: `test-reader-screen.cjs` (10 toggles, mocks), `test-reader-browser.cjs`. O relato EPUB original nunca foi
+  reconfirmado como sanado no ambiente real do usuário; causa para o EPUB, se ainda ocorrer: DESCONHECIDA. Diagnóstico: `localStorage.epubCenterResetDiagnostics="1"`.
+- Oscilação 1↔11 na reabertura: era PDF Reflow (corrida entre 1º e 2º page info, total 165→241). Causa CONFIRMADA; handshake `reflowRestoreState`
+  (`pending→applying→inactive`, `layoutReady` + ACK) implementado e hoje também usado no EPUB. Validação: Redmi `c382f99` (EPUB, 23/10) e Chromium de âncoras; reabertura Reflow
+  com total mutável sem teste dedicado identificado. Status: IMPLEMENTADO / VALIDAÇÃO FÍSICA DO REFLOW PENDENTE.
+
 ## 27/10/2026 — UX/UI em reformulação (PARCIAL)
 
 Atualização 06/11/2026: código consolidado em d6ef9c7/ea0b1ec/f970c2d; typecheck, 87/87 críticas, export e 8 suítes Chromium PASS (ver PROJECT_CONTEXT §3). Seguem pendentes preview/APK novos, revisão visual das tabs e homologação física.

@@ -11,10 +11,11 @@ description: "Iniciar, retomar ou encerrar trabalho no Aldus Reader, recuperando
    Não clone por cima nem troque de branch para coincidir com um registro antigo.
 2. Execute `node scripts/ai-project-preflight.cjs`, a partir da raiz. A opção `--json`
    facilita inspeção estruturada. Fora da raiz, use o caminho absoluto do script.
-3. Leia [PROJECT_CONTEXT.md](../../../PROJECT_CONTEXT.md) inteiro (protocolo, estado, mapa,
-   pendências, log). Abra só os módulos de `docs/context/` que o mapa indicar, por seção
+3. Leia [PROJECT_CONTEXT.md](../../../PROJECT_CONTEXT.md) inteiro (protocolo, estado, matriz de recursos §5, mapa §6,
+   pendências, regras, log). Abra só os módulos de `docs/context/` que o mapa indicar, por seção
    (`rg -n '^#{1,3} ' docs/context/*.md`). Bugs exigem também a entrada em
-   [BUGS_ATUAIS.md](../../../BUGS_ATUAIS.md). Não carregue o histórico alheio à tarefa.
+   [BUGS_ATUAIS.md](../../../BUGS_ATUAIS.md). Não carregue o histórico alheio à tarefa. `docs/context/referencias/` guarda handoffs de outras
+   IAs e requisitos: são hipótese/requisito, nunca prova de implementação.
 4. Confronte isso com pedido atual, `git log -5 --oneline`, `git diff --stat` e diferenças
    dos arquivos pertinentes, inclusive staged. Arquivos não versionados podem ser trabalho
    válido. Um registro antigo pode dizer pendente mesmo após uma seção posterior encerrar o item.
