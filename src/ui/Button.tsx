@@ -19,6 +19,8 @@ export interface ButtonProps {
   /** Ocupa toda a largura disponível. */
   block?: boolean;
   accessibilityHint?: string;
+  /** Nome acessível quando o texto visível é curto demais (ex.: "Renomear" → "Renomear coleção X"). */
+  accessibilityLabel?: string;
   expanded?: boolean;
   style?: StyleProp<ViewStyle>;
 }
@@ -29,7 +31,7 @@ export interface ButtonProps {
  */
 export function Button({
   label, onPress, variant = "secondary", icon, trailingIcon, disabled = false, loading = false,
-  block = false, accessibilityHint, expanded, style,
+  block = false, accessibilityHint, accessibilityLabel, expanded, style,
 }: ButtonProps) {
   const { palette } = useAppTheme();
   const inactive = disabled || loading;
@@ -42,7 +44,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: loading, expanded }}
       disabled={inactive}

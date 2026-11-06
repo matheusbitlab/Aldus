@@ -45,10 +45,13 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
   `DesignIdeas/` e `DesignIdeas.zip` (referência visual) e `aldus-context.zip` (pacote de contexto externo; seu conteúdo útil — os
   dois handoffs do ChatGPT — foi copiado para `docs/context/referencias/`). Arquivos na raiz ignorados: `Livros/`, `debug-reflow-*`,
   `artifacts/`, `dist/`, `.expo/`.
-- Redesign de UI em andamento (decisões e fases em `docs/context/design-system.md`): Fases 1 (fundação `src/ui`) e 2 (abas Biblioteca ·
-  Descobrir · Estudo · Conta; tela Descobrir com fontes) concluídas; Biblioteca, Conta, Estudo e Reader ainda com componentes antigos.
+- Redesign de UI em andamento (decisões e fases em `docs/context/design-system.md`): Fases 1 (fundação `src/ui`), 2 (abas Biblioteca ·
+  Descobrir · Estudo · Conta; tela Descobrir com fontes) e 3 (Biblioteca com "+") concluídas; Conta, Estudo e Reader ainda com componentes antigos.
   Acervo: etapa 1 pronta no commit local `11cf66c` do branch `claude/acervo-dominio-publico-ae9294` (worktree próprio), **não integrado à `main`**.
-- Validação local de 06/11 (Fase 2, sobre `b979ec8`): typecheck PASS; `test:critical` 89/89 PASS; `export:web` PASS (build `b979ec86d933`,
+- Validação local de 06/11 (Fase 3, sobre `c350015`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `c350015c8400`, dirty=true);
+  Chromium PASS: `test:library:bulk:web` (8 layouts/temas, mouse/toque/teclado, 1000 livros), `test:library:web`, `test:source-library:browser`,
+  `test:saas:web`; diff-check PASS. Capturas em `.expo/cycle2-library-web/library-*.png` (ícones como pontos: fonte de ícones não carrega no harness).
+- Validação anterior (Fase 2, sobre `b979ec8`): typecheck PASS; `test:critical` 89/89 PASS; `export:web` PASS (build `b979ec86d933`,
   dirty=true); `test:source-library:browser` (Chromium) PASS com capturas `.expo/source-library-validation/explore-{320,390,768,1440}.png`; diff-check PASS.
 - Validação anterior (Fase 1, sobre `f9a9aff`): `npm run typecheck` PASS; `npm run test:critical` 88/88 PASS; `npm run export:web` PASS
   (build `f9a9aff01dcf`, dirty=true); `git diff --check` PASS. Antes (HEAD `f61a0c8`): typecheck PASS, 87/87. Última rodada Web mais
@@ -120,7 +123,7 @@ Legenda: **IVER** = implementado e verificado (suíte/execução citada); **ISVS
 | Landing Web e legal | IVER (local/Chromium) | `src/marketing`, `src/legal`; `test:marketing*`, `test:legal*`. Deploy Vercel não reconferido. |
 | Android (build/APK/módulos) | PARC | `android/`, `scripts/build-apk-local.mjs`; APK `00b6e4d`/`53b4e32` (privados, ignorados). Homologação física BLOQUEADA (Redmi ausente), APK do HEAD inexistente. |
 | UX/UI reformulação (27/10) | IVER (Web controlado) / físico PENDENTE | commits `d6ef9c7`, `ea0b1ec`, `f970c2d`; `test-app-design`, 8 suítes Chromium. Será substituída pelo redesign abaixo. |
-| Redesign editorial (06/11, fases 1–5) | Fases 1–2 IVER (local + Chromium Descobrir); Fases 3–5 PLAN | `src/ui/*`, `app/(tabs)/_layout.tsx`, `app/(tabs)/search.tsx` (Descobrir); `test-ui-primitives`, `test-discover-ui`, `test-app-design` (critical), `test:source-library:browser`. Ver `docs/context/design-system.md`. |
+| Redesign editorial (06/11, fases 1–5) | Fases 1–3 IVER (local + Chromium); Fases 4–5 PLAN | `src/ui/*`, `app/(tabs)/_layout.tsx`, `app/(tabs)/search.tsx` (Descobrir), `app/(tabs)/library.tsx`, `BookCard.tsx`; `test-ui-primitives`, `test-discover-ui`, `test-app-design` (critical), `test:source-library:browser`. Ver `docs/context/design-system.md`. |
 | Reflow/PDF seleção ↔ EPUB equivalência | PLAN | `reader.md`: grifos mapeados entre PDF e Reflow ainda não equivalem ao EPUB. |
 
 ## 6. Mapa tarefa → arquivos (caminhos conferidos no disco em 06/11/2026)
@@ -170,7 +173,7 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 1. **Homologação física Android pendente** (Redmi): Reflow/PDF Original/seleção-grifos/brilho/permissões na build atual; restaurar
    `heads_up_notifications_enabled` para 1 quando o aparelho voltar (config temporária do aparelho, ver historico). Emulador isolado não
    iniciou o APK 00b6e4d (serviço phone).
-2. **Redesign (fases 3–5)**: Biblioteca com "+" (Importar, Drive, link, Descobrir) e cabeçalho enxuto, Conta/Estudo, moldura do Reader
+2. **Redesign (fases 4–5)**: Conta/Ajustes e Estudo com `ListGroup`/`ListRow`, moldura do Reader
    (`docs/context/design-system.md`). Literata não empacotada (exige autorização para baixar a fonte). Depois: revisão visual humana,
    texto ampliado Android, preview Vercel e APK do HEAD.
    **Acervo**: etapa 1 (contas novas só domínio público) pronta em `claude/acervo-dominio-publico-ae9294` (`11cf66c`), aguardando decisão de integrar; etapa 2 (cópia por usuário + nuvem privada, aprovada pelo usuário)
@@ -201,6 +204,15 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 
 ## 10. Log (mais recente primeiro; máx. 5 entradas, resto → docs/context/historico/)
 
+### 06/11/2026 — Redesign Fase 3: Biblioteca enxuta com "+" (Claude)
+- IMPLEMENTADO: cabeçalho "Biblioteca" com só busca + dois botões: **"+" (Adicionar livros)** abre menu com Importar arquivo, Conectar Google Drive
+  (`/sources?add=drive`, abre o fluxo direto), Adicionar biblioteca por link (`/sources?add=link`) e Buscar em catálogos públicos; **"⋯"** reúne
+  Selecionar livros, Coleções, Minhas fontes e tema. Situação em chips, formato/ordenação em folhas (`ActionMenu`), "Continue lendo" em cartão,
+  "Organizar" virou ícone no card. `BookCard` reestilizado (capa protagonista, formato · progresso). Lógica de organização/seleção/Sync intacta.
+- CORRIGIDO no caminho: regex de acentos de `normalizeBookTitle` tinha virado caracteres literais na edição; o Chromium pegou (`SyntaxError`) e foi restaurado.
+- VALIDADO: ver §3 (89/89, export, 4 suítes Chromium). Testes atualizados aos novos rótulos/menus: `test-library-bulk-web`, `test-library-web`,
+  `test-saas-web`, `redmi-qa` ("Sua Biblioteca" → "Biblioteca"). NÃO TESTADO: Android.
+
 ### 06/11/2026 — Redesign Fase 2: navegação e aba Descobrir (Claude)
 - IMPLEMENTADO: abas Biblioteca · Descobrir · Estudo · Conta (ícone cheio na aba ativa; sidebar Web com fundo `accentSoft`; rotas mantidas:
   `search` = Descobrir). `app/(tabs)/search.tsx` refeito com `src/ui`: busca + chips; sem busca ativa mostra **Suas fontes** (lista da conta,
@@ -219,18 +231,6 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
   NÃO TESTADO: Chromium, Android, captura visual (primitivos ainda sem uso em telas).
 - Próximo passo: Fase 2 (navegação + aba Descobrir).
 
-### 06/11/2026 — Onboarding 2: auditoria somente leitura + reescrita do contexto (Claude)
-- IMPLEMENTADO (só docs): `PROJECT_CONTEXT.md` reescrito (matriz de recursos §5 com evidência; mapa §6 conferido no disco; regras §9);
-  novos `docs/context/referencias/` com os dois handoffs do ChatGPT (copiados do `aldus-context.zip` untracked), a síntese verificada
-  `bugs-epub-center-reset-e-restore.md` e `requisitos-flashcards-batalha-geracao.md` (requisito/proposta × código); log anterior de 06/11 movido
-  para `historico/2026-11-06-ux-fechamento-e-onboarding-1.md`; AGENTS.md/README/skills alinhados à numeração `§`.
-- VALIDADO: `typecheck` PASS; `test:critical` 87/87 PASS; `node scripts/validate-ai-instructions.cjs` e `git diff --check` (ver comandos na resposta).
-  NÃO executado: export, Chromium, Android, Supabase.
-- Achados: (a) `BUG_CONTEXT_EPUB_*`, `CONTEXTO_FLASHCARDS*`, `PROMPTS_REVISAO*`, `Prompt_Codex_App_Leitura_Completo`,
-  `PROMPT_INTEGRACAO_FLASHCARDS*` foram apagados em `7f50a90` (recuperáveis em `7f50a90^`); (b) ausentes em qualquer lugar: `Pesquisa_Apps_Leitura_2026-10-05.md`,
-  `Prompt_Codex_Modo_Viagem.md`, `PROPOSTA_FONTES_DE_LIVROS.md`; (c) "progress restore" original era PDF Reflow; (d) o reset do toque central só foi
-  reproduzido/corrigido no Reflow; (e) geração local de flashcards usa pergunta fixa; (f) "Modo Viagem" não existe no código.
-- Pós-registro: usuário confirmou que o reset do toque central já está resolvido (BUGS_ATUAIS.md e referencias atualizados). Aguardar pedido do usuário (§8).
-
 ### 06/11/2026 — Entradas anteriores
 - Fechamento UX/UI e Onboarding 1: ver `docs/context/historico/2026-11-06-ux-fechamento-e-onboarding-1.md`.
+- Onboarding 2 (auditoria e reescrita do contexto): ver `docs/context/historico/2026-11-06-onboarding-2.md`.

@@ -112,7 +112,7 @@ async function main() {
     report.results.push({ status: 'PASS físico', scenario: 'Meu Plano/Comparar: backend indisponível, retry e retorno', commerciallyAvailable: false });
   } else if (command === 'admin-unavailable') {
     await protectCaptures();
-    await waitFor(all=>has(all,'Sua Biblioteca')||has(all,'Meu Plano')||has(all,'Painel administrativo'));
+    await waitFor(all=>has(all,'Biblioteca')||has(all,'Meu Plano')||has(all,'Painel administrativo'));
     scenario = 'Native direct Admin route unavailable/denied';
     shell('am','start','-a','android.intent.action.VIEW','-d','aldus://admin',packageName);
     const all=await waitFor(all=>has(all,'Acesso administrativo indisponível'));

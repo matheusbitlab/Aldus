@@ -4,10 +4,8 @@ import {
   FlatList,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,12 +25,11 @@ import { BookImportModal } from "@/src/presentation/components/BookImportModal";
 import { BookCloudControls } from '@/src/presentation/components/LibrarySyncControls';
 import { libraryAccountScope } from '@/src/data/library/LibraryAccountScope';
 import { LibraryBulkModal } from '@/src/presentation/components/LibraryBulkModal';
-import { AppAction, AppEmptyState } from '@/src/presentation/components/AppUi';
-import { appUi } from '@/src/theme/appUi';
+import { ActionMenu, ActionMenuItem, AppText, Button, Chip, ChipRow, EmptyState, IconButton, layout as uiLayout, ListGroup, ListRow, radius, ScreenHeader, SearchField, space } from '@/src/ui';
 
 type BookFilter = "all" | "reading" | "completed" | "unread" | "interrupted" | "favorites";
 type BookSort = "recent" | "title" | "author" | "progress" | "series";
-type OpenMenu = "filter" | "sort" | null;
+type OpenMenu = "add" | "more" | "format" | "sort" | null;
 
 const filters: { value: BookFilter; label: string }[] = [
   { value: "all", label: "Todos" },
@@ -86,8 +83,10 @@ function LibraryContent() {
   const [format, setFormat] = useState<'all' | 'epub' | 'pdf'>('all');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const requests = useRef(0);
-  const columns = layout === 'list' ? 1 : Math.max(1, Math.min(6, Math.floor((layoutWidth + 14) / 170)));
-  const cellWidth = (layoutWidth - 32 - (columns - 1) * 14) / columns;
+  const { width: windowWidth } = useWindowDimensions();
+  const gutter = uiLayout.gutter(windowWidth);
+  const columns = layout === 'list' ? 1 : Math.max(1, Math.min(6, Math.floor((layoutWidth - gutter * 2 + space.md) / 170)));
+  const cellWidth = (layoutWidth - gutter * 2 - (columns - 1) * space.md) / columns;
   const loadOrganization = useCallback(async () => {
     const request = ++requests.current, scope = libraryAccountScope.capture();
     try {
@@ -147,241 +146,139 @@ function LibraryContent() {
   const continueBook = useMemo(() => books.filter(book => Number.isFinite(book.lastOpenedDate) && (book.lastOpenedDate ?? 0) > 0 && inferredReadingStatus(book, organization[book.id]) !== 'completed')
     .reduce<LibraryBook | null>((latest, book) => !latest || book.lastOpenedDate! > latest.lastOpenedDate! ? book : latest, null), [books, organization]);
 
-  const selectedFilter =
-    filters.find((item) => item.value === filter)?.label ?? "Todos";
   const selectedSort =
     sorts.find((item) => item.value === sort)?.label ??
     "Adicionados recentemente";
 
-  const paddingTop = Platform.OS === "web" ? 16 : Math.max(insets.top, 16);
+  const paddingTop = Platform.OS === "web" ? space.xxl : Math.max(insets.top, space.lg);
+  const filtersActive = Boolean(query || filter !== "all" || format !== "all" || collection);
+  const clearFilters = () => { setQuery(""); setFilter("all"); setFormat("all"); setCollection(""); };
+  const startSelecting = () => { setSelecting(true); setSelection(new Set()); setNotice(null); };
+  const stopSelecting = () => { setSelecting(false); setSelection(new Set()); setNotice(null); };
+
+  const addItems: ActionMenuItem[] = [
+    { key: "file", label: "Importar arquivo", description: "EPUB ou PDF deste dispositivo", icon: "document-text-outline", disabled: bookImport.busy, onPress: () => void bookImport.start() },
+    { key: "drive", label: "Conectar Google Drive", description: "Leia os livros das suas pastas", icon: "logo-google", onPress: () => router.push("/sources?add=drive" as never) },
+    { key: "link", label: "Adicionar biblioteca por link", description: "Uma coleção de livros disponível na internet", icon: "link-outline", onPress: () => router.push("/sources?add=link" as never) },
+    { key: "discover", label: "Buscar em catálogos públicos", description: "Gutenberg, Gutendex e suas fontes", icon: "compass-outline", onPress: () => router.push("/(tabs)/search" as never) },
+  ];
+  const moreItems: ActionMenuItem[] = [
+    { key: "select", label: "Selecionar livros", description: "Organizar vários livros de uma vez", icon: "checkbox-outline", onPress: startSelecting },
+    { key: "collections", label: "Coleções", description: collections.length ? `${collections.length} ${collections.length === 1 ? "coleção" : "coleções"}` : "Agrupe livros por tema", icon: "albums-outline", onPress: () => setManageCollections(true) },
+    { key: "sources", label: "Minhas fontes", description: "Drive e bibliotecas conectadas", icon: "cloud-outline", onPress: () => router.push("/sources" as never) },
+    { key: "theme", label: resolvedTheme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro", icon: resolvedTheme === "dark" ? "sunny-outline" : "moon-outline", onPress: () => void setMode(resolvedTheme === "dark" ? "light" : "dark") },
+  ];
+  const formatItems: ActionMenuItem[] = (["all", "epub", "pdf"] as const).map(value => ({
+    key: value, label: value === "all" ? "Todos os formatos" : value.toUpperCase(), icon: format === value ? "checkmark" : "ellipse-outline", onPress: () => setFormat(value),
+  }));
+  const sortItems: ActionMenuItem[] = sorts.map(item => ({
+    key: item.value, label: item.label, icon: sort === item.value ? "checkmark" : "ellipse-outline", onPress: () => setSort(item.value),
+  }));
+  const formatLabel = format === "all" ? "Todos" : format.toUpperCase();
+
+  const header = (
+    <View style={styles.headerBlock}>
+      <ScreenHeader
+        title="Biblioteca"
+        subtitle={`${books.length} ${books.length === 1 ? "livro" : "livros"}${bookImport.busy ? " · importando…" : ""}`}
+        large
+        actions={<>
+          <IconButton icon="ellipsis-horizontal" label="Mais opções da biblioteca" onPress={() => setOpenMenu("more")} />
+          <IconButton icon="add" label="Adicionar livros" appearance="filled" onPress={() => setOpenMenu("add")} />
+        </>}
+      />
+      <SearchField value={query} onChangeText={setQuery} placeholder="Buscar por título, autor, série ou coleção" label="Buscar livros por metadados" />
+      <ChipRow label="Filtrar por situação">
+        {filters.map(item => <Chip key={item.value} label={item.label} selected={filter === item.value} onPress={() => setFilter(item.value)} />)}
+      </ChipRow>
+      {collections.length ? (
+        <ChipRow label="Filtrar por coleção">
+          {["", ...collections].map(name => <Chip key={name || "all"} label={name || "Todas as coleções"} icon={name ? "albums-outline" : undefined} selected={collection === name} onPress={() => setCollection(name)} />)}
+        </ChipRow>
+      ) : null}
+      <View style={styles.toolbar}>
+        <Button label={`Formato: ${formatLabel}`} variant="ghost" trailingIcon="chevron-down" style={styles.toolbarShrink} accessibilityLabel={`Filtrar formato: ${formatLabel}`} onPress={() => setOpenMenu("format")} />
+        <Button label={selectedSort} variant="ghost" icon="swap-vertical-outline" style={styles.toolbarShrink} accessibilityLabel={`Ordenar livros: ${selectedSort}`} onPress={() => setOpenMenu("sort")} />
+        <View style={styles.toolbarSpacer} />
+        <IconButton icon={layout === "grid" ? "list-outline" : "grid-outline"} label={layout === "grid" ? "Exibir em lista" : "Exibir em grade"} onPress={() => setLayout(layout === "grid" ? "list" : "grid")} />
+      </View>
+
+      {manageCollections ? (
+        <View style={styles.panel}>
+          <ListGroup title="Suas coleções" footer={collections.length ? undefined : "Nenhuma coleção ainda. Uma coleção reúne pelo menos um livro."}>
+            {collections.map(name => (
+              <ListRow
+                key={name}
+                title={name}
+                description={`${books.filter(book => organization[book.id]?.collections.includes(name)).length} livros`}
+                icon="albums-outline"
+                trailing={<Button label="Renomear" variant="ghost" disabled={!!organizationError} accessibilityLabel={`Renomear coleção ${name}`} onPress={() => setRename(name)} />}
+              />
+            ))}
+          </ListGroup>
+          <View style={styles.panelActions}>
+            <Button label="Criar coleção com livros" icon="add" onPress={() => { startSelecting(); setNotice("Selecione os livros e toque em Organizar seleção para criar uma coleção. Uma coleção reúne pelo menos um livro."); setManageCollections(false); }} />
+            <Button label="Fechar" variant="ghost" onPress={() => setManageCollections(false)} />
+          </View>
+        </View>
+      ) : null}
+
+      {selecting ? (
+        <View style={[styles.selectionBar, { backgroundColor: palette.accentSoft }]}>
+          <AppText variant="label" accessibilityLiveRegion="polite" style={{ flexGrow: 1 }}>{selectedIds.length} selecionados</AppText>
+          <Button label="Selecionar resultados" variant="ghost" onPress={() => setSelection(new Set(visibleBooks.map(book => book.id)))} />
+          <Button label="Organizar seleção" variant="primary" disabled={!selectedIds.length || !!organizationError} onPress={() => setBulkOpen(true)} />
+          <IconButton icon="close" label="Encerrar seleção" onPress={stopSelecting} />
+        </View>
+      ) : null}
+      {notice ? <AppText variant="bodySmall" tone="secondary" accessibilityLiveRegion="polite">{notice}</AppText> : null}
+      {organizationError ? (
+        <View style={styles.inlineError}>
+          <AppText variant="bodySmall" tone="danger" accessibilityRole="alert" style={{ flex: 1 }}>{organizationError}</AppText>
+          <Button label="Recarregar organização" variant="ghost" onPress={() => void loadOrganization().catch(() => undefined)} />
+        </View>
+      ) : null}
+
+      {!selecting && !filtersActive && continueBook ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Continuar lendo ${continueBook.title}`}
+          onPress={() => router.push({ pathname: "/reader/[bookId]", params: { bookId: continueBook.id } })}
+          style={({ pressed }) => [styles.continueReading, { backgroundColor: palette.surface, borderColor: palette.border, opacity: pressed ? 0.9 : 1 }]}
+        >
+          <View style={{ flex: 1, gap: space.xs }}>
+            <AppText variant="overline" tone="accent">Continue lendo</AppText>
+            <AppText variant="heading" numberOfLines={2}>{continueBook.title}</AppText>
+            <AppText variant="caption" tone="secondary">{continueBook.author}{continueBook.progress > 0 ? ` · ${Math.round(continueBook.progress * 100)}%` : ""}</AppText>
+          </View>
+          <View style={[styles.continueIcon, { backgroundColor: palette.accent }]}>
+            <Ionicons name="arrow-forward" size={20} color={palette.onAccent} />
+          </View>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 
   return (
     <View
       onLayout={event => setLayoutWidth(event.nativeEvent.layout.width)}
-      style={[
-        styles.screen,
-        { backgroundColor: palette.background, paddingTop },
-      ]}
+      style={[styles.screen, { backgroundColor: palette.background }]}
     >
-      <View style={styles.header}>
-        <View style={styles.heading}>
-          <Text accessibilityRole="header" style={[appUi.title, { color: palette.text }]}>
-            Sua Biblioteca
-          </Text>
-          <Text style={[styles.bookCount, { color: palette.secondaryText }]}>
-            {books.length} {books.length === 1 ? "livro" : "livros"}
-          </Text>
-           </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={resolvedTheme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
-          hitSlop={8}
-          onPress={() => void setMode(resolvedTheme === "dark" ? "light" : "dark")}
-          style={[styles.themeButton, { backgroundColor: palette.surfaceSecondary }]}
-        >
-          <Ionicons
-            name={resolvedTheme === "dark" ? "sunny-outline" : "moon-outline"}
-            size={20}
-            color={palette.text}
-          />
-        </Pressable>
-   </View>
-
-      <View style={styles.entryActions}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Importar livro"
-          style={[styles.importButton, { backgroundColor: palette.accent }]}
-          onPress={() => void bookImport.start()}
-          disabled={bookImport.busy}
-        >
-          {bookImport.busy ? (
-            <ActivityIndicator color={palette.onAccent} size="small" />
-          ) : (
-            <Ionicons name="add" size={21} color={palette.onAccent} />
-          )}
-          <Text style={[styles.importLabel, { color: palette.onAccent }]}>
-            {bookImport.selecting ? "Selecionando" : bookImport.busy ? "Importando" : "Importar livro"}
-          </Text>
-        </Pressable>
-        <AppAction label="Adicionar fonte" icon="add-outline" onPress={() => router.push('/sources?add=1' as never)} />
-        <Pressable accessibilityRole="button" accessibilityLabel="Minhas fontes" onPress={() => router.push('/sources' as never)} style={styles.textAction}>
-          <Text style={{ color: palette.text, fontSize: 14 }}>Minhas fontes</Text><Ionicons name="chevron-forward" size={16} color={palette.secondaryText} />
-        </Pressable>
-      </View>
-      <View
-        style={[
-          styles.searchBox,
-          {
-            backgroundColor: palette.panel,
-            borderColor: palette.separator,
-          },
-        ]}
-      >
-        <Ionicons
-          name="search-outline"
-          size={19}
-          color={palette.secondaryText}
-        />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Buscar na sua biblioteca"
-          placeholderTextColor={palette.secondaryText}
-          style={[styles.searchInput, { color: palette.text }]}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          accessibilityLabel="Buscar livros por metadados"
-        />
-      </View>
-
-      <View style={styles.toolbar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Filtrar livros: ${selectedFilter}`}
-          style={[styles.toolbarButton, { borderColor: palette.separator }]}
-          onPress={() =>
-            setOpenMenu(openMenu === "filter" ? null : "filter")
-          }
-        >
-          <Ionicons name="funnel-outline" size={16} color={palette.text} />
-          <Text
-            numberOfLines={1}
-            style={[styles.toolbarLabel, { color: palette.text }]}
-          >
-            {selectedFilter}{format !== 'all' ? ` · ${format.toUpperCase()}` : ''}
-          </Text>
-          <Ionicons
-            name="chevron-down"
-            size={14}
-            color={palette.secondaryText}
-          />
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Ordenar livros: ${selectedSort}`}
-          style={[styles.toolbarButton, { borderColor: palette.separator }]}
-          onPress={() => setOpenMenu(openMenu === "sort" ? null : "sort")}
-        >
-          <Ionicons
-            name="swap-vertical-outline"
-            size={16}
-            color={palette.text}
-          />
-          <Text
-            numberOfLines={1}
-            style={[styles.toolbarLabel, { color: palette.text }]}
-          >
-            {selectedSort}
-          </Text>
-          <Ionicons
-            name="chevron-down"
-            size={14}
-            color={palette.secondaryText}
-          />
-        </Pressable>
-      </View>
-
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={layout === 'grid' ? 'Exibir em lista' : 'Exibir em grade'} onPress={() => setLayout(layout === 'grid' ? 'list' : 'grid')} style={styles.viewButton}>
-          <Ionicons name={layout === 'grid' ? 'list-outline' : 'grid-outline'} size={21} color={palette.text} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={selecting ? "Encerrar seleção" : "Selecionar livros"} onPress={() => { setSelecting(!selecting); setSelection(new Set()); setNotice(null); }} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text }}>{selecting ? "Cancelar seleção" : "Selecionar"}</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: manageCollections }} onPress={() => setManageCollections(!manageCollections)} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text }}>Coleções</Text></Pressable>
-      </View>
-      {manageCollections ? <View style={{ gap: 10, marginBottom: 12, padding: 12, borderRadius: 10, backgroundColor: palette.panel }}>
-        <Text accessibilityRole="header" style={{ color: palette.text, fontWeight: "600" }}>Suas coleções</Text>
-        {collections.map(name => <View key={name} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Abrir coleção ${name}`} onPress={() => setCollection(name)} style={{ flex: 1, minHeight: 44, justifyContent: 'center' }}><Text style={{ color: palette.text }}>{name} · {books.filter(book => organization[book.id]?.collections.includes(name)).length}</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Renomear coleção ${name}`} disabled={!!organizationError} onPress={() => setRename(name)} style={styles.collectionChip}><Text style={{ color: palette.accent }}>Renomear</Text></Pressable>
-        </View>)}
-        <Pressable accessibilityRole="button" onPress={() => { setSelecting(true); setSelection(new Set()); setNotice('Selecione os livros e toque em Organizar seleção para criar uma coleção. Uma coleção reúne pelo menos um livro.'); setManageCollections(false); }} style={styles.collectionChip}><Text style={{ color: palette.accent }}>Criar coleção com livros</Text></Pressable>
-      </View> : null}
-      {selecting ? <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{selectedIds.length} selecionados</Text>
-        <Pressable accessibilityRole="button" onPress={() => setSelection(new Set(visibleBooks.map(book => book.id)))} style={styles.collectionChip}><Text style={{ color: palette.text }}>Selecionar resultados</Text></Pressable>
-        <Pressable accessibilityRole="button" disabled={!selectedIds.length || !!organizationError} onPress={() => setBulkOpen(true)} style={[styles.collectionChip, { backgroundColor: palette.accent, opacity: selectedIds.length ? 1 : .5 }]}><Text style={{ color: palette.onAccent }}>Organizar seleção</Text></Pressable>
-      </View> : null}
-      {notice ? <Text accessibilityLiveRegion="polite" style={{ color: palette.secondaryText, marginBottom: 12 }}>{notice}</Text> : null}
-
-      {openMenu === "filter" ? (
-        <ScrollView keyboardShouldPersistTaps="handled"
-          style={[
-            styles.dropdown,
-            {
-              backgroundColor: palette.panel,
-              borderColor: palette.separator,
-            },
-          ]}
-        >
-          {filters.map((item) => (
-            <MenuOption
-              key={item.value}
-              label={item.label}
-              selected={filter === item.value}
-              palette={palette}
-              onPress={() => {
-                setFilter(item.value);
-                setOpenMenu(null);
-              }}
-            />
-          ))}
-          <View style={{ borderTopWidth: 1, borderColor: palette.separator, paddingTop: 8 }}>
-            <Text style={{ color: palette.secondaryText, paddingHorizontal: 14, fontSize: 13 }}>Formato</Text>
-            {(['all', 'epub', 'pdf'] as const).map(value => <MenuOption key={value} label={value === 'all' ? 'Todos os formatos' : value.toUpperCase()} selected={format === value} palette={palette} onPress={() => { setFormat(value); setOpenMenu(null); }} />)}
-          </View>
-        </ScrollView>
-      ) : null}
-      {openMenu === "sort" ? (
-        <View
-          style={[
-            styles.dropdown,
-            {
-              backgroundColor: palette.panel,
-              borderColor: palette.separator,
-            },
-          ]}
-        >
-          {sorts.map((item) => (
-            <MenuOption
-              key={item.value}
-              label={item.label}
-              selected={sort === item.value}
-              palette={palette}
-              onPress={() => {
-                setSort(item.value);
-                setOpenMenu(null);
-              }}
-            />
-          ))}
-        </View>
-      ) : null}
-
-      <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }} contentContainerStyle={{ gap: 8 }}>
-        {collections.length ? ["", ...collections].map(name => <Pressable key={name} accessibilityRole="button" accessibilityState={{ selected: collection === name }} onPress={() => setCollection(name)} style={[styles.collectionChip, { borderColor: collection === name ? palette.accent : palette.separator }]}><Text style={{ color: palette.text }}>{name || "Todas as coleções"}</Text></Pressable>) : null}
-      </ScrollView>
-      {organizationError ? <View><Text accessibilityRole="alert" style={{ color: palette.accent }}>{organizationError}</Text><Pressable accessibilityRole="button" onPress={() => void loadOrganization().catch(() => undefined)}><Text style={{ color: palette.text }}>Recarregar organização</Text></Pressable></View> : null}
       {(status === "loading" || status === "idle") && books.length === 0 ? (
-        <View style={styles.loading}>
-          <ActivityIndicator color={palette.accent} />
-          <Text style={{ color: palette.secondaryText }}>
-            Carregando biblioteca...
-          </Text>
+        <View style={[styles.frame, { paddingHorizontal: gutter, paddingTop }]}>
+          {header}
+          <View style={styles.loading}>
+            <ActivityIndicator color={palette.accent} />
+            <AppText variant="bodySmall" tone="secondary">Carregando biblioteca…</AppText>
+          </View>
         </View>
       ) : null}
       {status === "error" ? (
-        <View style={styles.empty}>
-          <Text style={[styles.emptyTitle, { color: palette.text }]}>
-            Não foi possível carregar a biblioteca.
-          </Text>
-          {error ? (
-            <Text style={[styles.emptyHint, { color: palette.secondaryText }]}>
-              {error}
-            </Text>
-          ) : null}
-          <Pressable onPress={() => void reload()}>
-            <Text style={{ color: palette.accent }}>Tentar novamente</Text>
-          </Pressable>
+        <View style={[styles.frame, { paddingHorizontal: gutter, paddingTop }]}>
+          {header}
+          <EmptyState icon="alert-circle-outline" title="Não foi possível carregar a biblioteca." description={error ?? undefined}>
+            <Button label="Tentar novamente" onPress={() => void reload()} />
+          </EmptyState>
         </View>
       ) : null}
       {status !== "error" && (status === "success" || books.length > 0) ? (
@@ -390,53 +287,57 @@ function LibraryContent() {
           key={`columns-${columns}-${layout}`}
           numColumns={columns}
           keyExtractor={(book) => book.id}
-          renderItem={({ item }) => (
-            <View style={{ width: cellWidth, minWidth: 0, gap: 6, marginBottom: 16 }}>
-            {selecting ? <SharedBookCard layout={layout} book={toCardBook(item, Boolean(organization[item.id]))} themeMode={resolvedTheme} colors={palette} selection={selection.has(item.id)} onPress={() => toggleSelection(item.id)} /> : <>
-            <SharedBookCard
-              layout={layout}
-              book={toCardBook(item, Boolean(organization[item.id]))}
-              themeMode={resolvedTheme} colors={palette}
-              onPress={() => {
-                if (
-                  item.mimeType === "application/epub+zip" &&
-                  item.filePath.startsWith("bundled-epub://")
-                ) {
-                  startEpubOpenTrace(item.id, {
-                    fileName: item.fileName,
-                    source: "bundled-epub",
-                  });
-                }
-                router.push({
-                  pathname: "/reader/[bookId]",
-                  params: { bookId: item.id },
-                });
-              }}
-            />
-            <Text numberOfLines={1} style={{ color: palette.secondaryText, fontSize: 12 }}>{organization[item.id]?.favorite ? "★ · " : ""}{readingStatusLabels[inferredReadingStatus(item, organization[item.id])]}{organization[item.id]?.series ? ` · ${organization[item.id].series}${organization[item.id].volume ? ` ${organization[item.id].volume}` : ""}` : ""}</Text>
-            <BookCloudControls book={item}/>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Organizar ${toCardBook(item, Boolean(organization[item.id])).title}`} disabled={Boolean(organizationError)} onPress={() => { const displayed = toCardBook(item, Boolean(organization[item.id])); setOrganizing({ ...item, title: displayed.title, author: displayed.author }); }} style={[styles.collectionChip, { borderColor: palette.separator }]}><Text style={{ color: palette.text, textAlign: "center" }}>Organizar</Text></Pressable>
-            </>}
-            </View>
-          )}
-          contentContainerStyle={styles.list}
+          renderItem={({ item }) => {
+            const cardBook = toCardBook(item, Boolean(organization[item.id]));
+            const record = organization[item.id];
+            return (
+              <View style={{ width: cellWidth, minWidth: 0, gap: space.xs, marginBottom: space.lg }}>
+                {selecting ? <SharedBookCard layout={layout} book={cardBook} themeMode={resolvedTheme} colors={palette} selection={selection.has(item.id)} onPress={() => toggleSelection(item.id)} /> : <>
+                  <SharedBookCard
+                    layout={layout}
+                    book={cardBook}
+                    themeMode={resolvedTheme} colors={palette}
+                    onPress={() => {
+                      if (item.mimeType === "application/epub+zip" && item.filePath.startsWith("bundled-epub://")) {
+                        startEpubOpenTrace(item.id, { fileName: item.fileName, source: "bundled-epub" });
+                      }
+                      router.push({ pathname: "/reader/[bookId]", params: { bookId: item.id } });
+                    }}
+                  />
+                  <View style={styles.cardMeta}>
+                    <AppText variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+                      {record?.favorite ? "★ · " : ""}{readingStatusLabels[inferredReadingStatus(item, record)]}{record?.series ? ` · ${record.series}${record.volume ? ` ${record.volume}` : ""}` : ""}
+                    </AppText>
+                    <IconButton icon="pricetag-outline" size={18} label={`Organizar ${cardBook.title}`} disabled={Boolean(organizationError)} onPress={() => setOrganizing({ ...item, title: cardBook.title, author: cardBook.author })} />
+                  </View>
+                  <BookCloudControls book={item} />
+                </>}
+              </View>
+            );
+          }}
+          contentContainerStyle={[styles.list, { paddingHorizontal: gutter, paddingTop }]}
           columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
           initialNumToRender={12}
           maxToRenderPerBatch={12}
           windowSize={7}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          ListHeaderComponent={!selecting && !query && filter === 'all' && format === 'all' && !collection && continueBook ? <Pressable accessibilityRole="button" accessibilityLabel={`Continuar lendo ${continueBook.title}`} onPress={() => router.push({ pathname: '/reader/[bookId]', params: { bookId: continueBook.id } })} style={[styles.continueReading, { borderColor: palette.separator }]}>
-            <View style={{ flex: 1, gap: 4 }}><Text style={{ color: palette.secondaryText, fontSize: 12 }}>Continue lendo</Text><Text numberOfLines={1} style={{ color: palette.text, fontSize: 18, fontWeight: '600' }}>{continueBook.title}</Text></View>
-            <Ionicons name="arrow-forward" size={22} color={palette.text} />
-          </Pressable> : null}
+          ListHeaderComponent={header}
           ListEmptyComponent={
-            <AppEmptyState title={books.length === 0 ? 'Sua estante começa aqui' : 'Nenhum livro encontrado'} description={books.length === 0 ? 'Importe um EPUB ou PDF do dispositivo ou conecte uma fonte de livros pelos botões acima.' : 'Tente outro termo ou remova os filtros.'}>
-              {books.length ? <AppAction label="Limpar filtros" onPress={() => { setQuery(''); setFilter('all'); setFormat('all'); setCollection(''); }} /> : null}
-            </AppEmptyState>
+            <EmptyState
+              icon={books.length === 0 ? "library-outline" : "search-outline"}
+              title={books.length === 0 ? "Sua estante começa aqui" : "Nenhum livro encontrado"}
+              description={books.length === 0 ? "Importe um EPUB ou PDF, conecte o Google Drive ou busque em catálogos públicos." : "Tente outro termo ou remova os filtros."}
+            >
+              {books.length ? <Button label="Limpar filtros" onPress={clearFilters} /> : <Button label="Adicionar livros" icon="add" variant="primary" onPress={() => setOpenMenu("add")} />}
+            </EmptyState>
           }
         />
       ) : null}
+      <ActionMenu visible={openMenu === "add"} title="Adicionar livros" items={addItems} onClose={() => setOpenMenu(null)} />
+      <ActionMenu visible={openMenu === "more"} title="Biblioteca" items={moreItems} onClose={() => setOpenMenu(null)} />
+      <ActionMenu visible={openMenu === "format"} title="Formato" items={formatItems} onClose={() => setOpenMenu(null)} />
+      <ActionMenu visible={openMenu === "sort"} title="Ordenar livros" items={sortItems} onClose={() => setOpenMenu(null)} />
       {organizing ? <BookOrganizationModal book={organizing} record={organization[organizing.id]} onClose={() => setOrganizing(null)} onSaved={refreshOrganization} /> : null}
       {bulkOpen || rename ? <LibraryBulkModal bookIds={rename ? books.filter(book => organization[book.id]?.collections.includes(rename)).map(book => book.id) : selectedIds} collections={collections} rename={rename ?? undefined} onClose={() => { setBulkOpen(false); setRename(null); }} onSaved={async (count, replacement) => {
         await refreshOrganization(); if (rename && collection === rename && replacement) setCollection(replacement);
@@ -455,40 +356,6 @@ function LibraryContent() {
         }}
       />
     </View>
-  );
-}
-
-function MenuOption({
-  label,
-  selected,
-  palette,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  palette: ReturnType<typeof useAppTheme>["palette"];
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="menuitem"
-      accessibilityLabel={label}
-      accessibilityState={{ selected }}
-      style={styles.menuOption}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.menuLabel,
-          { color: selected ? palette.accent : palette.text },
-        ]}
-      >
-        {label}
-      </Text>
-      {selected ? (
-        <Ionicons name="checkmark" size={18} color={palette.accent} />
-      ) : null}
-    </Pressable>
   );
 }
 
@@ -517,142 +384,20 @@ function normalizeBookTitle(title: string): string {
 }
 
 const styles = StyleSheet.create({
-  entryActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 16 },
-  textAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  viewButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  continueReading: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, borderBottomWidth: 1, marginBottom: 18 },
-  collectionChip: { paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderRadius: 6, minHeight: 44, justifyContent: 'center' },
-  screen: {
-    flex: 1,
-    paddingHorizontal: 16,
-    width: "100%",
-  },
-  header: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 16,
-  },
-  heading: {
-    flex: 1,
-    gap: 3,
-  },
-  themeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "700",
-  },
-  bookCount: {
-    fontSize: 12,
-  },
-  importButton: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 13,
-    borderRadius: 8,
-  },
-  importLabel: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  searchBox: {
-    height: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 13,
-    marginBottom: 12,
-  },
-  searchInput: {
-    flex: 1,
-    height: "100%",
-    fontSize: 14,
-    paddingVertical: 0,
-  },
-  toolbar: {
-    flexDirection: "row",
-    gap: 9,
-    marginBottom: 14,
-  },
-  toolbarButton: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  toolbarLabel: {
-    flex: 1,
-    fontSize: 12,
-  },
-  dropdown: {
-    maxHeight: 240,
-    flexGrow: 0,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 4,
-    marginBottom: 12,
-  },
-  menuOption: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-  },
-  menuLabel: {
-    fontSize: 14,
-  },
-  loading: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  empty: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 22,
-    paddingVertical: 42,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  emptyHint: {
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 19,
-  },
-  list: {
-    paddingTop: 4,
-    paddingBottom: 28,
-  },
-  gridRow: {
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 18,
-  },
+  screen: { flex: 1, width: "100%" },
+  frame: { width: "100%", flex: 1 },
+  headerBlock: { gap: space.md, marginBottom: space.lg },
+  toolbar: { flexDirection: "row", alignItems: "center", gap: space.xs, marginLeft: -space.sm },
+  toolbarShrink: { flexShrink: 1, minWidth: 0 },
+  toolbarSpacer: { flexGrow: 1 },
+  panel: { gap: space.md },
+  panelActions: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  selectionBar: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm, padding: space.sm, paddingLeft: space.lg, borderRadius: radius.lg },
+  inlineError: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
+  continueReading: { flexDirection: "row", alignItems: "center", gap: space.lg, padding: space.lg, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, marginTop: space.xs },
+  continueIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  cardMeta: { flexDirection: "row", alignItems: "center", gap: space.xs, minHeight: 36 },
+  loading: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm, paddingVertical: space.section },
+  list: { paddingBottom: space.xxxl },
+  gridRow: { justifyContent: "flex-start", gap: space.md },
 });

@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | 1 | Fundação: `src/ui` (tokens + primitivos) e tokens semânticos de cor | IMPLEMENTADO (06/11) |
 | 2 | Navegação: abas Biblioteca · Descobrir · Estudo · Conta; sidebar no desktop Web; tela Descobrir com fontes | IMPLEMENTADO (06/11) |
-| 3 | Biblioteca: cabeçalho enxuto (título, busca, "+"), filtros em chips, "Continue lendo" | PENDENTE |
+| 3 | Biblioteca: cabeçalho enxuto (título, busca, "+" e "⋯"), filtros em chips, "Continue lendo", `BookCard` | IMPLEMENTADO (06/11) |
 | 4 | Conta/Ajustes e Estudo com `ListGroup`/`ListRow` | PENDENTE |
 | 5 | Moldura do Reader (cabeçalho/rodapé/painéis) — só visual, sem tocar motor/posições | PENDENTE |
 

@@ -18,7 +18,8 @@ export default function Sources() {
 }
 function SourceList({ accountId }: { accountId: string | null }) {
   const params = useLocalSearchParams<{ add?: string }>();
-  const [adding, setAdding] = useState(params.add === '1');
+  // `add=1` abre as opções; `add=drive`/`add=link` (vindos do "+" da Biblioteca) vão direto ao fluxo escolhido.
+  const [adding, setAdding] = useState(params.add === '1' || params.add === 'drive' || params.add === 'link');
   useEffect(() => { if (params.add === '1') setAdding(true); }, [params.add]);
   const { palette } = useAppTheme(), insets = useSafeAreaInsets();
   const { sources, legacySources, load, loadError, adoptLegacy } = useSourceStore();
@@ -30,6 +31,10 @@ function SourceList({ accountId }: { accountId: string | null }) {
   const drive = current.find(source => source.kind === 'google-drive');
   const legacy = legacySources.filter(source => !source.ownerId && !current.some(item => item.id === source.id));
   const manage = (sourceId: string, action: SourceManagerAction = 'manage') => setManager({ sourceId, action });
+  useEffect(() => {
+    if (params.add === 'drive') setManager({ sourceId: null, action: 'manage', initialKind: 'google-drive' });
+    else if (params.add === 'link') setManager({ sourceId: null, action: 'manage', initialKind: 'json' });
+  }, [params.add]);
   const adopt = () => {
     if (!adopting || busy) return;
     setBusy(true); setError(null);
