@@ -37,16 +37,14 @@ Persistência (legado mantido): Native SQLite `kindle-reader.db` (migrations v1�
 
 ## 3. Estado atual (verificado em 06/11/2026)
 
-- Git: `main` em `60b50c2` (feat library: fontes simples e grade responsiva). **Árvore suja herdada
-  do Codex, não commitada e não minha**: 16 arquivos de app (`app/(tabs)/{_layout,library,search,study}.tsx`,
-  `app/_layout.tsx`, `app/sources/index.tsx`, `src/theme/tokens.ts`, `SettingsLayout`, `AuthForm`,
-  `PlanScreens`, `admin/.../components.tsx`, `community/.../components.tsx`), `.gitignore` (+`.vercel`, `.env*`),
-  `scripts/test-critical.cjs` (+`app-design`), `scripts/test-source-library-browser.cjs`, além de
-  `scripts/test-app-design.cjs`, `DesignIdeas/` e `DesignIdeas.zip` (referência visual, não versionar).
-  É a continuação da reformulação UX/UI de 27/10; sua validação final **não foi concluída** (ver §7).
-- Validação local nesta sessão: `npm run typecheck` PASS (exit 0). `npm run test:critical`: resultado
-  registrado no Log (§8). Matriz crítica agora tem 87 suítes (o texto antigo dizia 86; `app-design` é novo
-  e não commitado). Nada de Android físico, Supabase remoto, deploy ou APK foi exercitado nesta sessão.
+- Git: `main`; HEAD após o fechamento de 06/11 = commit de docs deste registro, sobre `f970c2d`. Árvore limpa exceto `DesignIdeas/` e
+  `DesignIdeas.zip` (referência visual não versionada; nunca commitar). Reformulação UX/UI de 27/10 consolidada em
+  `d6ef9c7` (tema), `ea0b1ec` (telas/navegação) e `f970c2d` (.gitignore).
+- Validação local (06/11/2026, código = ea0b1ec): typecheck PASS; `test:critical` 87/87 PASS; `export:web` PASS
+  (build `f1c5941e25a2`, dirty=true na hora do export); Chromium PASS: `test:source-library:browser`, `test:library:bulk:web`,
+  `test:library:web`, `test:saas:web`, `test:admin:web`, `test:reader:browser`, `test:reader:settings:web`, `test:reader:markings:web`.
+  Capturas Web em `.expo/cycle2-library-web` (ícones aparecem como pontos nessas fixtures: fonte de ícones não carregada no harness, não é bug do app).
+  Nada de Android físico, Supabase remoto, deploy ou APK exercitado.
 - Funcional e conectado no código: Reader EPUB/PDF Original/PDF Reflow com âncoras textuais; marcações
   (grifos/marcadores); importação (EPUB/PDF) com cancelamento; biblioteca com organização e lote;
   Library Sync durável (outbox/CAS/tombstone) escopado por conta; Sources/Drive; OCR Android;
@@ -130,9 +128,9 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 
 ## 7. Pendências e riscos (ordem sugerida)
 
-1. **Reformulação UX/UI 27/10 inacabada**: 16 arquivos de app não commitados + `test-app-design`. Falta
-   revisar o diff, rodar export + `test:source-library:browser`/`test:library:bulk:web`, fechar contraste/rótulos,
-   commitar por onda. Preview/APK existentes não representam esse diff.
+1. **UX/UI**: código consolidado e validado em Web controlado. Faltam: revisão visual humana das telas Estudo/Conta/Explorar
+   com tab bar (sem captura de tabs nos harnesses), texto ampliado Android, preview Vercel e APK novos a partir do HEAD,
+   e homologação física. Preview/APK anteriores (00b6e4d) não representam este código.
 2. **Homologação física Android pendente** (Redmi): seleção/grifos por toque, PDF Original/Leitura Livre,
    brilho/permissões na build atual; restaurar `heads_up_notifications_enabled` para 1 quando o aparelho voltar
    (configuração temporária do aparelho, ver historico). Emulador isolado não iniciou o APK 00b6e4d (serviço phone).
@@ -147,6 +145,12 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 (cancelamento durante gravação), `AccountBookRepository`/escopo de conta.
 
 ## 8. Log (mais recente primeiro; máx. 5 entradas, resto → docs/context/historico/)
+
+### 06/11/2026 — Fechamento do código UX/UI pendente
+- IMPLEMENTADO (herdado do Codex, revisado): paleta terrosa com `onAccent`, tabs Biblioteca/Estudo/Explorar/Conta com altura/área segura,
+  títulos `appUi`, seções planas (Ajustes, Plano, Admin, Community), Estudo com "Mais ferramentas", moldura de celular só no Reader (Web).
+- VALIDADO: ver §3 (typecheck, 87/87, export, 8 suítes Chromium). Commits d6ef9c7, ea0b1ec, f970c2d. Revisei o diff completo; sem mudança de Reader engine, banco, Sync ou Auth.
+- NÃO TESTADO: Android físico/emulador, tabs em captura, TalkBack, preview/APK novos.
 
 ### 06/11/2026 — Onboarding: análise ponta a ponta e reorganização do contexto
 - Contexto reescrito (≈250 linhas); texto original dividido, sem reescrita, em `docs/context/*.md` e

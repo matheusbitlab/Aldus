@@ -2,6 +2,8 @@
 
 ## 27/10/2026 — UX/UI em reformulação (PARCIAL)
 
+Atualização 06/11/2026: código consolidado em d6ef9c7/ea0b1ec/f970c2d; typecheck, 87/87 críticas, export e 8 suítes Chromium PASS (ver PROJECT_CONTEXT §3). Seguem pendentes preview/APK novos, revisão visual das tabs e homologação física.
+
 A missão integral continua aberta. Biblioteca/fontes/navegação/Estudo/Ajustes têm incrementos locais; 86/86 suítes críticas e Library Chromium passaram no bloco intermediário. O novo export/reteste inclui correção da altura dos rótulos inferiores e labels do Estudo. Capturas, logs e limites estão no registro de 27/10 do PROJECT_CONTEXT.md. Ainda não há preview/APK novos nem homologação física deste diff. Não encerrar pendências anteriores de Reader/Android por testes controlados. Preservados dados, fontes e alterações locais preexistentes.
 
 
