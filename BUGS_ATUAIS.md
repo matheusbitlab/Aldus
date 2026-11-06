@@ -7,8 +7,7 @@ Origem: dossiês de 02/10 (`BUG_CONTEXT_EPUB_CENTER_RESET.md`, `BUG_CONTEXT_EPUB
 
 - Reset ao tocar no centro: RELATO do usuário no EPUB Web; NÃO reproduzido no EPUB (Chromium headless e browser integrado); REPRODUZIDO só no PDF Reflow.
   Causa CONFIRMADA no Reflow (troca de ancestralidade do documento por `controlsVisible` → remount do iframe → `epubPage 15→1`); corrigida estruturalmente
-  (`ReaderScreen.tsx` ≈L1043-1052, overlay estável). Cobertura: `test-reader-screen.cjs` (10 toggles, mocks), `test-reader-browser.cjs`. O relato EPUB original nunca foi
-  reconfirmado como sanado no ambiente real do usuário; causa para o EPUB, se ainda ocorrer: DESCONHECIDA. Diagnóstico: `localStorage.epubCenterResetDiagnostics="1"`.
+  (`ReaderScreen.tsx` ≈L1043-1052, overlay estável). Cobertura: `test-reader-screen.cjs` (10 toggles, mocks), `test-reader-browser.cjs`. O usuário confirmou em 06/11/2026 (em chat) que o reset já foi RESOLVIDO; não há mais ação pendente. Se voltar no EPUB, a causa seria DESCONHECIDA. Diagnóstico: `localStorage.epubCenterResetDiagnostics="1"`.
 - Oscilação 1↔11 na reabertura: era PDF Reflow (corrida entre 1º e 2º page info, total 165→241). Causa CONFIRMADA; handshake `reflowRestoreState`
   (`pending→applying→inactive`, `layoutReady` + ACK) implementado e hoje também usado no EPUB. Validação: Redmi `c382f99` (EPUB, 23/10) e Chromium de âncoras; reabertura Reflow
   com total mutável sem teste dedicado identificado. Status: IMPLEMENTADO / VALIDAÇÃO FÍSICA DO REFLOW PENDENTE.

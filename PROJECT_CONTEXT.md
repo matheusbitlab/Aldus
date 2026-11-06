@@ -96,7 +96,7 @@ Legenda: **IVER** = implementado e verificado (suíte/execução citada); **ISVS
 | Reader EPUB | IVER (Web) / físico até `c382f99` | `EpubReaderDocument.ts`, `EpubPageViewer.*`; `test-reader-{screen,navigation,location,native}`, `test-reading-anchors` (critical); `test:reader:{browser,epub:web}`; Redmi 23/10 (EPUB 4 categorias, restauração 15→16→15). HEAD atual não reexecutado no aparelho. |
 | PDF Original | IVER (Web) / físico PARC | `PdfPageViewer.*`; `test:reader:pdf:web`; Redmi 23/10 em `53b4e32`. Seleção/grifos PDF e repetição na build atual pendentes. |
 | PDF Reflow | IVER (Web) / Android PARC | `PdfReflowProcessor.*`, `PdfReflowDocumentBuilder.ts`, cache SQLite/IndexedDB; `test-pdf-reflow`, `test-reflow-*` (critical), `test:reader:reflow:web`. BUG 06: livro grande lento (584 págs ≈3m32 no Redmi, observação pontual). |
-| Bug EPUB/Reflow "center reset" | Reflow: causa CONFIRMADA e corrigida (estrutural); EPUB: relato NÃO reproduzido | `ReaderScreen.tsx` ≈L1043-1052; `test-reader-screen.cjs` (10 toggles, mocks) e `test-reader-browser.cjs`. Sem confirmação do usuário no ambiente real. Sem entrada em BUGS_ATUAIS.md. |
+| Bug EPUB/Reflow "center reset" | RESOLVIDO (usuário confirmou em 06/11). Reflow: causa confirmada e corrigida; EPUB: nunca reproduzido em teste | `ReaderScreen.tsx` ≈L1043-1052; `test-reader-screen.cjs` (10 toggles, mocks) e `test-reader-browser.cjs`. Registrado em BUGS_ATUAIS.md como resolvido. |
 | Bug restauração de progresso (era Reflow 1↔11) | Causa CONFIRMADA; handshake implementado; validação PARC | `ReaderScreen.tsx` L128/L769-822; sem teste Chromium dedicado de reabertura Reflow com total mudando; Redmi validou EPUB. |
 | Marcações (grifos/marcadores) | IVER (Web) / físico PENDENTE | `StudyPanelControls.tsx`, `Study{Bookmarks,Highlights}.ts`; `test-study-storage`, `test:reader:markings:web`, `test:reader:study:web`. Seleção por toque no Android não homologada. |
 | Biblioteca/organização/lote | IVER (local) | `library.tsx`, `OrganizeLibrarySelection.ts`; `test:library:*` (bulk, web, 1000 livros). |
@@ -159,17 +159,16 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 
 ## 8. Pendências e riscos (ordem sugerida)
 
-1. **Documentar bugs EPUB/Reflow** em BUGS_ATUAIS.md (hoje ausentes) e decidir se o relato EPUB "center reset" ainda ocorre no ambiente real.
-2. **Homologação física Android pendente** (Redmi): Reflow/PDF Original/seleção-grifos/brilho/permissões na build atual; restaurar
+1. **Homologação física Android pendente** (Redmi): Reflow/PDF Original/seleção-grifos/brilho/permissões na build atual; restaurar
    `heads_up_notifications_enabled` para 1 quando o aparelho voltar (config temporária do aparelho, ver historico). Emulador isolado não
    iniciou o APK 00b6e4d (serviço phone).
-3. **UX/UI**: faltam revisão visual humana das tabs (Estudo/Conta/Explorar), texto ampliado Android, preview Vercel e APK do HEAD.
-4. **Backend remoto não comprovado**: Library Sync/Battle/Admin/SaaS (BUG 02, 11), `username-login` (BUG 09), cadastro/recovery (BUG 08),
+2. **UX/UI**: faltam revisão visual humana das tabs (Estudo/Conta/Explorar), texto ampliado Android, preview Vercel e APK do HEAD.
+3. **Backend remoto não comprovado**: Library Sync/Battle/Admin/SaaS (BUG 02, 11), `username-login` (BUG 09), cadastro/recovery (BUG 08),
    Drive real (BUG 03). Nada disto é verificável pelo código.
-5. **Geração de flashcards por livro** é só local determinística (pergunta fixa): não vender como IA; IA exige decisão do usuário (§5).
-6. **Sources device-scoped** (BUG 12) e snapshot/config sem isolamento por conta.
-7. **Dependências** com avisos sem upgrade compatível (BUG 13; não rebaixar Expo/RN, sem `audit fix --force`).
-8. Limites conhecidos: atomicidade do lote entre abas Web independentes não comprovada; Reflow grande lento e consome memória (BUG 06);
+4. **Geração de flashcards por livro** é só local determinística (pergunta fixa): não vender como IA; IA exige decisão do usuário (§5).
+5. **Sources device-scoped** (BUG 12) e snapshot/config sem isolamento por conta.
+6. **Dependências** com avisos sem upgrade compatível (BUG 13; não rebaixar Expo/RN, sem `audit fix --force`).
+7. Limites conhecidos: atomicidade do lote entre abas Web independentes não comprovada; Reflow grande lento e consome memória (BUG 06);
    Community sem backend; `FORENSIC` logs (≈50) atrás da flag `epubCenterResetDiagnostics`.
 Áreas frágeis: `ReaderScreen.tsx`/`EpubReaderDocument.ts` (âncoras, ACK, geometria), `src/data/library/*` (outbox/CAS/epoch),
 `LibraryOrganizationStore` (escrita única + CAS), cache Reflow (cancelamento durante gravação), `AccountBookRepository`/escopo de conta.
@@ -201,7 +200,7 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
   `PROMPT_INTEGRACAO_FLASHCARDS*` foram apagados em `7f50a90` (recuperáveis em `7f50a90^`); (b) ausentes em qualquer lugar: `Pesquisa_Apps_Leitura_2026-10-05.md`,
   `Prompt_Codex_Modo_Viagem.md`, `PROPOSTA_FONTES_DE_LIVROS.md`; (c) "progress restore" original era PDF Reflow; (d) o reset do toque central só foi
   reproduzido/corrigido no Reflow; (e) geração local de flashcards usa pergunta fixa; (f) "Modo Viagem" não existe no código.
-- Próximo passo sugerido: registrar os bugs A/B em BUGS_ATUAIS.md e aguardar o pedido do usuário (§8).
+- Pós-registro: usuário confirmou que o reset do toque central já está resolvido (BUGS_ATUAIS.md e referencias atualizados). Aguardar pedido do usuário (§8).
 
 ### 06/11/2026 — Entradas anteriores
 - Fechamento UX/UI e Onboarding 1: ver `docs/context/historico/2026-11-06-ux-fechamento-e-onboarding-1.md`.

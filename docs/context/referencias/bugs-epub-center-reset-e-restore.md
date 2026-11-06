@@ -9,7 +9,8 @@
 
 | Item | Estado |
 | --- | --- |
-| RELATO | Usuário (ambiente real): num EPUB Web em página intermediária, **um** toque central abre os controles e o livro volta à página 1. Nunca houve nova confirmação do usuário de que o relato sumiu. |
+| STATUS | **RESOLVIDO** — confirmado pelo usuário em 06/11/2026 (chat). Sem pendência. O restante da tabela é histórico da investigação. |
+| RELATO | Usuário (ambiente real): num EPUB Web em página intermediária, **um** toque central abre os controles e o livro volta à página 1.  |
 | REPRODUÇÃO EPUB | **Não reproduzida**: Chrome Headless 154, EPUB de 26 capítulos, pág. 15 estável em 3 toggles; browser integrado do VS Code, pág. 15/877 estável (02/10). Não refuta o relato. |
 | REPRODUÇÃO Reflow | **Reproduzida** (Chrome Headless, Manifesto Comunista, Leitura Livre): clique central → `controlsVisible` false→true → `ReaderScreen` movia o documento de irmão de `ReaderControls` para filho (`flowReflowControls`) → unmount/remount de `DocumentReaderAdapter`/`EpubPageViewer`/iframe → novo iframe com `currentPage=1` → mensagem `page=1` → `setEpubPage 15→1`. |
 | CAUSA CONFIRMADA | Só para o **Reflow**: troca de ancestralidade do documento por `controlsVisible` (log runtime + condição em `ReaderScreen`). Para o EPUB original a causa do relato permanece **desconhecida**. |
