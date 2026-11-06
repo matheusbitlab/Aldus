@@ -13,6 +13,7 @@ export interface AppThemePalette {
   separator: string;
   border: string;
   accent: string;
+  onAccent: string;
   overlay: string;
   card: string;
   input: string;
@@ -22,36 +23,38 @@ export interface AppThemePalette {
 
 export const appThemeTokens: Record<"light" | "dark", AppThemePalette> = {
   light: {
-    background: "#F5F5F3",
-    surface: "#FFFFFF",
-    surfaceSecondary: "#F0F1F0",
-    text: "#171A1D",
-    textSecondary: "#5F6A70",
-    secondaryText: "#5F6A70",
-    separator: "#D9DED9",
-    border: "#D9DED9",
-    accent: "#D97757",
+    background: "#F7F4EE",
+    surface: "#FFFDF9",
+    surfaceSecondary: "#EDEFE5",
+    text: "#203B32",
+    textSecondary: "#5C6A63",
+    secondaryText: "#5C6A63",
+    separator: "#DADCD1",
+    border: "#DADCD1",
+    accent: "#A64E32",
+    onAccent: "#FFFFFF",
     overlay: "rgba(17, 22, 24, 0.55)",
-    card: "#FFFFFF",
-    input: "#F8F9F8",
-    tabBar: "#F9F9F7",
-    panel: "#FFFFFF",
+    card: "#FFFDF9",
+    input: "#FFFEFB",
+    tabBar: "#FBF9F4",
+    panel: "#FFFDF9",
   },
   dark: {
-    background: "#12171A",
-    surface: "#1B2125",
-    surfaceSecondary: "#20292D",
-    text: "#EEF2F4",
-    textSecondary: "#AAB6BA",
-    secondaryText: "#AAB6BA",
-    separator: "#2F383D",
-    border: "#2F383D",
-    accent: "#E59A76",
+    background: "#111916",
+    surface: "#1B2620",
+    surfaceSecondary: "#243129",
+    text: "#F0F0E7",
+    textSecondary: "#B1BDB4",
+    secondaryText: "#B1BDB4",
+    separator: "#36453B",
+    border: "#36453B",
+    accent: "#E5A17D",
+    onAccent: "#17211B",
     overlay: "rgba(8, 12, 14, 0.7)",
-    card: "#1E2529",
-    input: "#1A2125",
-    tabBar: "#171D20",
-    panel: "#1B2125",
+    card: "#1E2B23",
+    input: "#19251E",
+    tabBar: "#17211B",
+    panel: "#1B2620",
   },
 };
 
