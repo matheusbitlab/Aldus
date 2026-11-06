@@ -3,8 +3,8 @@ import { Asset } from "expo-asset";
 import { Platform } from "react-native";
 import { LibraryBook } from "@/src/domain/entities/LibraryBook";
 import { BookRepository } from "@/src/domain/repositories/BookRepository";
-import { MOCK_BOOKS } from "@/src/constants/mockBooks";
-import { bundledBookManifest, findBundledAsset } from '@/src/data/library/BundledBookIdentity';
+import { findBundledBookByFileName } from "@/src/data/library/bundledCatalog";
+import { bundledBookManifest, findBundledAsset, isLegacyBundledBook, LEGACY_BUNDLED_UNAVAILABLE_MESSAGE } from '@/src/data/library/BundledBookIdentity';
 
 type EpubContext = {
   keys(): string[];
@@ -39,9 +39,7 @@ export class BundledEpubCatalog {
         continue;
       }
 
-      const mock = MOCK_BOOKS.find(
-        (book) => book.fileUri.split("/").pop()?.toLowerCase() === fileName.toLowerCase()
-      );
+      const mock = findBundledBookByFileName(fileName);
       const now = Date.now();
       const book: LibraryBook = {
         id, bundledAssetId: assetId, importComplete: true,
@@ -70,7 +68,7 @@ export class BundledEpubCatalog {
     if (!book) throw new Error('Livro não disponível nesta conta.');
     const identity = findBundledAsset(book.bundledAssetId ?? bookId);
     const key = epubFiles.keys().find(file => file.replace(/^\.\//, '') === identity?.fileName);
-    if (!key) throw new Error("EPUB local não encontrado no pacote do aplicativo.");
+    if (!key) throw new Error(isLegacyBundledBook(book) ? LEGACY_BUNDLED_UNAVAILABLE_MESSAGE : "EPUB local não encontrado no pacote do aplicativo.");
 
     const asset = Asset.fromModule(epubFiles(key));
     await asset.downloadAsync();

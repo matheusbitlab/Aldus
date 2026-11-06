@@ -5,6 +5,16 @@
 
 ## 14. Legal
 
+**Acervo embutido (decisão permanente, 06/11/2026, adaptação de `21f595f`):** o catálogo ATIVO, registrado em contas novas, só
+contém obras originalmente escritas em português por autores falecidos há mais de 70 anos (Lei 9.610/98, art. 41), sem tradução,
+notas, adaptação ou prefácio de terceiros (traduções/edições são obras protegidas, art. 7º, XI). Cada título é declarado em
+`src/data/library/bundledCatalog.ts` (`source`, `license`, `authorDeathYear`) e em `bundledBookManifest.json` (hash). Os 33 títulos
+protegidos do acervo antigo são LEGADO (`legacyBundledAssets.json`, `legacyBundledCatalog.ts`): não entram em contas novas, mas o
+usuário decidiu que contas existentes não os perdem — retirada em 3 etapas (estado e desenho em PROJECT_CONTEXT.md §8). Nunca
+apagar entradas da lista legada. `scripts/test-bundled-catalog.cjs` (critical) impõe a política; `scripts/copy-books-to-dist.mjs` só
+publica arquivos declarados com hash conferido (`ALDUS_DIST_ACTIVE_BOOKS_ONLY=1` exclui o legado). Na dúvida sobre tradutor/edição,
+não incluir. Os binários continuam no histórico Git (não reescrito).
+
 Telas públicas e fontes: src/legal/legalContent.ts, legalConfig.ts, appMetadata.ts e
 app/legal/*.tsx. Privacidade/Termos acessíveis antes de login; política atual descreve
 Auth/Supabase privado, Sources/Drive, OCR, sensores, offline, exclusões e ausência de E2E.

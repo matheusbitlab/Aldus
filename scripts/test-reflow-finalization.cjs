@@ -46,8 +46,8 @@ function load(file){if(cache.has(file))return cache.get(file);const exports={};c
  console.log(JSON.stringify({jsonBytes:Buffer.byteLength(serialized),validationMs:Math.round(validationMs),serializationMs:Math.round(serializationMs),hostTurns:beats,heapBefore:before.heapUsed,heapAfter:process.memoryUsage().heapUsed}));
  if(process.argv.includes('--pdfs')){
    const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs');
-   for(const file of ['sobre-o-ocio.pdf','Weber-Etica.pdf','a-republica.pdf','weber-m-economia-e-sociedade-fundamentos-da-sociologia-compreensiva-volume-2.pdf']){
-     const data=fs.readFileSync(path.join('assets','Livros',file));const start=performance.now(),task=pdfjs.getDocument({data:new Uint8Array(data),useSystemFonts:true});
+   for(const file of ['assets/Livros/memórias postumas.pdf']){
+     const data=fs.readFileSync(file);const start=performance.now(),task=pdfjs.getDocument({data:new Uint8Array(data),useSystemFonts:true});
      const pdf=await task.promise,opened=performance.now(),pages=[];
      try{
        for(let n=1;n<=pdf.numPages;n++){const page=await pdf.getPage(n);try{const text=await page.getTextContent(),vp=page.getViewport({scale:1});pages.push({pageNumber:n,pageWidth:vp.width,pageHeight:vp.height,textItems:text.items.filter(i=>typeof i.str==='string'&&i.transform).map(i=>({text:i.str,x:i.transform[4],y:i.transform[5],width:i.width,height:i.height,fontName:i.fontName,hasEOL:i.hasEOL})),images:[]})}finally{page.cleanup()}}

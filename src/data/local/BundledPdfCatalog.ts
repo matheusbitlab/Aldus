@@ -3,7 +3,7 @@ import { Asset } from "expo-asset";
 import { Platform } from "react-native";
 import { BookRepository } from "@/src/domain/repositories/BookRepository";
 import { PdfFileImporter } from "@/src/data/local/PdfFileImporter";
-import { bundledBookManifest, findBundledAsset } from '@/src/data/library/BundledBookIdentity';
+import { bundledBookManifest, findBundledAsset, isLegacyBundledBook, LEGACY_BUNDLED_UNAVAILABLE_MESSAGE } from '@/src/data/library/BundledBookIdentity';
 
 type PdfContext = {
   keys(): string[];
@@ -50,7 +50,7 @@ export class BundledPdfCatalog {
     if (!book) throw new Error('Livro não disponível nesta conta.');
     const identity = findBundledAsset(book.bundledAssetId ?? bookId);
     const key = pdfFiles.keys().find(file => file.replace(/^\.\//, '') === identity?.fileName);
-    if (!key) throw new Error("PDF local não encontrado no pacote do aplicativo.");
+    if (!key) throw new Error(isLegacyBundledBook(book) ? LEGACY_BUNDLED_UNAVAILABLE_MESSAGE : "PDF local não encontrado no pacote do aplicativo.");
 
     const asset = Asset.fromModule(pdfFiles(key));
     await asset.downloadAsync();

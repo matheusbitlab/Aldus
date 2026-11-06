@@ -103,8 +103,8 @@ function load(file) {
   const { PdfFileImporter } = load('src/data/local/PdfFileImporter.ts');
   await assert.rejects(new PdfFileImporter(books, chapters, files).importFromUri('blob:invalid', 'invalid.pdf', undefined, new Blob(['not a PDF'])));
   assert.equal((await books.listActive()).length, 0);
-  const pdf = new Blob([fs.readFileSync('assets/Livros/sobre-o-ocio.pdf')], { type: 'application/pdf' });
-  const importedPdf = await new PdfFileImporter(books, chapters, files).importFromUri('blob:valid', 'sobre-o-ocio.pdf', 'pdf-import-test', pdf);
+  const pdf = new Blob([fs.readFileSync('assets/Livros/memórias postumas.pdf')], { type: 'application/pdf' });
+  const importedPdf = await new PdfFileImporter(books, chapters, files).importFromUri('blob:valid', 'memorias-postumas.pdf', 'pdf-import-test', pdf);
   assert.equal(importedPdf.filePath, 'web-pdf://pdf-import-test');
   assert.equal((await files.get(importedPdf.id)).size, pdf.size);
   const importer = new EpubFileImporter(new ImportEpubUseCase(new EpubParserService(), books, chapters), files);

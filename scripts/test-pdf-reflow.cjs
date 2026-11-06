@@ -78,15 +78,16 @@ function load(file) {
   console.log('PASS quality, OCR page policy/validation/provenance, legacy cache rejection, async cancel, progress, consent, Web fallback, Native bridge/module and narrow feedback layout');
   if(process.argv.includes('--pdfs')){
     const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs');
-    for(const [file,expected] of [['sociedade do espetaculo.pdf','ocr-required'],['manifestocomunista.pdf','ocr-required'],['sobre-o-ocio.pdf','reflow'],['o-banquete.pdf','reflow'],['a-republica.pdf','reflow']]){
-      const task=pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(path.join('assets','Livros',file))),useSystemFonts:true});
+    for(const [file,expected] of [['tests/fixtures/books/scanned-sample.pdf','ocr-required'],['assets/Livros/memórias postumas.pdf','reflow']]){
+      const task=pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(file)),useSystemFonts:true});
       const pdf=await task.promise, extracted=[];
       try{for(let n=1;n<=pdf.numPages;n++){
         const p=await pdf.getPage(n);try{const text=await p.getTextContent(),vp=p.getViewport({scale:1});
         extracted.push({pageNumber:n,pageWidth:vp.width,pageHeight:vp.height,textItems:text.items.filter(i=>typeof i.str==='string'&&i.transform).map(i=>({text:i.str,x:i.transform[4],y:i.transform[5],width:i.width,height:i.height,fontName:i.fontName,hasEOL:i.hasEOL})),images:[]});}finally{p.cleanup();}
       }
       const q=quality.assessTextExtractionQuality(extracted.flatMap(p=>p.textItems));
-      const actual=quality.isClearlyCorruptedTextExtraction(q)?'ocr-required':'reflow';assert.equal(actual,expected,file);
+      // Garbled text layers and image-only (scanned) PDFs both require OCR.
+      const actual=quality.isClearlyCorruptedTextExtraction(q)||ocr.createPdfOcrPlan(extracted).state==='OCR_REQUIRED'?'ocr-required':'reflow';assert.equal(actual,expected,file);
       if(actual==='ocr-required'){const plan=ocr.createPdfOcrPlan(extracted);assert.equal(plan.state,'OCR_REQUIRED');assert.ok(plan.pageNumbers.length>0);}
       else {const result=await builder.buildPdfReflowDocumentAsync(extracted,pdf.numPages,new AbortController().signal);assert.equal(quality.isValidatedReflowDocument(result),true);assert.notEqual(result.classification,'image-based');}
       console.log('PASS real PDF',file,JSON.stringify({pages:pdf.numPages,...q,result:actual}));

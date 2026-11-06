@@ -109,9 +109,10 @@ function measured(zip) {
   await assert.rejects(new EpubParserService().parse(bytes, controller.signal), error=>error.name==='AbortError');
   await assert.rejects(new EpubParserService().parse(new Uint8Array([1,2])), /ZIP EPUB/);
 
-  const bookPath = 'assets/Livros/Sigmund Freud Na Sua Época E Em Nosso Tempo - Elisabeth Roudinesco.epub';
+  const bookPath = 'assets/Livros/machado-de-assis-dom-casmurro.epub'; // public-domain bundled EPUB
   const healthyStart = performance.now();
   const healthy = await new EpubParserService().parse(new Uint8Array(fs.readFileSync(bookPath)));
-  assert.equal(healthy.chapters.length, 26); assert.ok(healthy.title && healthy.author);
+  assert.ok(healthy.chapters.length >= 3, `Dom Casmurro spine documents: ${healthy.chapters.length}`);
+  assert.ok(healthy.chapters.map(c => c.content ?? c.html ?? '').join('').length > 100000, 'Dom Casmurro full text must be parsed'); assert.ok(healthy.title && healthy.author);
   console.log(`PASS EPUB resources/cache/shared fonts, nested CSS/SVG/cycles, links, JSON roundtrip, cancellation and healthy EPUB: ${healthy.chapters.length} chapters in ${Math.round(performance.now()-healthyStart)}ms. Amendoas unavailable; Android not tested.`);
 })().catch(error=>{console.error(error);process.exitCode=1;});

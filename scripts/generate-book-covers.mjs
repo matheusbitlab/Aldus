@@ -8,7 +8,7 @@ import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const coversDirectory = path.join(root, "assets", "covers");
-const pdfDirectory = path.join(root, "Livros");
+const pdfDirectory = path.join(root, "assets", "Livros");
 const epubDirectory = path.join(root, "assets", "Livros");
 const xmlParser = new XMLParser({
   ignoreAttributes: false,

@@ -1,5 +1,15 @@
 # Aldus Reader — Bugs Atuais
 
+## 06/11/2026 — Acervo embutido com obras protegidas (risco autoral; PARCIAL, etapa 1 de 3)
+
+Problema: 33 dos 34 livros de `assets/Livros` são traduções/edições protegidas (Lei 9.610/98, art. 7º XI e art. 41; auditoria `21f595f`) e iam para o
+APK e para o `dist` público. Decisão do usuário: retirada em 3 etapas, sem perda para contas existentes.
+- Etapa 1 IMPLEMENTADA/VALIDADA local (typecheck, `test:critical` 88/88, `export:web`): contas novas recebem só 7 obras em domínio público; os 33 viraram
+  legado (`legacyBundledAssets.json`), continuam abrindo e sincronizando nas contas que já os têm.
+- **Risco ainda ATIVO**: os 33 arquivos seguem no APK, no `dist` público e no histórico Git. Só a etapa 3 + novo deploy/APK os retira do ar.
+- PENDENTE: etapa 2 (migrar cada registro legado para cópia própria com o mesmo ID e enviar à nuvem privada; desenho em PROJECT_CONTEXT.md §8 item 7);
+  etapa 3 (apagar arquivos, `ALDUS_DIST_ACTIVE_BOOKS_ONLY=1`). Reprodução: `node scripts/test-bundled-catalog.cjs`. NÃO TESTADO em aparelho, conta real ou deploy.
+
 ## 06/11/2026 — EPUB/Reflow: reset ao abrir controles e restauração de posição (registro retroativo)
 
 Origem: dossiês de 02/10 (`BUG_CONTEXT_EPUB_CENTER_RESET.md`, `BUG_CONTEXT_EPUB_PROGRESS_RESTORE.md`, apagados em 7f50a90). Síntese verificada com o código atual em

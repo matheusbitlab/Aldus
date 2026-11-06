@@ -53,6 +53,9 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
   Auth/OAuth, deploy de `username-login`, OWNER do Admin), Vercel, Redmi, APKs. Último APK/preview documentados (24/10) são do
   código `00b6e4d`, **não** do HEAD. Nada de Android físico, Supabase real, deploy ou APK foi exercitado em 06/11.
 - Bugs EPUB "center reset" e "restauração de progresso": ver §5 e `docs/context/referencias/bugs-epub-center-reset-e-restore.md`.
+- Acervo embutido: etapa 1 de 3 da retirada dos 33 títulos protegidos commitada no branch `claude/acervo-dominio-publico-ae9294`
+  (sobre `f9a9aff`, sem push, ainda não integrada à `main`). Validação nesse worktree: typecheck PASS, `test:critical` 88/88 PASS, `export:web` PASS
+  (`dist/assets/Livros` = 7 domínio público + 33 legados). Etapas 2–3 pendentes (§8 item 7).
 
 ## 4. Arquitetura (resumo) e invariantes
 
@@ -111,6 +114,7 @@ Legenda: **IVER** = implementado e verificado (suíte/execução citada); **ISVS
 | Sources / Drive | Sources IVER (local); Drive ISVS | `src/data/sources/*`, `src/data/drive/*`, `modules/aldus-drive-auth`; `test:source-catalog`, `test:drive`. BUG 03 (Drive real Android) e BUG 12 (Sources device-scoped) abertos. |
 | Community | PARC (somente local v0.1) | `LocalCommunityRepository`; `test-community-*`. Migration `202610130001_community_foundation.sql` **não aplicada**; não existe `SupabaseCommunityRepository`. |
 | SaaS/planos/cotas e Admin | IVER (local) / remoto ISVS | `src/domain/saas`, `src/admin`, migrations `20261015*`; `test:saas*`, `test:admin*`. Deploy/OWNER só por registro; login/TOTP real pendente. |
+| Acervo embutido — retirada em 3 etapas | Etapa 1 IVER (local); etapas 2–3 PLAN; físico/remoto NÃO TESTADO | Contas/instalações novas recebem só 7 obras em domínio público (Memórias Póstumas PDF + 6 EPUBs Gutenberg vindos do bundle Git): `bundledCatalog.ts` (`source`/`license`/`authorDeathYear`), `bundledBookManifest.json` (ativo). Os 33 títulos protegidos ficam em `legacyBundledAssets.json` + `legacyBundledCatalog.ts`: **continuam no APK e no `dist`** e registros `bundled-*` existentes ficam intactos (visíveis, abrem, Sync igual). `copy-books-to-dist.mjs` só publica o declarado com hash conferido. `test-bundled-catalog` (critical). |
 | Landing Web e legal | IVER (local/Chromium) | `src/marketing`, `src/legal`; `test:marketing*`, `test:legal*`. Deploy Vercel não reconferido. |
 | Android (build/APK/módulos) | PARC | `android/`, `scripts/build-apk-local.mjs`; APK `00b6e4d`/`53b4e32` (privados, ignorados). Homologação física BLOQUEADA (Redmi ausente), APK do HEAD inexistente. |
 | UX/UI reformulação (27/10) | IVER (Web controlado) / físico PENDENTE | commits `d6ef9c7`, `ea0b1ec`, `f970c2d`; `test-app-design`, 8 suítes Chromium. Falta revisão visual das tabs, texto ampliado Android, preview/APK novos. |
@@ -146,7 +150,7 @@ Documentos soltos na raiz (`GOOGLE_AUTH_DRIVE_DEPLOYMENT.md`, `LANDING_PAGE_CONT
 
 ## 7. Validação (comandos reais de package.json)
 
-Gates: `npm run typecheck`; `npm run test:critical` (87 suítes `scripts/test-*.cjs`, sem Android/Supabase real); `npm run export:web`;
+Gates: `npm run typecheck`; `npm run test:critical` (88 suítes `scripts/test-*.cjs`, sem Android/Supabase real); `npm run export:web`;
 `git diff --check`. Ferramentas de teste isoladas em `.expo/` (`npm run setup:test-tools`). Tempo típico: typecheck e critical levam alguns
 minutos; rode em segundo plano. Por área:
 - Reader: `test:reader:{browser,epub:web,reflow:web,study:web,pdf:web,settings:web,concentration:web,markings:web}` (Chromium; fora do critical)
@@ -168,7 +172,17 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 4. **Geração de flashcards por livro** é só local determinística (pergunta fixa): não vender como IA; IA exige decisão do usuário (§5).
 5. **Sources device-scoped** (BUG 12) e snapshot/config sem isolamento por conta.
 6. **Dependências** com avisos sem upgrade compatível (BUG 13; não rebaixar Expo/RN, sem `audit fix --force`).
-7. Limites conhecidos: atomicidade do lote entre abas Web independentes não comprovada; Reflow grande lento e consome memória (BUG 06);
+7. **Retirada do acervo protegido (decisão do usuário em 06/11: "3 etapas, sem perda"; nuvem privada autorizada na migração)**.
+   Etapa 1 feita (só novas contas mudam; risco autoral dos 33 arquivos no APK/`dist` público **continua**). **Etapa 2 (versão N) PENDENTE**, desenho:
+   para cada registro `bundled-*` legado não excluído da conta ativa, copiar o asset para cópia própria (nativo: `documentDirectory`; Web:
+   `webBookFileStore`/IndexedDB, `transaction.oncomplete`), mantendo o **mesmo ID**; trocar `filePath` e zerar `bundledAssetId` num único `save`
+   journaled; então o Sync envia a cópia ao bucket privado (consome quota; usuário autorizou). Pontos a mudar com teste: `AccountBookRepository` L61
+   (reanexa `bundledAssetId` a ids `bundled-*`: não reanexar legado), atalho de `PrivateBookFileService.upload`/`needsFile` para legado, `LibraryLocalReplica`
+   (outro aparelho deve aguardar `remotePath` em vez de remontar `bundled-…://`), idempotência/cancelamento por geração, A→B→A, tombstones. Quem não
+   abrir o app na versão N perde PDFs/EPUBs não abertos na N+1. **Etapa 3 (N+1)**: apagar os 33 de `assets`, `export:web` com
+   `ALDUS_DIST_ACTIVE_BOOKS_ONLY=1` (ou tornar padrão), fallback `LEGACY_BUNDLED_UNAVAILABLE_MESSAGE`; histórico Git segue com os binários.
+   Outros pendentes: créditos Gutenberg na tela de licenças/Direitos Autorais (`src/legal`), trocar o shim `src/constants/mockBooks.ts` nas telas após o redesign.
+8. Limites conhecidos: atomicidade do lote entre abas Web independentes não comprovada; Reflow grande lento e consome memória (BUG 06);
    Community sem backend; `FORENSIC` logs (≈50) atrás da flag `epubCenterResetDiagnostics`.
 Áreas frágeis: `ReaderScreen.tsx`/`EpubReaderDocument.ts` (âncoras, ACK, geometria), `src/data/library/*` (outbox/CAS/epoch),
 `LibraryOrganizationStore` (escrita única + CAS), cache Reflow (cancelamento durante gravação), `AccountBookRepository`/escopo de conta.
@@ -188,6 +202,20 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 - **IA externa:** não enviar livros/trechos a serviço de IA sem pedido e consentimento explícito do usuário final.
 
 ## 10. Log (mais recente primeiro; máx. 5 entradas, resto → docs/context/historico/)
+
+### 06/11/2026 — Acervo: etapa 1 da retirada das obras protegidas (Claude, sessão paralela)
+- Origem: auditoria de 23/10 (`21f595f`, branch `refactor/arquitetura-design-system`, bundle untracked `DesignIdeas/aldus-refactor.bundle`):
+  33 de 34 livros embutidos são traduções/edições protegidas e `copy-books-to-dist.mjs` os publicava. Usuário decidiu: "3 etapas, sem perda";
+  na migração, cópia na "nuvem privada" autorizada. O 21f595f escondia/recusava os livros; isso foi **descartado** (contas existentes não perdem nada).
+- IMPLEMENTADO: 6 EPUBs Gutenberg + capas trazidos do bundle Git (nada baixado); `bundledCatalog.ts` (fonte/licença/ano de morte) e manifesto ativo
+  com 7 títulos registrados em contas novas; `legacyBundledAssets.json`/`legacyBundledCatalog.ts` com os 33 (arquivos, capas, IDs, hashes e metadados
+  mantidos); `BundledBookIdentity` resolve ativo + legado; `copy-books-to-dist.mjs` só copia o declarado, com hash; gerador do manifesto exclui o legado;
+  mensagem `LEGACY_BUNDLED_UNAVAILABLE_MESSAGE` só como último recurso quando o arquivo some; testes que usavam livros protegidos passaram a usar
+  domínio público + fixture sintética `tests/fixtures/books/scanned-sample.pdf`; `src/constants/mockBooks.ts` virou shim (telas não editadas).
+- VALIDADO (worktree, Windows, deps via junction para `C:\KIndle\node_modules` e `.expo/*-test-tools`): `npm run typecheck` PASS; `npm run test:critical`
+  88/88 PASS (inclui novo `bundled-catalog`: registro real de conta nova/existente com `require.context` simulado, Sync payload, dist em sandbox);
+  `npm run export:web` PASS; `git diff --check` PASS. NÃO TESTADO: Chromium, Android, Supabase, conta antiga real, deploy.
+- Próximo: etapa 2 (migração para cópia própria + nuvem privada, desenho em §8 item 7), depois etapa 3.
 
 ### 06/11/2026 — Onboarding 2: auditoria somente leitura + reescrita do contexto (Claude)
 - IMPLEMENTADO (só docs): `PROJECT_CONTEXT.md` reescrito (matriz de recursos §5 com evidência; mapa §6 conferido no disco; regras §9);

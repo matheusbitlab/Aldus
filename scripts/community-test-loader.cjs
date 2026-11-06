@@ -8,6 +8,7 @@ module.exports = function makeLoader(overrides = {}) {
       if (inferred) file = inferred;
     }
     if (cache.has(file)) return cache.get(file).exports;
+    if (file.endsWith('.json')) return require(file);
     const module = { exports: {} }; cache.set(file, module);
     const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: {
       module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,

@@ -42,15 +42,15 @@ function load(file){if(cache.has(file))return cache.get(file);const exports={};c
  const paragraphs=Array.from({length:240},(_,i)=>`<p>Parágrafo ${i}. ${'A leitura conserva a localização do trecho e permite consultar o livro com clareza. '.repeat(8)}</p>`).join('');
  let chapters=[{id:'fixture-chapter',title:'Capítulo de regressão',html:paragraphs}];
  if(process.argv.includes('--epub')){
-  const file=fs.readdirSync('Livros').find(name=>/Sigmund Freud.*\.epub$/i.test(name));assert.ok(file);
-  const {EpubParserService}=load('src/data/epub/EpubParserService.ts');chapters=(await new EpubParserService().parse(new Uint8Array(fs.readFileSync(path.join('Livros',file))))).chapters;
+  const file='machado-de-assis-dom-casmurro.epub';
+  const {EpubParserService}=load('src/data/epub/EpubParserService.ts');chapters=(await new EpubParserService().parse(new Uint8Array(fs.readFileSync(path.join('assets','Livros',file))))).chapters;
   console.log('REAL EPUB',JSON.stringify({file,chapters:chapters.length}));
  }
  if(process.argv.includes('--reflow')){
-  const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs'),task=pdfjs.getDocument({data:new Uint8Array(fs.readFileSync('Livros/sobre-o-ocio.pdf')),useSystemFonts:true});
+  const pdfjs=await import('pdfjs-dist/legacy/build/pdf.mjs'),task=pdfjs.getDocument({data:new Uint8Array(fs.readFileSync('assets/Livros/memórias postumas.pdf')),useSystemFonts:true});
   const pdf=await task.promise,pages=[];
   try{for(let n=1;n<=pdf.numPages;n++){const p=await pdf.getPage(n);try{const text=await p.getTextContent(),vp=p.getViewport({scale:1});pages.push({pageNumber:n,pageWidth:vp.width,pageHeight:vp.height,textItems:text.items.filter(i=>typeof i.str==='string'&&i.transform).map(i=>({text:i.str,x:i.transform[4],y:i.transform[5],width:i.width,height:i.height,fontName:i.fontName,hasEOL:i.hasEOL})),images:[]});}finally{p.cleanup();}}
-  const builder=load('src/data/local/PdfReflowDocumentBuilder.ts');chapters=builder.toStoredReflowChapters('reflow-browser',builder.buildPdfReflowDocument(pages,pdf.numPages));console.log('REAL REFLOW',JSON.stringify({file:'sobre-o-ocio.pdf',sourcePages:pdf.numPages,chapters:chapters.length}));}finally{await task.destroy();}
+  const builder=load('src/data/local/PdfReflowDocumentBuilder.ts');chapters=builder.toStoredReflowChapters('reflow-browser',builder.buildPdfReflowDocument(pages,pdf.numPages));console.log('REAL REFLOW',JSON.stringify({file:'memórias postumas.pdf',sourcePages:pdf.numPages,chapters:chapters.length}));}finally{await task.destroy();}
  }
  const options={fontSize:16,fontFamily:'Georgia',marginSize:24,lineHeight:1.65,paragraphSpacing:1,textColor:'#222222',backgroundColor:'#f5ebd9'};
  if(process.argv.includes('--lazy-images')){
