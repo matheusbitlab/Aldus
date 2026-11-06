@@ -158,7 +158,7 @@ async function cdp(url) {
     await click('Novo deck');await until('Cancelar');await screenshot('study-create');await click('Cancelar');
     for (const width of [320,390,768,1440]) {
       await client.command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
-      for (const [route,expected,name] of [['/settings','Conta e plano','settings'],['/search','Explorar','explore']]) {
+      for (const [route,expected,name] of [['/settings','Conta e plano','settings'],['/search','Descobrir','explore']]) {
         await navigate(route);await until(expected);assert.equal(await client.evaluate('document.documentElement.scrollWidth>innerWidth'),false,name+' overflow');assert(await client.evaluate("[...document.querySelectorAll('[role=tab]')].every(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight+1})"),'tab labels stay within viewport');await screenshot(name+'-'+width);
       }
     }

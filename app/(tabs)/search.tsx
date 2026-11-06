@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { appUi } from '@/src/theme/appUi';
+import { ActivityIndicator, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { BookCover } from '@/src/presentation/components/BookCover';
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,7 +13,10 @@ import { ScrapedLink } from "@/src/domain/types/search";
 import { BUILTIN_CATALOG_NAMES } from "@/src/data/scraping/catalogPlugins";
 import { BNDIGITAL_BLOCK_REASON } from "@/src/data/scraping/BNDigitalSearchPlugin";
 import { appDependencies } from "@/src/presentation/services/dependencies";
-import { sourceIdentity } from "@/src/domain/types/sourceCatalog";
+import { sourceCapabilities, sourceIdentity } from "@/src/domain/types/sourceCatalog";
+import type { UserSource } from "@/src/domain/types/sources";
+import { sourceLibraryTypeLabel, sourceVisibleInAccount, useSourceAccountId } from "@/src/presentation/components/sourcePresentation";
+import { AppText, Button, Chip, ChipRow, EmptyState, IconButton, layout, ListGroup, ListRow, ScreenHeader, SearchField, Section, space } from "@/src/ui";
 
 export default function Search() {
   const insets = useSafeAreaInsets();
@@ -36,7 +38,10 @@ export default function Search() {
   } = useSearchStore();
   const { jobs, enqueue, cancel: cancelDownload } = useDownloadStore();
   const sources = useSourceStore((state) => state.sources);
-  const activeSources = useMemo(() => sources.filter((source) => source.enabled && source.status === "active"), [sources]);
+  const accountId = useSourceAccountId();
+  // Somente fontes da conta atual (Sources ainda são persistidas por dispositivo, BUG 12).
+  const accountSources = useMemo(() => sources.filter(source => sourceVisibleInAccount(source, accountId)), [sources, accountId]);
+  const activeSources = useMemo(() => accountSources.filter((source) => source.enabled && source.status === "active"), [accountSources]);
   const [touched, setTouched] = useState(false);
   const [sourceFilter, setSourceFilter] = useState(useSearchStore.getState().selectedSource);
   const externalSourceFilter = useSearchStore(state => state.selectedSource);
@@ -48,6 +53,14 @@ export default function Search() {
   const acquisitionController = useRef<AbortController | null>(null);
   useEffect(() => () => acquisitionController.current?.abort(), []);
   const loadSources = useSourceStore((state) => state.load);
+  const { width } = useWindowDimensions();
+  const gutter = layout.gutter(width);
+  const openSource = (source: UserSource) => {
+    const capabilities = sourceCapabilities(source);
+    if (capabilities.supportsCatalog) router.push({ pathname: "/sources/[sourceId]", params: { sourceId: source.id } } as never);
+    else if (capabilities.supportsSearch) { setSourceFilter(source.name); selectSource(source.name); }
+    else router.push("/sources" as never);
+  };
 
   useEffect(() => {
     void loadSources();
@@ -124,116 +137,104 @@ export default function Search() {
     void search(sourceFilter);
   };
 
-  return (
-    <View style={[styles.screen, { backgroundColor: palette.background, paddingTop: Platform.OS === "web" ? 16 : Math.max(insets.top, 16) }]}>
-      <View style={styles.header}>
-        <View style={styles.heading}>
-          <Text accessibilityRole="header" style={[appUi.title, { color: palette.text }]}>Explorar</Text>
-          <Text style={[styles.subtitle, { color: palette.secondaryText }]}>Encontre livros em catálogos públicos e nas suas fontes.</Text>
+  const discoverSources = (
+    <View style={styles.discover}>
+      <Section
+        title="Suas fontes"
+        action={<Button label="Adicionar fonte" icon="add" variant="primary" onPress={() => router.push("/sources?add=1" as never)} />}
+      >
+        {accountSources.length ? (
+          <ListGroup>
+            {accountSources.map(source => (
+              <ListRow
+                key={source.id}
+                title={source.name}
+                description={source.enabled ? sourceLibraryTypeLabel(source.kind) : `${sourceLibraryTypeLabel(source.kind)} · desativada`}
+                icon={source.kind === "google-drive" ? "logo-google" : source.kind === "json" ? "link-outline" : "library-outline"}
+                onPress={() => openSource(source)}
+              />
+            ))}
+          </ListGroup>
+        ) : (
+          <AppText variant="bodySmall" tone="secondary">
+            Conecte o Google Drive ou adicione uma biblioteca por link para encontrar seus livros aqui.
+          </AppText>
+        )}
+        <Button label="Gerenciar fontes" variant="ghost" trailingIcon="chevron-forward" onPress={() => router.push("/sources" as never)} />
+      </Section>
+      <ListGroup title="Bibliotecas digitais">
+        <ListRow title="BibliON" description="Biblioteca digital gratuita" icon="library-outline" onPress={() => router.push("/services/biblion" as never)} />
+        <ListRow title="MEC Livros" description="Acervo digital do Ministério da Educação" icon="school-outline" onPress={() => router.push("/services/mec" as never)} />
+      </ListGroup>
+    </View>
+  );
+
+  const header = (
+    <View style={styles.headerBlock}>
+      <ScreenHeader title="Descobrir" subtitle="Catálogos públicos, suas fontes e bibliotecas digitais." large />
+      <View style={styles.searchRow}>
+        <View style={styles.searchField}>
+          <SearchField value={query} onChangeText={setQuery} onSubmit={submitSearch} placeholder="Título, autor ou assunto" label="Buscar livros" />
         </View>
+        <IconButton icon="arrow-forward" label="Buscar" appearance="filled" disabled={!query.trim()} onPress={submitSearch} />
       </View>
+      <ChipRow label="Filtrar por fonte">
+        {filters.map(filter => (
+          <Chip
+            key={filter}
+            label={filter}
+            selected={sourceFilter === filter}
+            onPress={() => { setSourceFilter(filter); selectSource(filter); if (touched && query.trim()) void search(filter); }}
+          />
+        ))}
+        <Chip label="BNDigital · Indisponível" icon="alert-circle-outline" accessibilityHint="Fonte indisponível no momento" onPress={() => setSourceNotice(BNDIGITAL_BLOCK_REASON)} />
+      </ChipRow>
 
-      <View style={[styles.searchBox, { backgroundColor: palette.surface, borderColor: palette.separator }]}>
-        <Ionicons name="search-outline" size={20} color={palette.secondaryText} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          onSubmitEditing={submitSearch}
-          placeholder="Título, autor ou assunto"
-          placeholderTextColor={palette.secondaryText}
-          style={[styles.searchInput, { color: palette.text }]}
-          returnKeyType="search"
-          accessibilityLabel="Buscar livros"
-        />
-        {query.length > 0 ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Limpar busca" onPress={() => setQuery("")} hitSlop={8} style={styles.clearButton}>
-            <Ionicons name="close-circle" size={19} color={palette.secondaryText} />
-          </Pressable>
-        ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Buscar"
-          disabled={!query.trim()}
-          onPress={submitSearch}
-          style={[styles.searchButton, { backgroundColor: palette.accent, opacity: !query.trim() ? 0.5 : 1 }]}
-        >
-          <Ionicons name="arrow-forward" size={19} color={palette.onAccent} />
-        </Pressable>
-      </View>
-
-      <ScrollView horizontal style={{ flexGrow: 0 }} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-        {filters.map((filter) => {
-          const selected = sourceFilter === filter;
-          return (
-            <Pressable
-              key={filter}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              onPress={() => { setSourceFilter(filter); selectSource(filter); if (touched && query.trim()) void search(filter); }}
-              style={[styles.filterChip, { backgroundColor: selected ? palette.accent : palette.surfaceSecondary }]}
-            >
-              <Text style={[styles.filterText, { color: selected ? palette.onAccent : palette.text }]}>{filter}</Text>
-            </Pressable>
-          );
-        })}
-        <Pressable accessibilityRole="button" onPress={() => setSourceNotice(BNDIGITAL_BLOCK_REASON)} style={[styles.futureChip, { borderColor: palette.separator }]}>
-          <Text style={[styles.futureText, { color: palette.secondaryText }]}>BNDigital · Indisponível</Text>
-        </Pressable>
-      </ScrollView>
-
-      {sourceNotice ? <Text accessibilityRole="alert" style={[styles.stateText, { color: palette.secondaryText }]}>{sourceNotice}</Text> : null}
-      {sourceStatuses.length ? <Text accessibilityLiveRegion="polite" style={[styles.stateText, { color: palette.secondaryText }]}>{sourceStatuses.map(source => `${source.sourceName}: ${{ loading: "consultando", success: "concluída", empty: "sem resultados", error: "erro", cancelled: "cancelada" }[source.status]}`).join(" · ")}</Text> : null}
+      {sourceNotice ? <AppText variant="bodySmall" tone="secondary" accessibilityRole="alert">{sourceNotice}</AppText> : null}
+      {sourceStatuses.length ? <AppText variant="caption" tone="secondary" accessibilityLiveRegion="polite">{sourceStatuses.map(source => `${source.sourceName}: ${{ loading: "consultando", success: "concluída", empty: "sem resultados", error: "erro", cancelled: "cancelada" }[source.status]}`).join(" · ")}</AppText> : null}
 
       {isSearching ? (
         <View style={styles.stateRow}>
           <ActivityIndicator size="small" color={palette.accent} />
-          <Text style={[styles.stateText, { color: palette.secondaryText }]}>Consultando fontes…</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Cancelar busca" onPress={cancel}><Text style={{ color: palette.accent }}>Cancelar</Text></Pressable>
+          <AppText variant="bodySmall" tone="secondary" style={{ flex: 1 }}>Consultando fontes…</AppText>
+          <Button label="Cancelar busca" variant="ghost" onPress={cancel} />
         </View>
       ) : null}
 
       {status === "error" ? (
-        <View style={[styles.notice, { backgroundColor: palette.surface, borderColor: palette.separator }]}>
-          <Text style={[styles.noticeTitle, { color: palette.text }]}>Não foi possível concluir a busca</Text>
-          <Text style={[styles.noticeBody, { color: palette.secondaryText }]}>{error ?? "Confira sua conexão e tente novamente."}</Text>
-          <Pressable accessibilityRole="button" onPress={retrySearch} style={styles.retryButton}>
-            <Ionicons name="refresh-outline" size={16} color={palette.accent} />
-            <Text style={{ color: palette.accent, fontWeight: "600" }}>Tentar novamente</Text>
-          </Pressable>
+        <View style={[styles.notice, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <AppText variant="label">Não foi possível concluir a busca</AppText>
+          <AppText variant="bodySmall" tone="secondary">{error ?? "Confira sua conexão e tente novamente."}</AppText>
+          <Button label="Tentar novamente" icon="refresh-outline" variant="ghost" onPress={retrySearch} />
         </View>
       ) : null}
 
       {status === "partial" && (pendingSources.length > 0 || sourceStatuses.some(source => source.status === "error")) ? (
         <View style={[styles.partialNotice, { backgroundColor: palette.surfaceSecondary }]}>
           <Ionicons name="alert-circle-outline" size={17} color={palette.accent} />
-          <Text style={[styles.partialText, { color: palette.text }]}>
+          <AppText variant="caption" style={{ flex: 1 }}>
             {pendingSources.length ? `Resultados parciais. Aguardando: ${pendingSources.join(", ")}.` : `Algumas fontes falharam: ${sourceStatuses.filter((source) => source.status === "error").map((source) => source.sourceName).join(", ")}.`}
-          </Text>
+          </AppText>
         </View>
       ) : null}
 
-      {status === "cancelled" ? <Text accessibilityLiveRegion="polite" style={[styles.stateText, { color: palette.secondaryText }]}>Busca cancelada. Os resultados já recebidos continuam disponíveis.</Text> : null}
+      {status === "cancelled" ? <AppText variant="bodySmall" tone="secondary" accessibilityLiveRegion="polite">Busca cancelada. Os resultados já recebidos continuam disponíveis.</AppText> : null}
 
       {touched && (status === "empty" || (status === "partial" && results.length === 0)) ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="search-outline" size={25} color={palette.secondaryText} />
-          <Text style={[styles.emptyTitle, { color: palette.text }]}>Nenhum resultado</Text>
-          <Text style={[styles.emptyBody, { color: palette.secondaryText }]}>Experimente outro título, autor ou assunto.</Text>
-        </View>
+        <EmptyState icon="search-outline" title="Nenhum resultado" description="Experimente outro título, autor ou assunto." />
       ) : null}
 
-      {status === "idle" ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="book-outline" size={26} color={palette.secondaryText} />
-          <Text style={[styles.emptyTitle, { color: palette.text }]}>O que você quer ler?</Text>
-          <Text style={[styles.emptyBody, { color: palette.secondaryText }]}>Busque por título, autor ou assunto.</Text>
-        </View>
-      ) : null}
+      {status === "idle" ? discoverSources : null}
+    </View>
+  );
 
+  return (
+    <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <FlatList
         data={visibleResults}
         keyExtractor={(item) => item.url}
-        contentContainerStyle={[styles.results, { paddingBottom: Math.max(insets.bottom, 18) }]}
+        ListHeaderComponent={header}
+        contentContainerStyle={[styles.results, { maxWidth: layout.content + gutter * 2, paddingHorizontal: gutter, paddingTop: Platform.OS === "web" ? space.xxl : Math.max(insets.top, space.lg), paddingBottom: Math.max(insets.bottom, space.xxl) }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
@@ -241,25 +242,19 @@ export default function Search() {
             accessibilityRole="button"
             accessibilityLabel={`Detalhes de ${item.title}, de ${item.author ?? "autor desconhecido"}`}
             onPress={() => { setAcquisitionMessage(null); setSelectedBook(item); }}
-            style={[styles.resultRow, { backgroundColor: palette.surface, borderColor: palette.separator }]}
+            style={[styles.resultRow, { backgroundColor: palette.surface, borderColor: palette.border }]}
           >
             <View style={styles.cover}><BookCover identity={item.remoteBookId ?? item.url} title={item.title} author={item.author} format={item.format} source={item.coverUrl ? { uri: item.coverUrl } : null} compact /></View>
             <View style={styles.resultBody}>
-              <Text numberOfLines={2} style={[styles.resultTitle, { color: palette.text }]}>{item.title}</Text>
-              <Text numberOfLines={1} style={[styles.author, { color: palette.secondaryText }]}>{item.author ?? "Autor não informado"}</Text>
-              <View style={styles.metaRow}>
-                <Text style={[styles.meta, { color: palette.secondaryText }]}>{item.sourceSite}</Text>
-                <Text style={[styles.meta, { color: palette.secondaryText }]}>{[item.language?.toUpperCase(), item.format.toUpperCase()].filter(Boolean).join(" · ")}</Text>
-              </View>
-              <Text style={[styles.detailAction, { color: palette.accent }]}>Ver detalhes</Text>
+              <AppText variant="subheading" numberOfLines={2}>{item.title}</AppText>
+              <AppText variant="bodySmall" tone="secondary" numberOfLines={1}>{item.author ?? "Autor não informado"}</AppText>
+              <AppText variant="caption" tone="secondary">{[item.sourceSite, item.language?.toUpperCase(), item.format.toUpperCase()].filter(Boolean).join(" · ")}</AppText>
             </View>
             <Ionicons name="chevron-forward" size={18} color={palette.secondaryText} />
           </Pressable>
         )}
         ListFooterComponent={nextPageUrl && !isSearching ? (
-          <Pressable accessibilityRole="button" onPress={() => void loadMore()} style={[styles.loadMore, { borderColor: palette.separator }]}>
-            <Text style={{ color: palette.accent, fontWeight: "600" }}>Carregar mais</Text>
-          </Pressable>
+          <Button label="Carregar mais" variant="secondary" block onPress={() => void loadMore()} style={{ marginTop: space.sm }} />
         ) : null}
       />
 
@@ -382,42 +377,19 @@ function remoteProgressText(job: ReturnType<typeof useDownloadStore.getState>["j
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, width: "100%", paddingHorizontal: 16 },
-  header: { minHeight: 52, flexDirection: "row", alignItems: "center", marginBottom: 12 },
-  heading: { flex: 1, gap: 3 },
-  title: { fontSize: 24, fontWeight: "700" },
-  subtitle: { fontSize: 12 },
-  searchBox: { minHeight: 48, borderWidth: 1, borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 13, paddingRight: 5 },
-  searchInput: { flex: 1, minWidth: 0, minHeight: 44, fontSize: 15, paddingVertical: 8 },
-  clearButton: { width: 32, height: 36, alignItems: "center", justifyContent: "center" },
-  searchButton: { width: 38, height: 38, alignItems: "center", justifyContent: "center", borderRadius: 6 },
-  filters: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 12, paddingRight: 12 },
-  filterChip: { minHeight: 31, justifyContent: "center", paddingHorizontal: 11, borderRadius: 16 },
-  filterText: { fontSize: 12, fontWeight: "600" },
-  futureChip: { minHeight: 31, justifyContent: "center", paddingHorizontal: 10, borderWidth: 1, borderRadius: 16, opacity: 0.75 },
-  futureText: { fontSize: 11 },
-  stateRow: { flexDirection: "row", alignItems: "center", gap: 9, paddingVertical: 8 },
-  stateText: { fontSize: 13 },
-  notice: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 8, gap: 5 },
-  noticeTitle: { fontSize: 14, fontWeight: "700" },
-  noticeBody: { fontSize: 12, lineHeight: 18 },
-  retryButton: { flexDirection: "row", alignItems: "center", gap: 7, minHeight: 36, alignSelf: "flex-start", marginTop: 3 },
-  partialNotice: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 9, borderRadius: 6, marginBottom: 8 },
-  partialText: { flex: 1, fontSize: 11, lineHeight: 16 },
-  emptyState: { alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 24, paddingVertical: 34 },
-  emptyTitle: { fontSize: 16, fontWeight: "600" },
-  emptyBody: { fontSize: 12, textAlign: "center", lineHeight: 17 },
-  results: { width: "100%", maxWidth: 720, alignSelf: "center", gap: 8, paddingBottom: 20 },
-  resultRow: { minHeight: 116, flexDirection: "row", alignItems: "center", gap: 11, padding: 10, borderWidth: 1, borderRadius: 7 },
+  screen: { flex: 1, width: "100%" },
+  headerBlock: { gap: space.lg, marginBottom: space.lg },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  searchField: { flex: 1, minWidth: 0 },
+  discover: { gap: space.xxxl, marginTop: space.sm },
+  stateRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  notice: { borderWidth: 1, borderRadius: 10, padding: space.md, gap: space.xs },
+  partialNotice: { flexDirection: "row", alignItems: "flex-start", gap: space.sm, padding: space.sm + 2, borderRadius: 10 },
+  results: { width: "100%", alignSelf: "center", gap: space.sm },
+  resultRow: { minHeight: 116, flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14 },
   cover: { width: 62, height: 92, borderRadius: 4, backgroundColor: "#E6E6E1" },
-  coverFallback: { width: 62, height: 92, alignItems: "center", justifyContent: "center", borderRadius: 4 },
-  resultBody: { flex: 1, minWidth: 0, gap: 3 },
-  resultTitle: { fontSize: 14, lineHeight: 18, fontWeight: "700" },
-  author: { fontSize: 12 },
-  metaRow: { flexDirection: "row", flexWrap: "wrap", columnGap: 9 },
+  resultBody: { flex: 1, minWidth: 0, gap: space.xxs },
   meta: { fontSize: 10 },
-  detailAction: { fontSize: 12, fontWeight: "600", marginTop: 3 },
-  loadMore: { minHeight: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 7, marginVertical: 8 },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", paddingHorizontal: 8, paddingTop: 10 },
   detailSheet: { maxHeight: "92%", width: "100%", maxWidth: 620, alignSelf: "center", borderTopLeftRadius: 12, borderTopRightRadius: 12, overflow: "hidden" },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 10 },

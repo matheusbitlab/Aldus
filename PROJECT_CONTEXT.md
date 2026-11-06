@@ -45,9 +45,12 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
   `DesignIdeas/` e `DesignIdeas.zip` (referência visual) e `aldus-context.zip` (pacote de contexto externo; seu conteúdo útil — os
   dois handoffs do ChatGPT — foi copiado para `docs/context/referencias/`). Arquivos na raiz ignorados: `Livros/`, `debug-reflow-*`,
   `artifacts/`, `dist/`, `.expo/`.
-- Redesign de UI em andamento (decisões e fases em `docs/context/design-system.md`): Fase 1 (fundação `src/ui`) concluída; telas ainda
-  usam os componentes antigos. Retirada do acervo com risco autoral roda em sessão/branch própria (`claude/acervo-dominio-publico-*`), fora da `main`.
-- Validação local de 06/11 (Fase 1, sobre `f9a9aff`): `npm run typecheck` PASS; `npm run test:critical` 88/88 PASS; `npm run export:web` PASS
+- Redesign de UI em andamento (decisões e fases em `docs/context/design-system.md`): Fases 1 (fundação `src/ui`) e 2 (abas Biblioteca ·
+  Descobrir · Estudo · Conta; tela Descobrir com fontes) concluídas; Biblioteca, Conta, Estudo e Reader ainda com componentes antigos.
+  Acervo: etapa 1 pronta no commit local `11cf66c` do branch `claude/acervo-dominio-publico-ae9294` (worktree próprio), **não integrado à `main`**.
+- Validação local de 06/11 (Fase 2, sobre `b979ec8`): typecheck PASS; `test:critical` 89/89 PASS; `export:web` PASS (build `b979ec86d933`,
+  dirty=true); `test:source-library:browser` (Chromium) PASS com capturas `.expo/source-library-validation/explore-{320,390,768,1440}.png`; diff-check PASS.
+- Validação anterior (Fase 1, sobre `f9a9aff`): `npm run typecheck` PASS; `npm run test:critical` 88/88 PASS; `npm run export:web` PASS
   (build `f9a9aff01dcf`, dirty=true); `git diff --check` PASS. Antes (HEAD `f61a0c8`): typecheck PASS, 87/87. Última rodada Web mais
   ampla (código `ea0b1ec`, igual ao UX atual): `export:web` PASS e 8 suítes Chromium PASS (`test:source-library:browser`,
   `test:library:bulk:web`, `test:library:web`, `test:saas:web`, `test:admin:web`, `test:reader:browser`, `test:reader:settings:web`,
@@ -117,7 +120,7 @@ Legenda: **IVER** = implementado e verificado (suíte/execução citada); **ISVS
 | Landing Web e legal | IVER (local/Chromium) | `src/marketing`, `src/legal`; `test:marketing*`, `test:legal*`. Deploy Vercel não reconferido. |
 | Android (build/APK/módulos) | PARC | `android/`, `scripts/build-apk-local.mjs`; APK `00b6e4d`/`53b4e32` (privados, ignorados). Homologação física BLOQUEADA (Redmi ausente), APK do HEAD inexistente. |
 | UX/UI reformulação (27/10) | IVER (Web controlado) / físico PENDENTE | commits `d6ef9c7`, `ea0b1ec`, `f970c2d`; `test-app-design`, 8 suítes Chromium. Será substituída pelo redesign abaixo. |
-| Redesign editorial (06/11, fases 1–5) | Fase 1 IVER (local, sem uso em telas); Fases 2–5 PLAN | `src/ui/*`, `src/theme/tokens.ts` (accentSoft/danger/success/focus); `test-ui-primitives`, `test-app-design` (critical). Ver `docs/context/design-system.md`. |
+| Redesign editorial (06/11, fases 1–5) | Fases 1–2 IVER (local + Chromium Descobrir); Fases 3–5 PLAN | `src/ui/*`, `app/(tabs)/_layout.tsx`, `app/(tabs)/search.tsx` (Descobrir); `test-ui-primitives`, `test-discover-ui`, `test-app-design` (critical), `test:source-library:browser`. Ver `docs/context/design-system.md`. |
 | Reflow/PDF seleção ↔ EPUB equivalência | PLAN | `reader.md`: grifos mapeados entre PDF e Reflow ainda não equivalem ao EPUB. |
 
 ## 6. Mapa tarefa → arquivos (caminhos conferidos no disco em 06/11/2026)
@@ -151,7 +154,7 @@ Documentos soltos na raiz (`GOOGLE_AUTH_DRIVE_DEPLOYMENT.md`, `LANDING_PAGE_CONT
 
 ## 7. Validação (comandos reais de package.json)
 
-Gates: `npm run typecheck`; `npm run test:critical` (88 suítes `scripts/test-*.cjs`, sem Android/Supabase real); `npm run export:web`;
+Gates: `npm run typecheck`; `npm run test:critical` (89 suítes `scripts/test-*.cjs`, sem Android/Supabase real); `npm run export:web`;
 `git diff --check`. Ferramentas de teste isoladas em `.expo/` (`npm run setup:test-tools`). Tempo típico: typecheck e critical levam alguns
 minutos; rode em segundo plano. Por área:
 - Reader: `test:reader:{browser,epub:web,reflow:web,study:web,pdf:web,settings:web,concentration:web,markings:web}` (Chromium; fora do critical)
@@ -167,10 +170,10 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 1. **Homologação física Android pendente** (Redmi): Reflow/PDF Original/seleção-grifos/brilho/permissões na build atual; restaurar
    `heads_up_notifications_enabled` para 1 quando o aparelho voltar (config temporária do aparelho, ver historico). Emulador isolado não
    iniciou o APK 00b6e4d (serviço phone).
-2. **Redesign (fases 2–5)**: navegação com aba Descobrir + "+" na Biblioteca, Biblioteca, Conta/Estudo, moldura do Reader
+2. **Redesign (fases 3–5)**: Biblioteca com "+" (Importar, Drive, link, Descobrir) e cabeçalho enxuto, Conta/Estudo, moldura do Reader
    (`docs/context/design-system.md`). Literata não empacotada (exige autorização para baixar a fonte). Depois: revisão visual humana,
    texto ampliado Android, preview Vercel e APK do HEAD.
-   **Acervo**: etapa 1 (contas novas só domínio público) em branch própria; etapa 2 (cópia por usuário + nuvem privada, aprovada pelo usuário)
+   **Acervo**: etapa 1 (contas novas só domínio público) pronta em `claude/acervo-dominio-publico-ae9294` (`11cf66c`), aguardando decisão de integrar; etapa 2 (cópia por usuário + nuvem privada, aprovada pelo usuário)
    e etapa 3 (remover os 33 arquivos do APK/`dist`) pendentes.
 3. **Backend remoto não comprovado**: Library Sync/Battle/Admin/SaaS (BUG 02, 11), `username-login` (BUG 09), cadastro/recovery (BUG 08),
    Drive real (BUG 03). Nada disto é verificável pelo código.
@@ -197,6 +200,14 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 - **IA externa:** não enviar livros/trechos a serviço de IA sem pedido e consentimento explícito do usuário final.
 
 ## 10. Log (mais recente primeiro; máx. 5 entradas, resto → docs/context/historico/)
+
+### 06/11/2026 — Redesign Fase 2: navegação e aba Descobrir (Claude)
+- IMPLEMENTADO: abas Biblioteca · Descobrir · Estudo · Conta (ícone cheio na aba ativa; sidebar Web com fundo `accentSoft`; rotas mantidas:
+  `search` = Descobrir). `app/(tabs)/search.tsx` refeito com `src/ui`: busca + chips; sem busca ativa mostra **Suas fontes** (lista da conta,
+  "Adicionar fonte" primário → `/sources?add=1`, "Gerenciar fontes") e **Bibliotecas digitais** (BibliON, MEC Livros). Lógica de busca/aquisição intacta.
+- CORRIGIDO: chips de filtro da busca listavam fontes ativas de **outras contas** do mesmo aparelho; agora filtram por conta (relacionado ao BUG 12).
+- VALIDADO: typecheck; `test:critical` 89/89 (nova `discover-ui`); `export:web`; `test:source-library:browser` (Chromium, 320–1440); diff-check.
+  NÃO TESTADO: Android. Nota: um teste que entregava instância React ao `assert` esgotou a memória ao falhar — use booleanos (ver `test-discover-ui.cjs`).
 
 ### 06/11/2026 — Redesign Fase 1: fundação do design system (Claude)
 - Decisões do usuário: redesign do zero (bundle de 23/10 só como inspiração), editorial calmo, fontes em aba Descobrir + "+" na Biblioteca,

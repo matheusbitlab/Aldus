@@ -445,6 +445,8 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
   isolamento persistido de Sources (que continua ausente por contrato DEVICE).
 - Pendente: ownership por conta e adoção explícita dos legados, sem inferir dono, ocultar
   definitivamente fontes existentes nem apagar livros/catálogos. Exige migração/UI próprias.
+- 06/11/2026: a aba Descobrir passou a filtrar fontes por conta também nos chips de busca (antes listava fontes ativas
+  de outras contas do aparelho); `test-discover-ui.cjs`. Persistência continua DEVICE: o item segue aberto.
 - Arquivos: UserSourceRepository, sourceStore, repositories de SourceCatalog e driveDependencies.
 - Não regredir: raiz, árvore, snapshots offline e biblioteca pessoal; não atribuir legado automaticamente.
 
