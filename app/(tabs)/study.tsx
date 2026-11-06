@@ -36,7 +36,7 @@ import {
 import { FlashcardCreateModal } from "@/src/presentation/components/flashcards/FlashcardCreateModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookCover } from '@/src/presentation/components/BookCover';
-import { appUi } from '@/src/theme/appUi';
+import { AppText, Button, EmptyState, ListGroup, ListRow, Screen, ScreenHeader } from '@/src/ui';
 import { getBookCover } from '@/src/utils/coverHelper';
 
 export default function Study() {
@@ -244,30 +244,10 @@ function StudyContent() {
   };
 
   return (
-    <View
-      style={[
-        styles.screen,
-        { backgroundColor: palette.background, paddingTop: insets.top + 18 },
-      ]}
-    >
-      <View style={styles.header}>
-        <View>
-          <Text accessibilityRole="header" style={[appUi.title, { color: palette.text }]}>Estudo</Text>
-          <Text style={{ color: palette.secondaryText }}>
-            Revise o que você leu, no seu ritmo.
-          </Text>
-        </View>
-        <Ionicons name="school-outline" size={27} color={palette.accent} />
-      </View>
-
+    <Screen inTabs header={<ScreenHeader title="Estudo" subtitle="Revise o que você leu, no seu ritmo." large />}>
       <View style={styles.actions}>
-        <Action
-          label="Novo deck"
-          icon="add-circle-outline"
-          onPress={() => setModal("deck")}
-          palette={palette}
-        />
-        <Action
+        <Button label="Novo deck" icon="add" variant="primary" onPress={() => setModal("deck")} />
+        <Button
           label="Criar flashcard"
           icon="create-outline"
           onPress={() => {
@@ -277,85 +257,44 @@ function StudyContent() {
             }
             setShowCreateCardModal(true);
           }}
-          palette={palette}
+        />
+        <Button
+          label="Mais ferramentas"
+          variant="ghost"
+          trailingIcon={moreTools ? "chevron-up" : "chevron-down"}
+          accessibilityLabel="Mais ferramentas de estudo"
+          expanded={moreTools}
+          onPress={() => setMoreTools(!moreTools)}
         />
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Mais ferramentas de estudo" accessibilityState={{ expanded: moreTools }} onPress={() => setMoreTools(!moreTools)} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <Text style={{ color: palette.secondaryText }}>Mais ferramentas</Text><Ionicons name={moreTools ? 'chevron-up' : 'chevron-down'} size={16} color={palette.secondaryText} />
-      </Pressable>
-      {moreTools ? <View style={styles.actions}>
-        <Action
-          label="Gerar do livro"
-          icon="sparkles-outline"
-          onPress={() => setModal("generate")}
-          palette={palette}
-        />
-        <Action
-          label="Batalha"
-          icon="people-outline"
-          onPress={() => router.push("/battle" as never)}
-          palette={palette}
-        />
-      </View> : null}
-
-
-      {error ? (
-        <Text
-          accessibilityRole="alert"
-          style={{ color: palette.accent, marginBottom: 10 }}
-        >
-          {error}
-        </Text>
+      {moreTools ? (
+        <ListGroup title="Ferramentas">
+          <ListRow title="Gerar do livro" description="Rascunhos editáveis a partir de capítulos, sem IA" icon="document-text-outline" onPress={() => setModal("generate")} />
+          <ListRow title="Batalha" description="Desafie outra pessoa com seus decks" icon="people-outline" onPress={() => router.push("/battle" as never)} />
+        </ListGroup>
       ) : null}
+
+      {error ? <AppText variant="bodySmall" tone="danger" accessibilityRole="alert">{error}</AppText> : null}
 
       {/* Prévia de candidatos gerados */}
       {candidates.length ? (
-        <View
-          style={[
-            styles.preview,
-            { backgroundColor: palette.panel, borderColor: palette.separator },
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>
-            Prévia para aprovação ({candidates.length})
-          </Text>
-          <Text style={{ color: palette.secondaryText, marginBottom: 8 }}>
-            Rascunhos locais. Revise cada flashcard e selecione o gabarito antes
-            de estudar ou usar na batalha.
-          </Text>
-          <ScrollView style={{ maxHeight: 260 }}>
+        <View style={[styles.preview, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <AppText variant="heading">Prévia para aprovação ({candidates.length})</AppText>
+          <AppText variant="bodySmall" tone="secondary">
+            Rascunhos locais. Revise cada flashcard e selecione o gabarito antes de estudar ou usar na batalha.
+          </AppText>
+          <ScrollView style={{ maxHeight: 260 }} nestedScrollEnabled>
             {candidates.map((candidate, index) => (
-              <View
-                key={index}
-                style={[styles.candidate, { borderColor: palette.separator }]}
-              >
-                <Text style={{ color: palette.text, fontWeight: "700" }}>
-                  {candidate.front}
-                </Text>
-                <Text style={{ color: palette.secondaryText, marginTop: 4 }}>
-                  {candidate.back}
-                </Text>
-                <Text
-                  style={{ color: palette.accent, fontSize: 11, marginTop: 5 }}
-                >
-                  {candidate.source.chapterTitle}
-                </Text>
+              <View key={index} style={[styles.candidate, { borderColor: palette.separator }]}>
+                <AppText variant="label">{candidate.front}</AppText>
+                <AppText variant="bodySmall" tone="secondary">{candidate.back}</AppText>
+                <AppText variant="caption" tone="accent">{candidate.source.chapterTitle}</AppText>
               </View>
             ))}
           </ScrollView>
           <View style={styles.actions}>
-            <Action
-              label="Descartar"
-              icon="close-outline"
-              onPress={() => setCandidates([])}
-              palette={palette}
-            />
-            <Action
-              label="Salvar rascunhos"
-              icon="checkmark-circle-outline"
-              onPress={() => void approveCandidates()}
-              palette={palette}
-            />
+            <Button label="Descartar" icon="close-outline" variant="ghost" onPress={() => setCandidates([])} />
+            <Button label="Salvar rascunhos" icon="checkmark-circle-outline" variant="primary" onPress={() => void approveCandidates()} />
           </View>
         </View>
       ) : null}
@@ -363,73 +302,23 @@ function StudyContent() {
       {/* Lista de Decks */}
       {!snapshot ? (
         <ActivityIndicator color={palette.accent} />
-      ) : (
-        <ScrollView contentContainerStyle={styles.list}>
-          {snapshot.decks.length ? (
-            snapshot.decks.map((deck) => (
-              <Pressable
+      ) : snapshot.decks.length ? (
+        <ListGroup title="Seus decks">
+          {snapshot.decks.map((deck) => {
+            const origin = deck.bookIds.length ? books.find((book) => book.id === deck.bookIds[0])?.title ?? "livro indisponível" : null;
+            return (
+              <ListRow
                 key={deck.id}
+                title={deck.title}
+                description={`${cardCount.get(deck.id) ?? 0} flashcards · ${deck.category}${origin ? ` · ${origin}` : ""}`}
+                icon={deck.isGenerated ? "document-text-outline" : "albums-outline"}
                 onPress={() => router.push(`/decks/${deck.id}` as never)}
-                style={[
-                  styles.deck,
-                  {
-                    backgroundColor: 'transparent',
-                    borderColor: palette.separator,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.deckIcon,
-                    { backgroundColor: palette.surfaceSecondary },
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      deck.isGenerated ? "sparkles-outline" : "albums-outline"
-                    }
-                    size={21}
-                    color={palette.accent}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.deckTitle, { color: palette.text }]}>
-                    {deck.title}
-                  </Text>
-                  <Text style={{ color: palette.secondaryText }}>
-                    {cardCount.get(deck.id) ?? 0} flashcards · {deck.category}
-                  </Text>
-                  {deck.bookIds.length ? (
-                    <Text
-                      numberOfLines={1}
-                      style={{ color: palette.secondaryText, fontSize: 12 }}
-                    >
-                      Origem:{" "}
-                      {books.find((book) => book.id === deck.bookIds[0])
-                        ?.title ?? "livro indisponível"}
-                    </Text>
-                  ) : null}
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={palette.secondaryText}
-                />
-              </Pressable>
-            ))
-          ) : (
-            <View style={styles.empty}>
-              <Text style={[styles.sectionTitle, { color: palette.text }]}>
-                Nenhum deck local ainda
-              </Text>
-              <Text
-                style={{ color: palette.secondaryText, textAlign: "center" }}
-              >
-                Crie um deck ou gere uma prévia a partir de um livro importado.
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+              />
+            );
+          })}
+        </ListGroup>
+      ) : (
+        <EmptyState icon="albums-outline" title="Nenhum deck local ainda" description="Crie um deck ou gere uma prévia a partir de um livro importado." />
       )}
 
       {/* Modal de Criação / Geração de Deck */}
@@ -564,7 +453,7 @@ function StudyContent() {
           palette={palette}
         />
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
@@ -572,32 +461,13 @@ function Action({
   label,
   icon,
   onPress,
-  palette,
 }: {
   label: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
   onPress: () => void;
-  palette: ReturnType<typeof useAppTheme>["palette"];
+  palette?: ReturnType<typeof useAppTheme>["palette"];
 }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={[
-        styles.action,
-        {
-          backgroundColor: palette.surfaceSecondary,
-          borderColor: palette.separator,
-        },
-      ]}
-    >
-      <Ionicons name={icon} size={17} color={palette.accent} />
-      <Text style={{ color: palette.text, fontWeight: "600", flexShrink: 1 }}>
-        {label}
-      </Text>
-    </Pressable>
-  );
+  return <Button label={label} icon={icon} onPress={onPress} />;
 }
 
 const styles = StyleSheet.create({
@@ -609,7 +479,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: { fontSize: 27, fontWeight: "700" },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
+  actions: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   action: {
     flex: 1,
     flexBasis: 145,
@@ -642,8 +512,8 @@ const styles = StyleSheet.create({
   deckTitle: { fontSize: 16, fontWeight: "700", marginBottom: 3 },
   empty: { alignItems: "center", padding: 32, gap: 8 },
   sectionTitle: { fontSize: 17, fontWeight: "700", marginBottom: 5 },
-  preview: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12 },
-  candidate: { borderBottomWidth: 1, paddingVertical: 9 },
+  preview: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 10 },
+  candidate: { borderBottomWidth: 1, paddingVertical: 9, gap: 4 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,.55)",

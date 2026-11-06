@@ -108,7 +108,7 @@ async function main() {
       input('swipe', Math.round(screenWidth * .8), Math.round(screenHeight * .8), Math.round(screenWidth * .8), Math.round(screenHeight * .35), 500);
     }
     tap('Voltar aos Ajustes');
-    await waitFor(all => has(all, 'Ajustes') && all.some(n=>n.label==='Meu Plano'));
+    await waitFor(all => has(all, 'Conta') && all.some(n=>n.label==='Meu Plano'));
     report.results.push({ status: 'PASS físico', scenario: 'Meu Plano/Comparar: backend indisponível, retry e retorno', commerciallyAvailable: false });
   } else if (command === 'admin-unavailable') {
     await protectCaptures();
@@ -120,7 +120,7 @@ async function main() {
     assert.ok(!has(all,'Configurar autenticador TOTP'));
     screenshot('admin-native-unavailable');
     tap('Voltar aos Ajustes');
-    await waitFor(all=>has(all,'Ajustes')&&all.some(n=>n.label==='Meu Plano'));
+    await waitFor(all=>has(all,'Conta')&&all.some(n=>n.label==='Meu Plano'));
     report.results.push({status:'PASS físico',scenario,authorizedAdminNotTested:true,remoteOwnerNotProvisioned:true});
   } else if (command === 'saas-offline') {
     assert.ok(has(nodes(), 'Meu Plano'), 'Start on Ajustes with Meu Plano visible');

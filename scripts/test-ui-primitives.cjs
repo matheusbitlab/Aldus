@@ -160,5 +160,9 @@ assert.equal(ui.touchTarget, 44);
   assert.ok(r.root.findAllByType('Text').some(t => t.props.accessibilityRole === 'header' && text(t) === 'Sua estante está vazia'));
   assert.equal(pressables(r).length, 1);
 
-  console.log('PASS ui primitives: tokens, AppText variants, Button/IconButton/Chip states, ListGroup, ScreenHeader back, ActionMenu, SearchField, EmptyState. Stub host components; not a visual/TalkBack proof.');
+  // NativeWind's css-interop stacked a functional Pressable style on a physical Android: keep them static.
+  for (const file of [...fs.readdirSync('src/ui').map(name => 'src/ui/' + name), 'src/presentation/components/BookCard.tsx', 'app/(tabs)/library.tsx', 'app/(tabs)/search.tsx', 'src/presentation/components/SettingsLayout.tsx']) {
+    if (/\.tsx$/.test(file)) assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /style=\{\s*\(\s*\{\s*pressed/, file + ' must not use a functional Pressable style');
+  }
+  console.log('PASS ui primitives: tokens, AppText variants, Button/IconButton/Chip states, ListGroup, ScreenHeader back, ActionMenu, SearchField, EmptyState, static Pressable styles. Stub host components; not a visual/TalkBack proof.');
 })().catch(error => { console.error(error); process.exit(1); });

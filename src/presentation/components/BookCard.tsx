@@ -46,10 +46,11 @@ export const BookCard: React.FC<BookCardProps> = ({
         if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (!event.repeat) onPress(book); }
       } } : {})}
       accessibilityLabel={selection === undefined ? `Abrir ${book.title}, de ${book.author}` : `Selecionar ${book.title}`}
-      style={({ pressed }) => [
+      android_ripple={{ color: theme.border }}
+      style={[
         styles.card,
         layout === "list" && styles.listCard,
-        { borderColor: selection ? theme.accent : 'transparent', opacity: pressed ? 0.88 : 1 },
+        { borderColor: selection ? theme.accent : 'transparent' },
       ]}
       onPress={() => onPress(book)}
     >

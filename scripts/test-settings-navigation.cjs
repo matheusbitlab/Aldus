@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),React=require('../.expo/auth-test-too
 global.IS_REACT_ACT_ENVIRONMENT=true;
 let section='appearance',adminSession=null;const routes=[],modes=[];
 const load=require('./community-test-loader.cjs')({react:React,'react/jsx-runtime':require('../.expo/auth-test-tools/node_modules/react/jsx-runtime'),
- 'react-native':{View:'View',Text:'Text',ScrollView:'ScrollView',Pressable:'Pressable',StyleSheet:{create:v=>v}},
+ 'react-native':{View:'View',Text:'Text',ScrollView:'ScrollView',Pressable:'Pressable',TextInput:'TextInput',ActivityIndicator:'ActivityIndicator',Modal:({visible,children})=>visible?React.createElement('Modal',null,children):null,StyleSheet:{create:v=>v,hairlineWidth:1,absoluteFill:{}},Platform:{OS:'android',select:o=>o.android??o.default},useWindowDimensions:()=>({width:390,height:844})},
  '@expo/vector-icons':{Ionicons:()=>null},'@expo/vector-icons/Ionicons':()=>null,
  'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},
  'expo-router':{router:{push:p=>routes.push(p),replace:p=>routes.push(p),canGoBack:()=>false},useLocalSearchParams:()=>({section}),useFocusEffect:()=>{}},

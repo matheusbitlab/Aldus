@@ -21,7 +21,7 @@
 | 1 | Fundação: `src/ui` (tokens + primitivos) e tokens semânticos de cor | IMPLEMENTADO (06/11) |
 | 2 | Navegação: abas Biblioteca · Descobrir · Estudo · Conta; sidebar no desktop Web; tela Descobrir com fontes | IMPLEMENTADO (06/11) |
 | 3 | Biblioteca: cabeçalho enxuto (título, busca, "+" e "⋯"), filtros em chips, "Continue lendo", `BookCard` | IMPLEMENTADO (06/11) |
-| 4 | Conta/Ajustes e Estudo com `ListGroup`/`ListRow` | PENDENTE |
+| 4 | Conta/Ajustes e Estudo com `ListGroup`/`ListRow` | IMPLEMENTADO (06/11) |
 | 5 | Moldura do Reader (cabeçalho/rodapé/painéis) — só visual, sem tocar motor/posições | PENDENTE |
 
 ## Fundação (`src/ui`)
@@ -45,6 +45,9 @@
 - Telas novas usam `src/ui`; nada de `fontSize`/hex/raio soltos. Componentes antigos (`AppAction`,
   `AppHeading`, `SettingsLayout`) são migrados tela a tela e removidos quando sem uso.
 - Um `primary` por área; ícone sozinho sempre com `label`; seleção não só por cor; alvos ≥ 44.
+- `Pressable` sempre com estilo **estático** (nunca `style={({ pressed }) => …}`): com NativeWind (css-interop) o estilo-função
+  empilhou conteúdo no Android físico. Feedback de toque via `android_ripple`. `test-ui-primitives` verifica `src/ui` e telas migradas.
+- `overline` não força caixa alta: o texto escrito é o texto lido (testes Chromium usam `innerText`).
 - Não remontar o documento do Reader, não mexer em geometria/âncoras/posições ao reestilizar.
 - Suítes que conferem textos/estrutura atuais (`test:library:web`, `test:source-library:browser`,
   `test-library-ui`, `test-source-ui`, `test-saas-ui`, `test-flashcard-ui`) devem ser atualizadas junto,

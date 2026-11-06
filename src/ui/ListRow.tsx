@@ -42,7 +42,7 @@ export function ListRow({ title, description, icon, trailing, onPress, destructi
       disabled={disabled}
       onPress={onPress}
       android_ripple={{ color: palette.surfaceSecondary }}
-      style={({ pressed }) => [styles.row, { opacity: disabled ? 0.5 : 1, backgroundColor: pressed ? palette.surfaceSecondary : "transparent" }]}
+      style={[styles.row, { opacity: disabled ? 0.5 : 1 }]}
     >
       {body}
     </Pressable>

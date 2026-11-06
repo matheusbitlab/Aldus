@@ -55,7 +55,7 @@ export function ActionMenu({ visible, title, items, onClose }: ActionMenuProps) 
               disabled={item.disabled}
               onPress={() => { onClose(); item.onPress(); }}
               android_ripple={{ color: palette.surfaceSecondary }}
-              style={({ pressed }) => [styles.item, { opacity: item.disabled ? 0.5 : 1, backgroundColor: pressed ? palette.surfaceSecondary : "transparent" }]}
+              style={[styles.item, { opacity: item.disabled ? 0.5 : 1 }]}
             >
               <View style={[styles.icon, { backgroundColor: palette.accentSoft }]}>
                 <Ionicons name={item.icon} size={20} color={palette.accent} />

@@ -121,7 +121,7 @@ async function cdp(url){const socket=new WebSocket(url);await new Promise((r,j)=
   await click('Abrir navegação');await until('Navegação administrativa');await click('Auditoria');await until('Pesquisar nesta página da auditoria');
   await navigate('/admin','admin');await until('Papel verificado: Administrador');await until('Usuários cadastrados');assert.ok(!(await text()).includes('Planos e Preços'));assert.ok(!(await text()).includes('Administradores'));await shot('delegated-admin');
   await navigate('/admin','user');await until('Acesso administrativo indisponível');assert.ok(!(await text()).includes('Usuários cadastrados'));await shot('direct-route-denied');
-  await navigate('/settings','user');await until('Ajustes');await wait(500);assert.ok(!(await text()).includes('Abrir Aldus Admin'));
+  await navigate('/settings','user');await until('Conta e plano');await wait(500);assert.ok(!(await text()).includes('Abrir Aldus Admin'));
   await navigate('/admin','owner');await until('Usuários cadastrados');await enqueue(async()=>{await f.db.exec('reset role');await f.db.query('delete from auth.sessions where user_id=$1',[f.ids.owner]);});
   await click('Revalidar permissões');await until('Acesso administrativo indisponível');
   await client.evaluate("localStorage.setItem('fixture-admin-offline','1')");await client.command('Page.reload');await until('Acesso administrativo indisponível');assert.ok(!(await text()).includes('Usuários cadastrados'));

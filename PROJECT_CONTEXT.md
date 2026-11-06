@@ -46,9 +46,12 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
   dois handoffs do ChatGPT — foi copiado para `docs/context/referencias/`). Arquivos na raiz ignorados: `Livros/`, `debug-reflow-*`,
   `artifacts/`, `dist/`, `.expo/`.
 - Redesign de UI em andamento (decisões e fases em `docs/context/design-system.md`): Fases 1 (fundação `src/ui`), 2 (abas Biblioteca ·
-  Descobrir · Estudo · Conta; tela Descobrir com fontes) e 3 (Biblioteca com "+") concluídas; Conta, Estudo e Reader ainda com componentes antigos.
+  Descobrir · Estudo · Conta; tela Descobrir com fontes) 3 (Biblioteca com "+") e 4 (Conta e Estudo) concluídas; falta a moldura do Reader (Fase 5).
   Acervo: etapa 1 pronta no commit local `11cf66c` do branch `claude/acervo-dominio-publico-ae9294` (worktree próprio), **não integrado à `main`**.
-- Validação local de 06/11 (Fase 3, sobre `c350015`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `c350015c8400`, dirty=true);
+- Validação local de 06/11 (Fase 4, sobre `02bb6f4`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `02bb6f4ecac8`, dirty=true);
+  Chromium PASS: `test:source-library:browser` (Conta/Estudo/Descobrir 320–1440), `test:library:bulk:web`, `test:library:web`, `test:saas:web`,
+  `test:admin:web`; diff-check PASS. Último ajuste (remover o botão duplicado do estado vazio do Estudo) validado só por typecheck.
+- Validação anterior (Fase 3, sobre `c350015`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `c350015c8400`, dirty=true);
   Chromium PASS: `test:library:bulk:web` (8 layouts/temas, mouse/toque/teclado, 1000 livros), `test:library:web`, `test:source-library:browser`,
   `test:saas:web`; diff-check PASS. Capturas em `.expo/cycle2-library-web/library-*.png` (ícones como pontos: fonte de ícones não carrega no harness).
 - Validação anterior (Fase 2, sobre `b979ec8`): typecheck PASS; `test:critical` 89/89 PASS; `export:web` PASS (build `b979ec86d933`,
@@ -123,7 +126,7 @@ Legenda: **IVER** = implementado e verificado (suíte/execução citada); **ISVS
 | Landing Web e legal | IVER (local/Chromium) | `src/marketing`, `src/legal`; `test:marketing*`, `test:legal*`. Deploy Vercel não reconferido. |
 | Android (build/APK/módulos) | PARC | `android/`, `scripts/build-apk-local.mjs`; APK `00b6e4d`/`53b4e32` (privados, ignorados). Homologação física BLOQUEADA (Redmi ausente), APK do HEAD inexistente. |
 | UX/UI reformulação (27/10) | IVER (Web controlado) / físico PENDENTE | commits `d6ef9c7`, `ea0b1ec`, `f970c2d`; `test-app-design`, 8 suítes Chromium. Será substituída pelo redesign abaixo. |
-| Redesign editorial (06/11, fases 1–5) | Fases 1–3 IVER (local + Chromium); Fases 4–5 PLAN | `src/ui/*`, `app/(tabs)/_layout.tsx`, `app/(tabs)/search.tsx` (Descobrir), `app/(tabs)/library.tsx`, `BookCard.tsx`; `test-ui-primitives`, `test-discover-ui`, `test-app-design` (critical), `test:source-library:browser`. Ver `docs/context/design-system.md`. |
+| Redesign editorial (06/11, fases 1–5) | Fases 1–4 IVER (local + Chromium); Fase 5 PLAN | `src/ui/*`, `app/(tabs)/_layout.tsx`, `app/(tabs)/search.tsx` (Descobrir), `app/(tabs)/library.tsx`, `BookCard.tsx`; `test-ui-primitives`, `test-discover-ui`, `test-app-design` (critical), `test:source-library:browser`. Ver `docs/context/design-system.md`. |
 | Reflow/PDF seleção ↔ EPUB equivalência | PLAN | `reader.md`: grifos mapeados entre PDF e Reflow ainda não equivalem ao EPUB. |
 
 ## 6. Mapa tarefa → arquivos (caminhos conferidos no disco em 06/11/2026)
@@ -173,7 +176,7 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 1. **Homologação física Android pendente** (Redmi): Reflow/PDF Original/seleção-grifos/brilho/permissões na build atual; restaurar
    `heads_up_notifications_enabled` para 1 quando o aparelho voltar (config temporária do aparelho, ver historico). Emulador isolado não
    iniciou o APK 00b6e4d (serviço phone).
-2. **Redesign (fases 4–5)**: Conta/Ajustes e Estudo com `ListGroup`/`ListRow`, moldura do Reader
+2. **Redesign (fase 5)**: moldura do Reader (cabeçalho/rodapé/painéis), só visual
    (`docs/context/design-system.md`). Literata não empacotada (exige autorização para baixar a fonte). Depois: revisão visual humana,
    texto ampliado Android, preview Vercel e APK do HEAD.
    **Acervo**: etapa 1 (contas novas só domínio público) pronta em `claude/acervo-dominio-publico-ae9294` (`11cf66c`), aguardando decisão de integrar; etapa 2 (cópia por usuário + nuvem privada, aprovada pelo usuário)
@@ -203,6 +206,15 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 - **IA externa:** não enviar livros/trechos a serviço de IA sem pedido e consentimento explícito do usuário final.
 
 ## 10. Log (mais recente primeiro; máx. 5 entradas, resto → docs/context/historico/)
+
+### 06/11/2026 — Redesign Fase 4: Conta e Estudo; estilos estáticos (Claude)
+- IMPLEMENTADO: `SettingsLayout`/`SettingsGroup`/`SettingsLink` reescritos sobre `src/ui` (mesma API → todas as subtelas de ajustes, legal,
+  suporte e Admin herdam o visual). Aba **Conta** com cartão de perfil (iniciais), grupos com descrições curtas. **Estudo**: "Novo deck" primário,
+  "Mais ferramentas" como lista (Gerar do livro *sem IA*, Batalha), decks em `ListGroup`, estado vazio. `overline` sem caixa alta forçada.
+- CORRIGIDO (risco Android): primitivos, `BookCard` e cartões da Biblioteca usavam estilo-função em `Pressable`, padrão que com NativeWind
+  empilhou conteúdo no Redmi; agora estáticos + `android_ripple`, com trava em `test-ui-primitives`.
+- Teste: loader compartilhado resolve pasta→`index.ts`; `test-settings-navigation`, `test-admin-web`, `redmi-qa` seguem os novos títulos.
+  VALIDADO: ver §3. NÃO TESTADO: Android.
 
 ### 06/11/2026 — Redesign Fase 3: Biblioteca enxuta com "+" (Claude)
 - IMPLEMENTADO: cabeçalho "Biblioteca" com só busca + dois botões: **"+" (Adicionar livros)** abre menu com Importar arquivo, Conectar Google Drive

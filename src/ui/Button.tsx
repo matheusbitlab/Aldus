@@ -26,6 +26,10 @@ export interface ButtonProps {
 }
 
 /**
+ * Estilos de Pressable são sempre estáticos: com NativeWind (react-native-css-interop) um
+ * estilo em função foi observado no Android físico empilhando o conteúdo. Feedback de toque
+ * vem do `android_ripple`.
+ *
  * Botão único do app. Hierarquia: no máximo um `primary` por tela/área;
  * `secondary` para ações frequentes; `ghost` para ações de texto; `danger` para destrutivas.
  */
@@ -50,10 +54,10 @@ export function Button({
       disabled={inactive}
       onPress={onPress}
       android_ripple={{ color: palette.separator }}
-      style={({ pressed }) => [
+      style={[
         styles.base,
         variant === "ghost" ? styles.ghost : null,
-        { backgroundColor: look.background, borderColor: look.border, opacity: inactive ? 0.5 : pressed ? 0.85 : 1 },
+        { backgroundColor: look.background, borderColor: look.border, opacity: inactive ? 0.5 : 1 },
         block ? styles.block : null,
         style,
       ]}
@@ -92,7 +96,7 @@ export function IconButton({ icon, label, onPress, appearance = "plain", disable
       onPress={onPress}
       hitSlop={4}
       android_ripple={{ color: palette.separator, borderless: appearance === "plain" }}
-      style={({ pressed }) => [styles.icon, { backgroundColor: background, opacity: disabled ? 0.5 : pressed ? 0.8 : 1 }, style]}
+      style={[styles.icon, { backgroundColor: background, opacity: disabled ? 0.5 : 1 }, style]}
     >
       <View pointerEvents="none"><Ionicons name={icon} size={size} color={ink} /></View>
     </Pressable>

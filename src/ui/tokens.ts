@@ -86,7 +86,7 @@ export const typography: Record<TextRole, TextStyle> = {
   bodySmall: { fontFamily: sans, fontSize: 14, lineHeight: 21, fontWeight: "400" },
   label: { fontFamily: sans, fontSize: 14, lineHeight: 20, fontWeight: "600" },
   caption: { fontFamily: sans, fontSize: 12, lineHeight: 17, fontWeight: "400" },
-  overline: { fontFamily: sans, fontSize: 11, lineHeight: 16, fontWeight: "600", letterSpacing: 0.8, textTransform: "uppercase" },
+  overline: { fontFamily: sans, fontSize: 12, lineHeight: 16, fontWeight: "600", letterSpacing: 0.4 },
 };
 
 /** Papéis que anunciam cabeçalho a leitores de tela. */

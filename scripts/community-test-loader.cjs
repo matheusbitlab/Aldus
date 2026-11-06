@@ -3,8 +3,10 @@ module.exports = function makeLoader(overrides = {}) {
   const cache = new Map();
   function load(file) {
     file = path.resolve(file);
-    if (!fs.existsSync(file)) {
-      const inferred = [file + '.ts', file + '.tsx'].find(candidate => fs.existsSync(candidate));
+    if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      // A folder import (e.g. `@/src/ui`) resolves to its index module.
+      const inferred = [file + '.ts', file + '.tsx', path.join(file, 'index.ts'), path.join(file, 'index.tsx')]
+        .find(candidate => fs.existsSync(candidate) && fs.statSync(candidate).isFile());
       if (inferred) file = inferred;
     }
     if (cache.has(file)) return cache.get(file).exports;

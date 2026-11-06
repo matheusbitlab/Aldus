@@ -28,12 +28,13 @@ export function Chip({ label, selected = false, onPress, icon, disabled = false,
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      android_ripple={{ color: palette.separator }}
+      style={[
         styles.chip,
         {
           backgroundColor: selected ? palette.accentSoft : palette.surface,
           borderColor: selected ? palette.accent : palette.border,
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+          opacity: disabled ? 0.5 : 1,
         },
       ]}
     >

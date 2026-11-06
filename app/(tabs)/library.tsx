@@ -244,7 +244,8 @@ function LibraryContent() {
           accessibilityRole="button"
           accessibilityLabel={`Continuar lendo ${continueBook.title}`}
           onPress={() => router.push({ pathname: "/reader/[bookId]", params: { bookId: continueBook.id } })}
-          style={({ pressed }) => [styles.continueReading, { backgroundColor: palette.surface, borderColor: palette.border, opacity: pressed ? 0.9 : 1 }]}
+          android_ripple={{ color: palette.surfaceSecondary }}
+          style={[styles.continueReading, { backgroundColor: palette.surface, borderColor: palette.border }]}
         >
           <View style={{ flex: 1, gap: space.xs }}>
             <AppText variant="overline" tone="accent">Continue lendo</AppText>
