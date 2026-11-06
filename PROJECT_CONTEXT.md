@@ -45,7 +45,10 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
   `DesignIdeas/` e `DesignIdeas.zip` (referência visual) e `aldus-context.zip` (pacote de contexto externo; seu conteúdo útil — os
   dois handoffs do ChatGPT — foi copiado para `docs/context/referencias/`). Arquivos na raiz ignorados: `Livros/`, `debug-reflow-*`,
   `artifacts/`, `dist/`, `.expo/`.
-- Validação local de 06/11 (HEAD `f61a0c8`): `npm run typecheck` PASS; `npm run test:critical` 87/87 PASS. Última rodada Web mais
+- Redesign de UI em andamento (decisões e fases em `docs/context/design-system.md`): Fase 1 (fundação `src/ui`) concluída; telas ainda
+  usam os componentes antigos. Retirada do acervo com risco autoral roda em sessão/branch própria (`claude/acervo-dominio-publico-*`), fora da `main`.
+- Validação local de 06/11 (Fase 1, sobre `f9a9aff`): `npm run typecheck` PASS; `npm run test:critical` 88/88 PASS; `npm run export:web` PASS
+  (build `f9a9aff01dcf`, dirty=true); `git diff --check` PASS. Antes (HEAD `f61a0c8`): typecheck PASS, 87/87. Última rodada Web mais
   ampla (código `ea0b1ec`, igual ao UX atual): `export:web` PASS e 8 suítes Chromium PASS (`test:source-library:browser`,
   `test:library:bulk:web`, `test:library:web`, `test:saas:web`, `test:admin:web`, `test:reader:browser`, `test:reader:settings:web`,
   `test:reader:markings:web`). Nesta sessão **não** foram reexecutados export nem Chromium.
@@ -113,7 +116,8 @@ Legenda: **IVER** = implementado e verificado (suíte/execução citada); **ISVS
 | SaaS/planos/cotas e Admin | IVER (local) / remoto ISVS | `src/domain/saas`, `src/admin`, migrations `20261015*`; `test:saas*`, `test:admin*`. Deploy/OWNER só por registro; login/TOTP real pendente. |
 | Landing Web e legal | IVER (local/Chromium) | `src/marketing`, `src/legal`; `test:marketing*`, `test:legal*`. Deploy Vercel não reconferido. |
 | Android (build/APK/módulos) | PARC | `android/`, `scripts/build-apk-local.mjs`; APK `00b6e4d`/`53b4e32` (privados, ignorados). Homologação física BLOQUEADA (Redmi ausente), APK do HEAD inexistente. |
-| UX/UI reformulação (27/10) | IVER (Web controlado) / físico PENDENTE | commits `d6ef9c7`, `ea0b1ec`, `f970c2d`; `test-app-design`, 8 suítes Chromium. Falta revisão visual das tabs, texto ampliado Android, preview/APK novos. |
+| UX/UI reformulação (27/10) | IVER (Web controlado) / físico PENDENTE | commits `d6ef9c7`, `ea0b1ec`, `f970c2d`; `test-app-design`, 8 suítes Chromium. Será substituída pelo redesign abaixo. |
+| Redesign editorial (06/11, fases 1–5) | Fase 1 IVER (local, sem uso em telas); Fases 2–5 PLAN | `src/ui/*`, `src/theme/tokens.ts` (accentSoft/danger/success/focus); `test-ui-primitives`, `test-app-design` (critical). Ver `docs/context/design-system.md`. |
 | Reflow/PDF seleção ↔ EPUB equivalência | PLAN | `reader.md`: grifos mapeados entre PDF e Reflow ainda não equivalem ao EPUB. |
 
 ## 6. Mapa tarefa → arquivos (caminhos conferidos no disco em 06/11/2026)
@@ -135,6 +139,7 @@ Legenda: **IVER** = implementado e verificado (suíte/execução citada); **ISVS
 | Planos/cotas e Admin | `src/domain/saas/*`, `src/data/saas/SupabaseAccountPlanRepository.ts`, `presentation/saas/*`, `app/plan/*`; `src/admin/**`, `app/admin/index.tsx` (autorização real é RPC no servidor) | biblioteca-sync.md (6.1/6.2) |
 | Flashcards/Estudo/Batalha | `app/(tabs)/study.tsx`, `app/decks`, `app/study`, `app/battle.tsx`, `src/domain/study/*`, `src/domain/types/flashcards.ts`, `src/data/local/Flashcard*`, `src/data/remote/FlashcardBattleRepository.ts`, `components/flashcards/*` | `community-estudo.md` §12, `referencias/requisitos-flashcards-batalha-geracao.md`, skill study-flashcards |
 | Community | `src/community/**`, `app/community/*` | community-estudo.md §11/13, skill community |
+| Design system (tokens/primitivos) | `src/ui/*` (`tokens.ts`, `Text`, `Button`, `Chip`, `ListRow`, `Screen`, `EmptyState`, `ActionMenu`, `SearchField`), cores em `src/theme/tokens.ts` | `docs/context/design-system.md` |
 | Navegação/tema/UI geral | `app/(tabs)/_layout.tsx`, `app/_layout.tsx`, `src/theme/{tokens,appUi}.ts`, `components/{AppUi,SettingsLayout,TopHeader}.tsx`, `screens/SettingsScreen.tsx` | skill interface-review |
 | Landing/legal | `src/marketing/*`, `src/legal/*`, `app/legal/*`, `app/index.web.tsx`, `public/`; `LANDING_PAGE_CONTEXT.md` (raiz) | `legal-build-git.md` §14 |
 | Build Web/CI | `package.json` (`export:web`), `scripts/{validate-web-env,write-build-metadata,write-public-web}.cjs`, `scripts/copy-books-to-dist.mjs`, `vercel.json`, `.github/workflows/validate.yml` | legal-build-git.md §16 |
@@ -146,7 +151,7 @@ Documentos soltos na raiz (`GOOGLE_AUTH_DRIVE_DEPLOYMENT.md`, `LANDING_PAGE_CONT
 
 ## 7. Validação (comandos reais de package.json)
 
-Gates: `npm run typecheck`; `npm run test:critical` (87 suítes `scripts/test-*.cjs`, sem Android/Supabase real); `npm run export:web`;
+Gates: `npm run typecheck`; `npm run test:critical` (88 suítes `scripts/test-*.cjs`, sem Android/Supabase real); `npm run export:web`;
 `git diff --check`. Ferramentas de teste isoladas em `.expo/` (`npm run setup:test-tools`). Tempo típico: typecheck e critical levam alguns
 minutos; rode em segundo plano. Por área:
 - Reader: `test:reader:{browser,epub:web,reflow:web,study:web,pdf:web,settings:web,concentration:web,markings:web}` (Chromium; fora do critical)
@@ -162,7 +167,11 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 1. **Homologação física Android pendente** (Redmi): Reflow/PDF Original/seleção-grifos/brilho/permissões na build atual; restaurar
    `heads_up_notifications_enabled` para 1 quando o aparelho voltar (config temporária do aparelho, ver historico). Emulador isolado não
    iniciou o APK 00b6e4d (serviço phone).
-2. **UX/UI**: faltam revisão visual humana das tabs (Estudo/Conta/Explorar), texto ampliado Android, preview Vercel e APK do HEAD.
+2. **Redesign (fases 2–5)**: navegação com aba Descobrir + "+" na Biblioteca, Biblioteca, Conta/Estudo, moldura do Reader
+   (`docs/context/design-system.md`). Literata não empacotada (exige autorização para baixar a fonte). Depois: revisão visual humana,
+   texto ampliado Android, preview Vercel e APK do HEAD.
+   **Acervo**: etapa 1 (contas novas só domínio público) em branch própria; etapa 2 (cópia por usuário + nuvem privada, aprovada pelo usuário)
+   e etapa 3 (remover os 33 arquivos do APK/`dist`) pendentes.
 3. **Backend remoto não comprovado**: Library Sync/Battle/Admin/SaaS (BUG 02, 11), `username-login` (BUG 09), cadastro/recovery (BUG 08),
    Drive real (BUG 03). Nada disto é verificável pelo código.
 4. **Geração de flashcards por livro** é só local determinística (pergunta fixa): não vender como IA; IA exige decisão do usuário (§5).
@@ -188,6 +197,16 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 - **IA externa:** não enviar livros/trechos a serviço de IA sem pedido e consentimento explícito do usuário final.
 
 ## 10. Log (mais recente primeiro; máx. 5 entradas, resto → docs/context/historico/)
+
+### 06/11/2026 — Redesign Fase 1: fundação do design system (Claude)
+- Decisões do usuário: redesign do zero (bundle de 23/10 só como inspiração), editorial calmo, fontes em aba Descobrir + "+" na Biblioteca,
+  acervo em sessão separada (3 etapas sem perda; nuvem privada aprovada). Registradas em `docs/context/design-system.md`.
+- IMPLEMENTADO: `src/ui/` (tokens de espaço/raio/tipografia com 9 papéis, primitivos `AppText`, `Button`, `IconButton`, `Chip`, `ListGroup`/`ListRow`,
+  `Screen`/`ScreenHeader`/`Section`, `EmptyState`, `ActionMenu`, `SearchField`); paleta com `accentSoft`, `danger`, `onDanger`, `success`, `focus`.
+  Nenhuma tela migrada ainda (comportamento do app inalterado).
+- VALIDADO: `typecheck` PASS; `test:critical` 88/88 (nova `ui-primitives`; `app-design` ampliada); `export:web` PASS; `git diff --check` PASS.
+  NÃO TESTADO: Chromium, Android, captura visual (primitivos ainda sem uso em telas).
+- Próximo passo: Fase 2 (navegação + aba Descobrir).
 
 ### 06/11/2026 — Onboarding 2: auditoria somente leitura + reescrita do contexto (Claude)
 - IMPLEMENTADO (só docs): `PROJECT_CONTEXT.md` reescrito (matriz de recursos §5 com evidência; mapa §6 conferido no disco; regras §9);

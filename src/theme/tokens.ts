@@ -14,6 +14,13 @@ export interface AppThemePalette {
   border: string;
   accent: string;
   onAccent: string;
+  /** Fundo suave do destaque (chip/seleção ativa); `accent` e `text` mantêm AA sobre ele. */
+  accentSoft: string;
+  danger: string;
+  onDanger: string;
+  success: string;
+  /** Anel de foco de teclado. */
+  focus: string;
   overlay: string;
   card: string;
   input: string;
@@ -33,6 +40,11 @@ export const appThemeTokens: Record<"light" | "dark", AppThemePalette> = {
     border: "#DADCD1",
     accent: "#A64E32",
     onAccent: "#FFFFFF",
+    accentSoft: "#F6E9E1",
+    danger: "#B42318",
+    onDanger: "#FFFFFF",
+    success: "#2E6B4A",
+    focus: "#A64E32",
     overlay: "rgba(17, 22, 24, 0.55)",
     card: "#FFFDF9",
     input: "#FFFEFB",
@@ -50,6 +62,11 @@ export const appThemeTokens: Record<"light" | "dark", AppThemePalette> = {
     border: "#36453B",
     accent: "#E5A17D",
     onAccent: "#17211B",
+    accentSoft: "#3A2A22",
+    danger: "#F4A39A",
+    onDanger: "#17211B",
+    success: "#8FD3A8",
+    focus: "#E5A17D",
     overlay: "rgba(8, 12, 14, 0.7)",
     card: "#1E2B23",
     input: "#19251E",

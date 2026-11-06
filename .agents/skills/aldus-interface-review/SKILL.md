@@ -5,7 +5,8 @@ description: "Evoluir e revisar a interface Aldus em pt-BR, temas, responsividad
 
 # Interface literária e consistente
 
-Leia o [contexto](../../../PROJECT_CONTEXT.md) (estado da reformulação UX/UI e árvore suja), a tela real
+Leia o [contexto](../../../PROJECT_CONTEXT.md) (estado da reformulação UX/UI e árvore suja), o módulo
+[design-system](../../../docs/context/design-system.md) (decisões, fases e regras de `src/ui`), a tela real
 e o tema em uso. Identifique alterações locais ainda não concluídas antes de reutilizar
 componentes. A existência de um arquivo não comprova que ele está integrado ou validado.
 
