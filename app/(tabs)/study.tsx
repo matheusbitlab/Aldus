@@ -36,6 +36,7 @@ import {
 import { FlashcardCreateModal } from "@/src/presentation/components/flashcards/FlashcardCreateModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookCover } from '@/src/presentation/components/BookCover';
+import { appUi } from '@/src/theme/appUi';
 import { getBookCover } from '@/src/utils/coverHelper';
 
 export default function Study() {
@@ -57,6 +58,7 @@ function StudyContent() {
   const [snapshot, setSnapshot] = useState<FlashcardSnapshot | null>(null);
   const [selectedBookId, setSelectedBookId] = useState("");
   const [modal, setModal] = useState<"deck" | "generate" | null>(null);
+  const [moreTools, setMoreTools] = useState(false);
   const [showCreateCardModal, setShowCreateCardModal] = useState(false);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Leitura");
@@ -250,9 +252,9 @@ function StudyContent() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: palette.text }]}>Estudo</Text>
+          <Text accessibilityRole="header" style={[appUi.title, { color: palette.text }]}>Estudo</Text>
           <Text style={{ color: palette.secondaryText }}>
-            Decks e flashcards vinculados aos seus livros
+            Revise o que você leu, no seu ritmo.
           </Text>
         </View>
         <Ionicons name="school-outline" size={27} color={palette.accent} />
@@ -277,6 +279,11 @@ function StudyContent() {
           }}
           palette={palette}
         />
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Mais ferramentas de estudo" accessibilityState={{ expanded: moreTools }} onPress={() => setMoreTools(!moreTools)} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <Text style={{ color: palette.secondaryText }}>Mais ferramentas</Text><Ionicons name={moreTools ? 'chevron-up' : 'chevron-down'} size={16} color={palette.secondaryText} />
+      </Pressable>
+      {moreTools ? <View style={styles.actions}>
         <Action
           label="Gerar do livro"
           icon="sparkles-outline"
@@ -289,7 +296,8 @@ function StudyContent() {
           onPress={() => router.push("/battle" as never)}
           palette={palette}
         />
-      </View>
+      </View> : null}
+
 
       {error ? (
         <Text
@@ -365,7 +373,7 @@ function StudyContent() {
                 style={[
                   styles.deck,
                   {
-                    backgroundColor: palette.panel,
+                    backgroundColor: 'transparent',
                     borderColor: palette.separator,
                   },
                 ]}
@@ -574,6 +582,7 @@ function Action({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
       style={[
         styles.action,
@@ -616,9 +625,9 @@ const styles = StyleSheet.create({
   list: { gap: 10, paddingBottom: 30 },
   deck: {
     minHeight: 78,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 13,
+    borderBottomWidth: 1,
+    paddingVertical: 18,
+    paddingHorizontal: 4,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -641,7 +650,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 18,
   },
-  modal: { borderWidth: 1, borderRadius: 12, padding: 16 },
+  modal: { borderWidth: 1, borderRadius: 12, padding: 16, width: '100%', maxWidth: 680, alignSelf: 'center' },
   input: {
     minHeight: 44,
     borderWidth: 1,

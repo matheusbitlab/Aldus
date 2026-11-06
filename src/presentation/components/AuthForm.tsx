@@ -1,3 +1,4 @@
+import { appUi } from '@/src/theme/appUi';
 import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -12,7 +13,7 @@ export function AuthForm({ title, subtitle, children }: { title: string; subtitl
     <View style={{ width: "100%", maxWidth: 420, alignSelf: "center", gap: 15 }}>
       <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: palette.surfaceSecondary, alignItems: "center", justifyContent: "center" }}><Ionicons name="book-outline" size={27} color={palette.accent} /></View>
       <Text style={{ color: palette.accent, fontWeight: "700", letterSpacing: 1.2, fontSize: 12 }}>ALDUS READER</Text>
-      <Text accessibilityRole="header" style={{ color: palette.text, fontSize: 28, fontWeight: "700" }}>{title}</Text>
+      <Text accessibilityRole="header" style={[appUi.title, { color: palette.text }]}>{title}</Text>
       {subtitle ? <Text style={{ color: palette.secondaryText, lineHeight: 21 }}>{subtitle}</Text> : null}
       {children}
     </View>
@@ -38,8 +39,8 @@ export function AuthInput({ label, value, onChangeText, secureTextEntry, keyboar
 export function AuthButton({ title, onPress, disabled, icon, secondary }: { title: string; onPress: () => void; disabled?: boolean; icon?: React.ComponentProps<typeof Ionicons>["name"]; secondary?: boolean }) {
   const { palette } = useAppTheme();
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={{ minHeight: 50, borderRadius: 10, borderWidth: secondary ? 1 : 0, borderColor: palette.border, backgroundColor: secondary ? palette.surface : palette.accent, opacity: disabled ? .55 : 1, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 9, paddingHorizontal: 14 }}>
-    {icon ? <Ionicons name={icon} size={19} color={secondary ? palette.text : "#FFFFFF"} /> : null}
-    <Text style={{ color: secondary ? palette.text : "#FFFFFF", fontWeight: "700", fontSize: 15 }}>{title}</Text>
+    {icon ? <Ionicons name={icon} size={19} color={secondary ? palette.text : palette.onAccent} /> : null}
+    <Text style={{ color: secondary ? palette.text : palette.onAccent, fontWeight: "700", fontSize: 15 }}>{title}</Text>
   </Pressable>;
 }
 
@@ -53,7 +54,7 @@ export function AuthLegalNotice({ intro }: { intro: string }) {
   return <View style={{ alignItems: "center", gap: 5, paddingHorizontal: 6 }}>
     <Text style={{ color: palette.secondaryText, fontSize: 12, lineHeight: 18, textAlign: "center" }}>{intro}</Text>
     <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: 5 }}>
-      <Pressable accessibilityRole="link" onPress={() => router.push("/legal/terms" as never)} style={{ minHeight: 34, justifyContent: "center" }}><Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" }}>Termos de Uso</Text></Pressable>
+      <Pressable accessibilityRole="link" onPress={() => router.push("/legal/terms" as never)} style={{ minHeight: 44, justifyContent: "center" }}><Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" }}>Termos de Uso</Text></Pressable>
       <Text style={{ color: palette.secondaryText, fontSize: 12 }}>e a</Text>
       <Pressable accessibilityRole="link" onPress={() => router.push("/legal/privacy" as never)} style={{ minHeight: 34, justifyContent: "center" }}><Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" }}>Política de Privacidade</Text></Pressable>
     </View>

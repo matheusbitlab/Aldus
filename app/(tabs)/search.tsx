@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { appUi } from '@/src/theme/appUi';
 import { BookCover } from '@/src/presentation/components/BookCover';
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -127,8 +128,8 @@ export default function Search() {
     <View style={[styles.screen, { backgroundColor: palette.background, paddingTop: Platform.OS === "web" ? 16 : Math.max(insets.top, 16) }]}>
       <View style={styles.header}>
         <View style={styles.heading}>
-          <Text style={[styles.title, { color: palette.text }]}>Descobrir livros</Text>
-          <Text style={[styles.subtitle, { color: palette.secondaryText }]}>Catálogos públicos e fontes adicionadas</Text>
+          <Text accessibilityRole="header" style={[appUi.title, { color: palette.text }]}>Explorar</Text>
+          <Text style={[styles.subtitle, { color: palette.secondaryText }]}>Encontre livros em catálogos públicos e nas suas fontes.</Text>
         </View>
       </View>
 
@@ -156,7 +157,7 @@ export default function Search() {
           onPress={submitSearch}
           style={[styles.searchButton, { backgroundColor: palette.accent, opacity: !query.trim() ? 0.5 : 1 }]}
         >
-          <Ionicons name="arrow-forward" size={19} color="#FFFFFF" />
+          <Ionicons name="arrow-forward" size={19} color={palette.onAccent} />
         </Pressable>
       </View>
 
@@ -171,7 +172,7 @@ export default function Search() {
               onPress={() => { setSourceFilter(filter); selectSource(filter); if (touched && query.trim()) void search(filter); }}
               style={[styles.filterChip, { backgroundColor: selected ? palette.accent : palette.surfaceSecondary }]}
             >
-              <Text style={[styles.filterText, { color: selected ? "#FFFFFF" : palette.text }]}>{filter}</Text>
+              <Text style={[styles.filterText, { color: selected ? palette.onAccent : palette.text }]}>{filter}</Text>
             </Pressable>
           );
         })}
@@ -336,8 +337,8 @@ function BookDetailsModal({
             ) : null}
             {job?.status !== "completed" ? (
               <Pressable accessibilityRole="button" disabled={active} onPress={onAcquire} style={[styles.acquireButton, { backgroundColor: palette.accent, opacity: active ? 0.6 : 1 }]}>
-                <Ionicons name="download-outline" size={19} color="#FFFFFF" />
-                <Text style={styles.acquireText}>{active ? "Importação em andamento…" : job?.status === "failed" || job?.status === "cancelled" ? "Tentar novamente" : "Baixar e adicionar"}</Text>
+                <Ionicons name="download-outline" size={19} color={palette.onAccent} />
+                <Text style={[styles.acquireText, { color: palette.onAccent }]}>{active ? "Importação em andamento…" : job?.status === "failed" || job?.status === "cancelled" ? "Tentar novamente" : "Baixar e adicionar"}</Text>
               </Pressable>
             ) : null}
             {Platform.OS === "web" && job?.status === "failed" && book && !book.drive ? (

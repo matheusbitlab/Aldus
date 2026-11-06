@@ -1,3 +1,4 @@
+import { appUi } from '@/src/theme/appUi';
 import { PropsWithChildren,useState } from 'react';
 import { Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,7 +8,7 @@ import { AdminCommand } from '../domain/contracts';
 import { adminRepository } from '../data/AdminRepository';
 import { newLibraryId } from '@/src/domain/entities/libraryId';
 
-export function Card({title,children}:PropsWithChildren<{title:string}>){const {palette}=useAppTheme();return <View style={[styles.card,{backgroundColor:palette.surface,borderColor:palette.border}]}><Text accessibilityRole="header" style={[styles.heading,{color:palette.text}]}>{title}</Text>{children}</View>;}
+export function Card({title,children}:PropsWithChildren<{title:string}>){const {palette}=useAppTheme();return <View style={[styles.card,{backgroundColor:'transparent',borderColor:palette.border}]}><Text accessibilityRole="header" style={[styles.heading,{color:palette.text}]}>{title}</Text>{children}</View>;}
 export function Label({children}:PropsWithChildren){const {palette}=useAppTheme();return <Text selectable style={{color:palette.text,lineHeight:22,marginVertical:3}}>{children}</Text>;}
 export function Muted({children}:PropsWithChildren){const {palette}=useAppTheme();return <Text style={{color:palette.secondaryText,lineHeight:21,marginVertical:3}}>{children}</Text>;}
 export function Button({title,onPress,disabled=false,accessibilityLabel,selected=false,expanded,icon,navigation=false}: {title:string;onPress:()=>void;disabled?:boolean;accessibilityLabel?:string;selected?:boolean;expanded?:boolean;icon?:React.ComponentProps<typeof Ionicons>['name'];navigation?:boolean}){
@@ -39,4 +40,4 @@ export function ConfirmChange({change,onClose,onSaved,onDenied}:{change:PendingC
   {!!error&&<Label>{error}</Label>}<View style={rowStyle}><Button title={busy?'Salvando…':'Confirmar operação'} disabled={busy||reason.trim().length<8||confirmation!==`CONFIRMAR ${change.target}`} onPress={()=>void submit()}/><Button title="Cancelar" disabled={busy} onPress={onClose}/></View>
  </ScrollView></View></Modal>;
 }
-const styles=StyleSheet.create({card:{borderWidth:1,borderRadius:14,padding:18,marginBottom:14,gap:5},heading:{fontSize:20,fontWeight:'700',marginBottom:8},button:{minHeight:44,paddingHorizontal:14,paddingVertical:12,borderWidth:1,borderRadius:9,justifyContent:'center'},input:{borderWidth:1,borderRadius:8,padding:11,fontSize:15},scrim:{flex:1,backgroundColor:'rgba(0,0,0,.5)',justifyContent:'center',alignItems:'center',padding:18},dialog:{padding:22,borderRadius:14,borderWidth:1,width:'100%',maxWidth:680}});
+const styles=StyleSheet.create({card:{borderTopWidth:1,paddingVertical:20,paddingHorizontal:8,marginBottom:14,gap:8},heading:{...appUi.sectionTitle,marginBottom:8},button:{minHeight:44,paddingHorizontal:14,paddingVertical:12,borderWidth:1,borderRadius:9,justifyContent:'center'},input:{borderWidth:1,borderRadius:8,padding:11,fontSize:15},scrim:{flex:1,backgroundColor:'rgba(0,0,0,.5)',justifyContent:'center',alignItems:'center',padding:18},dialog:{padding:22,borderRadius:14,borderWidth:1,width:'100%',maxWidth:680}});

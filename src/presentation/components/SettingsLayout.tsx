@@ -4,6 +4,7 @@ import { PropsWithChildren } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../contexts/AppThemeContext';
+import { appUi } from '@/src/theme/appUi';
 
 export function SettingsLayout({ title, children, back = true }: PropsWithChildren<{ title: string; back?: boolean }>) {
   const { palette } = useAppTheme(), insets = useSafeAreaInsets();
@@ -11,7 +12,7 @@ export function SettingsLayout({ title, children, back = true }: PropsWithChildr
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ width: '100%', maxWidth: 680, alignSelf: 'center', padding: 20, paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 30), gap: 22 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         {back ? <Pressable accessibilityRole="button" accessibilityLabel="Voltar aos Ajustes" onPress={() => router.canGoBack() ? router.back() : router.replace('/settings' as never)} style={styles.back}><Ionicons name="arrow-back" size={22} color={palette.text} /></Pressable> : null}
-        <Text accessibilityRole="header" style={{ color: palette.text, fontSize: 28, fontWeight: '700', flexShrink: 1 }}>{title}</Text>
+        <Text accessibilityRole="header" style={[appUi.title, { color: palette.text, flexShrink: 1 }]}>{title}</Text>
       </View>
       {children}
     </ScrollView>
@@ -19,7 +20,7 @@ export function SettingsLayout({ title, children, back = true }: PropsWithChildr
 }
 export function SettingsGroup({ title, children }: PropsWithChildren<{ title: string }>) {
   const { palette } = useAppTheme();
-  return <View style={{ gap: 7 }}><Text accessibilityRole="header" style={{ color: palette.secondaryText, fontSize: 13, fontWeight: '600', marginLeft: 4 }}>{title}</Text><View style={{ backgroundColor: palette.surface, borderRadius: 14, paddingHorizontal: 12 }}>{children}</View></View>;
+  return <View style={{ gap: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator, paddingTop: 18 }}><Text accessibilityRole="header" style={{ color: palette.secondaryText, fontSize: 13, fontWeight: '600', marginLeft: 4 }}>{title}</Text><View>{children}</View></View>;
 }
 export function SettingsLink({ title, description, icon, onPress }: { title: string; description?: string; icon: React.ComponentProps<typeof Ionicons>['name']; onPress: () => void }) {
   const { palette } = useAppTheme();

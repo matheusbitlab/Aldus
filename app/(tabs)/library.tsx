@@ -196,11 +196,11 @@ function LibraryContent() {
           disabled={bookImport.busy}
         >
           {bookImport.busy ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
+            <ActivityIndicator color={palette.onAccent} size="small" />
           ) : (
-            <Ionicons name="add" size={21} color="#FFFFFF" />
+            <Ionicons name="add" size={21} color={palette.onAccent} />
           )}
-          <Text style={styles.importLabel}>
+          <Text style={[styles.importLabel, { color: palette.onAccent }]}>
             {bookImport.selecting ? "Selecionando" : bookImport.busy ? "Importando" : "Importar livro"}
           </Text>
         </Pressable>
@@ -300,7 +300,7 @@ function LibraryContent() {
       {selecting ? <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{selectedIds.length} selecionados</Text>
         <Pressable accessibilityRole="button" onPress={() => setSelection(new Set(visibleBooks.map(book => book.id)))} style={styles.collectionChip}><Text style={{ color: palette.text }}>Selecionar resultados</Text></Pressable>
-        <Pressable accessibilityRole="button" disabled={!selectedIds.length || !!organizationError} onPress={() => setBulkOpen(true)} style={[styles.collectionChip, { backgroundColor: palette.accent, opacity: selectedIds.length ? 1 : .5 }]}><Text style={{ color: 'white' }}>Organizar seleção</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={!selectedIds.length || !!organizationError} onPress={() => setBulkOpen(true)} style={[styles.collectionChip, { backgroundColor: palette.accent, opacity: selectedIds.length ? 1 : .5 }]}><Text style={{ color: palette.onAccent }}>Organizar seleção</Text></Pressable>
       </View> : null}
       {notice ? <Text accessibilityLiveRegion="polite" style={{ color: palette.secondaryText, marginBottom: 12 }}>{notice}</Text> : null}
 

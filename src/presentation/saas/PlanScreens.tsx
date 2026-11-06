@@ -1,3 +1,4 @@
+import { appUi } from '@/src/theme/appUi';
 import { planLabel } from '@/src/presentation/i18n/ptBR';
 import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -32,14 +33,14 @@ function Copy({ children, muted = false }: { children: React.ReactNode; muted?: 
   const { palette } = useAppTheme(); return <Text style={{ color: muted ? palette.secondaryText : palette.text, fontSize: 15, lineHeight: 23 }}>{children}</Text>;
 }
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const { palette } = useAppTheme(); return <View style={[styles.section, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+  const { palette } = useAppTheme(); return <View style={[styles.section, { borderColor: palette.border, backgroundColor: 'transparent' }]}>
     <Text accessibilityRole="header" style={[styles.sectionTitle, { color: palette.text }]}>{title}</Text>{children}</View>;
 }
 function Layout({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   const { palette } = useAppTheme(), insets = useSafeAreaInsets();
   return <AuthGuard><View style={{ flex: 1, backgroundColor: palette.background }}><ScrollView contentContainerStyle={[styles.page, { paddingTop: Math.max(insets.top, 24), paddingBottom: Math.max(insets.bottom, 28) }]}>
     <View style={styles.actions}><PlanButton title="Voltar aos Ajustes" onPress={() => router.push('/settings' as never)} /></View>
-    <Text accessibilityRole="header" style={[styles.title, { color: palette.text }]}>{title}</Text><Copy muted>{subtitle}</Copy>{children}
+    <Text accessibilityRole="header" style={[appUi.title, { color: palette.text }]}>{title}</Text><Copy muted>{subtitle}</Copy>{children}
   </ScrollView></View></AuthGuard>;
 }
 function Failure({ error, refresh }: { error: PlanFailure | null; refresh: () => Promise<void> }) {
@@ -131,7 +132,7 @@ export function ComparePlansScreen() {
 const styles = StyleSheet.create({
   page: { padding: 24, gap: 18, width: '100%', maxWidth: 1000, alignSelf: 'center' },
   title: { fontSize: 30, fontWeight: '700' }, sectionTitle: { fontSize: 21, fontWeight: '600' },
-  section: { padding: 20, gap: 16, borderWidth: 1, borderRadius: 14 }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  section: { paddingVertical: 24, gap: 16, borderTopWidth: 1 }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   button: { minHeight: 46, paddingVertical: 13, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: 9, flexShrink: 1 },
   divider: { height: 1 }, loading: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 20 },
   catalogs: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 }, catalog: { flexBasis: 320, flexGrow: 1, flexShrink: 1, minWidth: 0, padding: 20, gap: 16, borderWidth: 1, borderRadius: 14 },

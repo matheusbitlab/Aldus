@@ -46,7 +46,8 @@ function AppShell() {
   const { palette, resolvedTheme } = useAppTheme();
   const { loading, session, profile } = useAuth();
   const publicLanding = Platform.OS === 'web' && (!segments.length || String(segments[0]) === 'index');
-  const usePhoneFrame = Platform.OS === "web" && width > 480 && !publicLanding && !['admin','plan','(tabs)'].includes(String(segments[0]));
+  // Preserve the tested Reader viewport; other task screens own their responsive width.
+  const usePhoneFrame = Platform.OS === "web" && width > 480 && String(segments[0]) === 'reader';
   const appReady = !loading && !!session && !!profile?.username && profile.account_status === "active";
   useEffect(()=>{
     if(!appReady||publicLanding)return;

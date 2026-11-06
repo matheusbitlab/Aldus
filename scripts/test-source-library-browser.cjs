@@ -70,12 +70,12 @@ async function cdp(url) {
       }
     `;
     await client.command('Page.addScriptToEvaluateOnNewDocument', { source: fixtureScript });
-    const text = () => client.evaluate('document.body.innerText');
+    const text = () => client.evaluate("document.body?.innerText ?? ''");
     const until = async (snippet, timeout = 12000) => { const start = Date.now(); while (Date.now() - start < timeout) { if ((await text()).includes(snippet)) return; await wait(100); } throw Error(`Missing UI: ${snippet}; ` + (await text()).slice(0, 800) + JSON.stringify(await client.evaluate(`({keys:Object.keys(localStorage),requests:window.fixtureRequests})`))); };
     const click = async label => {
       const start=Date.now();
       while(Date.now()-start<12000){
-        const clicked=await client.evaluate(`(() => { const e = [...document.querySelectorAll('[role="button"]')].find(e => e.textContent.trim() === ${JSON.stringify(label)} && !e.disabled && e.getAttribute('aria-disabled') !== 'true'); e?.click(); return !!e; })()`);
+        const clicked=await client.evaluate(`(() => { const e = [...document.querySelectorAll('[role="button"]')].find(e => (e.getAttribute('aria-label') === ${JSON.stringify(label)} || e.textContent.trim() === ${JSON.stringify(label)}) && !e.disabled && e.getAttribute('aria-disabled') !== 'true'); e?.click(); return !!e; })()`);
         if(clicked)return;await wait(100);
       }
       throw Error('Missing enabled button '+label+'; '+(await text()).slice(0,800));
@@ -86,6 +86,14 @@ async function cdp(url) {
     await client.evaluate(`document.querySelector('[aria-label="Abrir biblioteca: Minha biblioteca de teste"]').click()`); await until('Use Atualizar');
     hold=true; await click('Atualizar'); await until('Buscando livros'); await screenshot('loading'); releaseResponses(); await until('20 livros'); await screenshot('grid');
     assert.equal(requests, 1, 'one collection request, metadata only');
+    for (const width of [320,390,768,1440]) {
+      await client.command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});await wait(250);
+      assert.equal(await client.evaluate('document.documentElement.scrollWidth>innerWidth'),false,'source grid stays inside viewport');
+      const cardWidth=await client.evaluate(`document.querySelector('[aria-label^="Abrir Dom Casmurro"]').getBoundingClientRect().width`);
+      assert(cardWidth>100&&cardWidth<360,'responsive source cover width '+cardWidth);await screenshot('sources-grid-'+width);
+    }
+    await client.command('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:false});await wait(200);
+
     const input = async value => { await client.evaluate(`(() => { const e = document.querySelector('input[aria-label="Pesquisar nesta biblioteca"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e, ${JSON.stringify(value)}); e.dispatchEvent(new Event('input',{bubbles:true})); })()`); await wait(300); };
     await input('Dom Casmuro'); await until('Dom Casmurro'); assert.equal(requests, 1, 'typing does not call the source'); await screenshot('search');
     await click('Lista'); await screenshot('list');
@@ -144,6 +152,16 @@ async function cdp(url) {
     const removed = await client.evaluate(`(async () => { const p=window.fixturePersistence; return { catalog:await p.webGetPersistent('source_catalogs','browser-source'), links:(await p.webSourceLinksPersistent('browser-source')).length, imported:(await p.webGetAllPersistent('books')).filter(b=>b.id===${JSON.stringify(importedBookId)} && !b.isDeleted).length }; })()`);
     assert.equal(removed.catalog, null); assert.equal(removed.links, 0); assert.equal(removed.imported, 1);
     const filePreserved = await client.evaluate(`(async () => !!(await window.fixturePersistence.webGetPersistent('documents', ${JSON.stringify(importedBookId)}))?.data)()`); assert.ok(filePreserved,'imported EPUB Blob remains after removing source');
+    await navigate('/study');await until('Nenhum deck local ainda');await until('Mais ferramentas');
+    assert(!(await text()).includes('Gerar do livro'),'secondary study tools start collapsed');
+    await client.evaluate(`document.querySelector('[aria-label="Mais ferramentas de estudo"]').click()`);await until('Gerar do livro');await until('Batalha');await screenshot('study-tools');
+    await click('Novo deck');await until('Cancelar');await screenshot('study-create');await click('Cancelar');
+    for (const width of [320,390,768,1440]) {
+      await client.command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+      for (const [route,expected,name] of [['/settings','Conta e plano','settings'],['/search','Explorar','explore']]) {
+        await navigate(route);await until(expected);assert.equal(await client.evaluate('document.documentElement.scrollWidth>innerWidth'),false,name+' overflow');assert(await client.evaluate("[...document.querySelectorAll('[role=tab]')].every(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight+1})"),'tab labels stay within viewport');await screenshot(name+'-'+width);
+      }
+    }
     console.log(`PASS exported Web: Sources/route/grid/list/search/import/reopen/stale/refresh-error/offline/auth/empty/remove; real IndexedDB rollback+links+personal book/file preserved; 1000 indexed ~${indexedMs.toFixed(0)}ms (includes controlled response gate), ${mounted} mounted cards. Screenshots .expo/source-library-validation. Supabase/remote fixture only; Drive real/Android NOT TESTED.`);
   } finally {
     client?.close(); const exited = new Promise(r => child.once('exit',r)); child.kill(); await Promise.race([exited,wait(2000)]); await new Promise(r => server.close(r));
