@@ -1,5 +1,9 @@
 # Aldus Reader — Bugs Atuais
 
+## 27/10/2026 — UX/UI em reformulação (PARCIAL)
+
+A missão integral continua aberta. Biblioteca/fontes/navegação/Estudo/Ajustes têm incrementos locais; 86/86 suítes críticas e Library Chromium passaram no bloco intermediário. O novo export/reteste inclui correção da altura dos rótulos inferiores e labels do Estudo. Capturas, logs e limites estão no registro de 27/10 do PROJECT_CONTEXT.md. Ainda não há preview/APK novos nem homologação física deste diff. Não encerrar pendências anteriores de Reader/Android por testes controlados. Preservados dados, fontes e alterações locais preexistentes.
+
 
 ## 24/10/2026 — UX das marcações corrigida; Android físico pendente
 
@@ -65,13 +69,17 @@ Oito incidentes originais mantidos, além dos três problemas ativos adicionais 
 nenhum encerramento é inferido de merge, export ou teste controlado.
 Problemas ativos e validações recentes da campanha, sempre limitadas ao cenário executado.
 Contexto permanente: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
-APK release consolidado: pendente. Homologação debug física em 16/10 no Redmi Android 16;
-identidade do artefato, protocolo e limites de evidência em PROJECT_CONTEXT.md, seção 15.
+APK release consolidado de 761c28d gerado e atualizado no Redmi sem desinstalação/limpeza;
+assinatura, hash instalado e abertura conferidos. Isso não repete a QA funcional completa.
+Identidade do artefato e limites em PROJECT_CONTEXT.md, seção de entrega consolidada.
 
 Interface de 16/10: landing pública Web, acabamento Admin e apresentação pt-BR implementados
 e homologados localmente; não encerram incidentes de Reader/Auth/Sync por inferência.
 Dados financeiros e telemetria ausentes permanecem indisponíveis. Capturas Admin usam
-fixtures identificadas, sem implantação remota ou provisionamento OWNER. Detalhes e
+fixtures identificadas. Posteriormente, com autorização explícita, backend SaaS/Admin
+implantado e OWNER provisionado após backup real e restauração local. Login/TOTP real
+e fluxo completo autenticado ainda pendentes; ver seção “Dashboard remoto” do contexto.
+Detalhes e
 limites de validação na seção “Interface pública, Aldus Admin e português brasileiro”
 de PROJECT_CONTEXT.md. Biblioteca mantém menu discreto e exportação nos Ajustes.
 
@@ -514,6 +522,17 @@ e 7f50a90^:DIAGNOSTICO_BUGS_APK.md. Não restaurar esses arquivos como contexto.
 - Android físico permanece pendente; futuro build/instalação necessário para distribuir
   o novo bundle. Nenhum APK/deploy/migration remota/backup real nesta etapa. A janela de
   senha anterior foi encerrada sem leitura de credenciais. Bugs físicos anteriores intactos.
+
+### Drive / fontes — atualização local de 16/10/2026
+
+- BUG-03 permanece ABERTO para conexão/indexação real no Redmi. Instrumentação correlacionada
+  separa autorização, pasta, busca, organização e gravação sem tokens/URLs/nomes nos traces.
+  ADB sem aparelho nesta execução: não foi possível identificar a primeira divergência real.
+- Corrigidos localmente isolamento de cadastros por conta, adoção explícita dos legados,
+  cancelamento antes do commit, retorno tardio, corrupção de configuração sem sobrescrita
+  e preservação do índice anterior em edição/falha. Testes controlados não são prova física.
+- Teste real da fonte Teste, contagem atual de livros, reconexão, importação e navegação
+  Android continuam pendentes; nenhum cadastro ou livro real foi removido nesta execução.
 
 ### Cadastro, Google e travamentos Android — atualização de 19/10/2026
 

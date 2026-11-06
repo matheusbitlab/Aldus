@@ -4,6 +4,55 @@ Leitor EPUB/PDF para Android e Web, construído com Expo/React Native e TypeScri
 Contexto técnico: [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 Problemas ativos: [BUGS_ATUAIS.md](BUGS_ATUAIS.md).
 
+## Começar ou continuar com uma IA
+
+Abra a raiz deste repositório e comece por [AGENTS.md](AGENTS.md). O processo orienta
+entrada, preservação do worktree, escolha de skills, implementação, validação e registro
+do próximo passo. Não depende da memória de uma conversa anterior.
+
+```powershell
+node scripts/ai-project-preflight.cjs
+node scripts/ai-project-preflight.cjs --json
+```
+
+O comando só inspeciona o checkout local: mostra branch/HEAD, alterações, documentos,
+skills, nomes de scripts e presença de ferramentas. Não instala, testa, compila, carrega
+valores de `.env`, conecta serviços ou usa o celular. Funciona mesmo iniciado em outra
+pasta quando chamado pelo caminho absoluto; `--root` permite indicar outro clone Aldus.
+
+As onze skills em [.agents/skills](.agents/skills) cobrem continuidade, validação,
+Reader, biblioteca/Sync, importação/Sources/Drive, Community, Flashcards/Battle,
+interface, backend/Auth/Admin, entrega Web e APK. O catálogo com os gatilhos está no
+AGENTS. Leia apenas as pertinentes.
+Para IAs sem descoberta de skills, abra os `SKILL.md` indicados manualmente.
+
+Prompt pronto para uma nova conversa:
+
+```text
+Leia AGENTS.md na raiz do Aldus e siga a skill aldus-project-continuity.
+Execute o preflight, confira Git e leia PROJECT_CONTEXT.md (única leitura obrigatória;
+módulos de docs/context/ só quando o mapa indicar) e a entrada pertinente de BUGS_ATUAIS.md. Preserve as alterações locais. Retome o último passo autorizado
+ainda pendente e valide no ambiente pertinente, sem tratar build/Web como prova
+física ou remota. Ao concluir, registre resultado, limites e próximo passo nos
+documentos oficiais. Se o objetivo não estiver claro, informe a lacuna antes de editar.
+```
+
+O estado continua somente nos dois documentos oficiais. O
+[modelo de registro](.agents/skills/aldus-project-continuity/references/session-record.md)
+serve para atualizá-los, sem criar um novo arquivo de handoff por sessão.
+Para manter as instruções:
+
+```powershell
+node scripts/validate-ai-instructions.cjs
+git diff --check
+```
+
+A estrutura usa [AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
+e [skills locais em `.agents/skills`](https://learn.chatgpt.com/docs/build-skills),
+conforme a documentação oficial OpenAI consultada em 26/10/2026. Verifique a descoberta
+na nova sessão; se necessário, reabra a IA na raiz do checkout. Isso não exige copiar
+skills para um perfil global ou alterar configurações pessoais.
+
 ## Executar
 
 Node.js 24 e npm; usar o lockfile existente:
