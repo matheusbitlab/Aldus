@@ -19,6 +19,9 @@ interface Props {
   diagnosticContext?: ReaderUiContext;
 }
 
+/** Hex #RRGGBB + alfa; outras notações (nome, rgb) seguem sem transparência em vez de virarem cor inválida. */
+const withAlpha = (color: string, alpha: string) => /^#[0-9a-f]{6}$/i.test(color) ? `${color}${alpha}` : color;
+
 export function TopHeader({
   layoutMode = "overlay",
   title,
@@ -43,7 +46,7 @@ export function TopHeader({
       onLayout={event => { onHeight?.(event.nativeEvent.layout.height); readerUiDiagnostic("LAYOUT", "header", diagnosticContext, event.nativeEvent.layout, { zIndex: 20, elevation: 4, pointerEvents: "auto" }); }}
       style={[
         layoutMode === "flow" ? styles.headerFlow : styles.header,
-        { paddingTop },
+        { paddingTop, borderBottomColor: withAlpha(text, "1F") },
         background ? { backgroundColor: background } : null,
       ]}
     >
@@ -60,7 +63,7 @@ export function TopHeader({
         <Text numberOfLines={1} style={[styles.title, { color: text }]}>
           {title}
         </Text>
-        <Text numberOfLines={1} style={[styles.chapter, { color: accent }]}>
+        <Text numberOfLines={1} style={[styles.chapter, { color: withAlpha(text, "B3") }]}>
           {chapterTitle}
         </Text>
       </View>
@@ -100,6 +103,10 @@ export function TopHeader({
   );
 }
 
+// Moldura editorial discreta: linha fina em vez de sombra, título serifado, alvos de 44.
+// Só aparência: posição, ordem, rótulos e onLayout (altura medida) são contrato do Reader.
+const serif = Platform.OS === "web" ? 'Literata, Georgia, "Times New Roman", serif' : Platform.OS === "android" ? "serif" : Platform.OS === "ios" ? "Georgia" : undefined;
+
 const styles = StyleSheet.create({
   header: {
     position: "absolute",
@@ -107,28 +114,27 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 12,
-    paddingBottom: 14,
+    paddingHorizontal: 8,
+    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    gap: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    elevation: 0,
   },
   headerFlow: {
     width: "100%",
-    paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -138,12 +144,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontFamily: serif,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "600",
   },
   chapter: {
     fontSize: 12,
-    marginTop: 2,
-    letterSpacing: 0.3,
+    lineHeight: 16,
+    marginTop: 1,
   },
 });

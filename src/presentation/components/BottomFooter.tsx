@@ -22,6 +22,9 @@ interface Props {
   hideReadingCounts?: boolean;
 }
 
+/** Hex #RRGGBB + alfa; outras notações (nome, rgb) seguem sem transparência em vez de virarem cor inválida. */
+const withAlpha = (color: string, alpha: string) => /^#[0-9a-f]{6}$/i.test(color) ? `${color}${alpha}` : color;
+
 export function BottomFooter({
   layoutMode = "overlay",
   progress,
@@ -53,7 +56,7 @@ export function BottomFooter({
   });
 
   return (
-    <View style={[layoutMode === "flow" ? styles.footerFlow : styles.footer, { backgroundColor: background, paddingBottom }]}>
+    <View style={[layoutMode === "flow" ? styles.footerFlow : styles.footer, { backgroundColor: background, paddingBottom, borderTopColor: withAlpha(secondaryText, "33") }]}>
       <View style={styles.sliderRow}>
         <Pressable
           accessibilityRole="button"
@@ -115,38 +118,32 @@ export function BottomFooter({
 }
 
 const styles = StyleSheet.create({
+  // Linha fina em vez de sombra (moldura editorial); geometria e posição inalteradas.
   footer: {
     position: "absolute",
     zIndex: 10,
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 4,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   footerFlow: {
     width: "100%",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 4,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   sliderRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 6,
   },
   navButton: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -161,8 +158,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
-    paddingHorizontal: 6,
-    paddingTop: 2,
+    paddingHorizontal: 50,
+    paddingTop: 0,
   },
   label: {
     fontSize: 12,

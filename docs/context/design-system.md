@@ -22,7 +22,7 @@
 | 2 | Navegação: abas Biblioteca · Descobrir · Estudo · Conta; sidebar no desktop Web; tela Descobrir com fontes | IMPLEMENTADO (06/11) |
 | 3 | Biblioteca: cabeçalho enxuto (título, busca, "+" e "⋯"), filtros em chips, "Continue lendo", `BookCard` | IMPLEMENTADO (06/11) |
 | 4 | Conta/Ajustes e Estudo com `ListGroup`/`ListRow` | IMPLEMENTADO (06/11) |
-| 5 | Moldura do Reader (cabeçalho/rodapé/painéis) — só visual, sem tocar motor/posições | PENDENTE |
+| 5 | Moldura do Reader (cabeçalho/rodapé) — só visual, sem tocar motor/posições; painéis inalterados | IMPLEMENTADO (09/11) |
 
 ## Fundação (`src/ui`)
 
