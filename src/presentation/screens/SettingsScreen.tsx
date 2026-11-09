@@ -21,11 +21,11 @@ export default function SettingsScreen() {
   const { profile, user } = useAuth(), { palette } = useAppTheme();
   const [readerVisible, setReaderVisible] = useState(false), metadata = getAppMetadata();
   const go = (path: string) => router.push(path as never);
-  const name = profile?.display_name || 'Leitor';
+  const name = profile?.display_name || profile?.username || 'Leitor';
   return <><SettingsLayout title="Conta" back={false}>
     <View style={[styles.profile, { backgroundColor: palette.surface, borderColor: palette.border }]}>
       <View style={[styles.avatar, { backgroundColor: palette.accentSoft }]}>
-        <AppText variant="heading" tone="accent">{initials(profile?.display_name)}</AppText>
+        <AppText variant="heading" tone="accent">{initials(profile?.display_name || profile?.username)}</AppText>
       </View>
       <View style={styles.profileText}>
         <AppText variant="subheading" numberOfLines={1}>{name}</AppText>

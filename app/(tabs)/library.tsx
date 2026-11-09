@@ -40,6 +40,8 @@ const filters: { value: BookFilter; label: string }[] = [
   { value: "favorites", label: "Favoritos" },
 ];
 
+// `short` cabe numa linha no celular; `label` completo continua no menu e no nome acessível.
+const sortShortLabels: Record<BookSort, string> = { recent: "Recentes", title: "Título", author: "Autor", progress: "Progresso", series: "Série" };
 const sorts: { value: BookSort; label: string }[] = [
   { value: "recent", label: "Adicionados recentemente" },
   { value: "title", label: "Título A–Z" },
@@ -197,8 +199,8 @@ function LibraryContent() {
         </ChipRow>
       ) : null}
       <View style={styles.toolbar}>
-        <Button label={`Formato: ${formatLabel}`} variant="ghost" trailingIcon="chevron-down" style={styles.toolbarShrink} accessibilityLabel={`Filtrar formato: ${formatLabel}`} onPress={() => setOpenMenu("format")} />
-        <Button label={selectedSort} variant="ghost" icon="swap-vertical-outline" style={styles.toolbarShrink} accessibilityLabel={`Ordenar livros: ${selectedSort}`} onPress={() => setOpenMenu("sort")} />
+        <Button label={format === "all" ? "Formato" : formatLabel} variant="ghost" icon="funnel-outline" trailingIcon="chevron-down" style={styles.toolbarShrink} accessibilityLabel={`Filtrar formato: ${formatLabel}`} onPress={() => setOpenMenu("format")} />
+        <Button label={sortShortLabels[sort]} variant="ghost" icon="swap-vertical-outline" style={styles.toolbarShrink} accessibilityLabel={`Ordenar livros: ${selectedSort}`} onPress={() => setOpenMenu("sort")} />
         <View style={styles.toolbarSpacer} />
         <IconButton icon={layout === "grid" ? "list-outline" : "grid-outline"} label={layout === "grid" ? "Exibir em lista" : "Exibir em grade"} onPress={() => setLayout(layout === "grid" ? "list" : "grid")} />
       </View>

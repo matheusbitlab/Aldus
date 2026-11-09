@@ -1,5 +1,14 @@
 # Aldus Reader — Bugs Atuais
 
+## 09/11/2026 — "Continue lendo" nunca aparece na Biblioteca (ABERTO)
+
+- Reprodução: Redmi, APK `ae98991`, após ler "Amêndoas" e voltar à Biblioteca: o cartão "Continue lendo" não aparece.
+- Causa CONFIRMADA no código: `continueBook` (`app/(tabs)/library.tsx`) exige `LibraryBook.lastOpenedDate`, mas nenhum caminho grava esse campo ao
+  abrir um livro (nasce `null` em importações/catálogo; `OpenBookUseCase`/`UpdateReadingProgressUseCase` não o atualizam; SQLite não o lê). Pré-existente
+  ao redesign: o recurso nunca funcionou para usuários reais. Fixtures de teste preenchem o campo, por isso os testes passavam.
+- Correção proposta (não feita): usar a data real da última gravação de progresso (`reading_progress.updatedAt`) já persistida, sem novo campo
+  nem mudança de Sync; ou gravar `lastOpenedDate` pelo repositório existente. Exige testes SQLite/IndexedDB e conta A/B.
+
 ## 06/11/2026 — EPUB/Reflow: reset ao abrir controles e restauração de posição (registro retroativo)
 
 Origem: dossiês de 02/10 (`BUG_CONTEXT_EPUB_CENTER_RESET.md`, `BUG_CONTEXT_EPUB_PROGRESS_RESTORE.md`, apagados em 7f50a90). Síntese verificada com o código atual em

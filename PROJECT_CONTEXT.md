@@ -57,6 +57,11 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
   → Success; `firstInstallTime` 2026-10-11 21:38:27 preservado; hash do `base.apk` instalado = `5fcbd88e…`. Abertura: carregamento → tela de
   **login** (sem crash/FATAL no logcat). Telas pós-login (Biblioteca/Descobrir/Conta/Estudo/Reader) NÃO exercitadas: exigem a senha do usuário.
   Não se verificou se a sessão estava ativa antes da atualização. Nenhuma configuração do aparelho foi alterada.
+  **PASS físico (09/11, após o usuário entrar):** Reader EPUB (livro pessoal) 11/189 → 10 toques centrais + 1 → controles alternam e página/trecho
+  iguais; moldura nova OK; Biblioteca "40 livros", linhas lado a lado (sem empilhamento), menus "+" e "⋯" em folha; Descobrir com 3 fontes Drive
+  e BibliON/MEC; Estudo e Conta OK; sem FATAL no logcat. Achados: rótulos da barra quebravam (corrigido depois do APK, em `library.tsx`), nome
+  "Leitor"/inicial "A" sem `display_name` (corrigido: usa o username), **"Continue lendo" nunca aparece** (BUGS_ATUAIS.md; pré-existente).
+  Essas duas correções NÃO estão no APK instalado.
 - Validação local de 09/11 (Fase 5, sobre `bb9d5dd`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `bb9d5dd4597e`, dirty=true);
   Chromium PASS: `test:reader:{browser,epub:web,reflow:web,concentration:web,settings:web,markings:web,pdf:web}`; diff-check PASS.
 - Validação anterior (Fase 4, sobre `02bb6f4`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `02bb6f4ecac8`, dirty=true);
@@ -223,8 +228,9 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
   lugar da sombra; cor com alfa só para hex `#RRGGBB` (outras notações seguem sem alfa). `ReaderControls` (slot estável/ancestralidade/opacidade),
   documento, posições, âncoras, painéis e handlers **não** foram tocados. Cabeçalho segue < 86 px (contrato do feedback do Reflow).
 - VALIDADO: ver §3 (89/89, export, 7 suítes Chromium do Reader, incl. 6 botões recebendo toque acima do iframe). NÃO TESTADO: Android.
-- Entrega: APK de ensaio `device-rehearsal` do `ae98991` compilado, conferido e instalado no Redmi com `install -r` (dados/`firstInstallTime` preservados);
-  abre até o login; telas pós-login aguardam o usuário entrar.
+- Entrega: APK de ensaio `device-rehearsal` do `ae98991` compilado, conferido e instalado no Redmi com `install -r` (dados/`firstInstallTime` preservados).
+  Homologação física parcial PASS (§3); ajustes de rótulos/nome depois validados em typecheck, 89/89, export e Chromium (Biblioteca/fontes),
+  ainda fora do APK. `test-library-bulk-web` passou a esperar a fixture após reload (falhava por tempo fixo de 500 ms).
 
 ### 06/11/2026 — Redesign Fase 4: Conta e Estudo; estilos estáticos (Claude)
 - IMPLEMENTADO: `SettingsLayout`/`SettingsGroup`/`SettingsLink` reescritos sobre `src/ui` (mesma API → todas as subtelas de ajustes, legal,
