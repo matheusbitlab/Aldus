@@ -48,6 +48,11 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
 - Redesign de UI em andamento (decisões e fases em `docs/context/design-system.md`): Fases 1 (fundação `src/ui`), 2 (abas Biblioteca ·
   Descobrir · Estudo · Conta; tela Descobrir com fontes) 3 (Biblioteca com "+"), 4 (Conta e Estudo) e 5 (moldura do Reader, só visual) concluídas.
   Acervo: etapa 1 pronta no commit local `11cf66c` do branch `claude/acervo-dominio-publico-ae9294` (worktree próprio), **não integrado à `main`**.
+- **APK de ensaio do HEAD `ae98991` (09/11)**: `artifacts/apk/Aldus-ae98991-device-rehearsal.apk` (ignorado pelo Git; cópia de
+  `android/app/build/outputs/apk/release/app-release.apk`), 346.643.174 bytes, SHA-256 `5fcbd88e…df5e71`. `com.aldus.reader` 1.0.0-beta.2/code 3,
+  sem debuggable, ABIs arm64-v8a/armeabi-v7a/x86/x86_64, assinatura v2 com certificado `fac61745…033b9c` (debug/`device-rehearsal`, o mesmo
+  da instalação do Redmi registrada no histórico) — **não é o Beta privado**. Bundle Hermes contém os textos do redesign. Gradle 26 min, sem
+  reuso. `build:apk:archive` recusou (exige chave privada). NÃO INSTALADO: `adb devices` vazio em 09/11.
 - Validação local de 09/11 (Fase 5, sobre `bb9d5dd`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `bb9d5dd4597e`, dirty=true);
   Chromium PASS: `test:reader:{browser,epub:web,reflow:web,concentration:web,settings:web,markings:web,pdf:web}`; diff-check PASS.
 - Validação anterior (Fase 4, sobre `02bb6f4`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `02bb6f4ecac8`, dirty=true);
@@ -178,8 +183,9 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
 1. **Homologação física Android pendente** (Redmi): Reflow/PDF Original/seleção-grifos/brilho/permissões na build atual; restaurar
    `heads_up_notifications_enabled` para 1 quando o aparelho voltar (config temporária do aparelho, ver historico). Emulador isolado não
    iniciou o APK 00b6e4d (serviço phone).
-2. **Redesign concluído no código (fases 1–5)**; faltam: revisão visual humana, Android (APK do HEAD e Redmi: estilos estáticos, ripple, texto
-   ampliado), preview Vercel, Literata empacotada (exige autorização para baixar a fonte) e, se desejado, painéis do Reader (ajustes/marcações)
+2. **Redesign concluído no código (fases 1–5)**; APK de ensaio `ae98991` pronto (§3), falta instalar no Redmi (`adb -s SERIAL install -r`,
+   após conferir package/certificado/versionCode instalados) e homologar: estilos estáticos, ripple, menus "+"/"⋯", texto ampliado;
+   revisão visual humana, preview Vercel, Literata empacotada (exige autorização para baixar a fonte) e, se desejado, painéis do Reader (ajustes/marcações)
    no novo visual (`docs/context/design-system.md`).
    **Acervo**: etapa 1 (contas novas só domínio público) pronta em `claude/acervo-dominio-publico-ae9294` (`11cf66c`), aguardando decisão de integrar; etapa 2 (cópia por usuário + nuvem privada, aprovada pelo usuário)
    e etapa 3 (remover os 33 arquivos do APK/`dist`) pendentes.
@@ -214,6 +220,7 @@ Export/build/teste controlado **não** comprova Android físico, sessão autenti
   lugar da sombra; cor com alfa só para hex `#RRGGBB` (outras notações seguem sem alfa). `ReaderControls` (slot estável/ancestralidade/opacidade),
   documento, posições, âncoras, painéis e handlers **não** foram tocados. Cabeçalho segue < 86 px (contrato do feedback do Reflow).
 - VALIDADO: ver §3 (89/89, export, 7 suítes Chromium do Reader, incl. 6 botões recebendo toque acima do iframe). NÃO TESTADO: Android.
+- Entrega: APK de ensaio `device-rehearsal` do `ae98991` compilado e conferido (hash, package, versão, certificado, bundle); não instalado (Redmi ausente).
 
 ### 06/11/2026 — Redesign Fase 4: Conta e Estudo; estilos estáticos (Claude)
 - IMPLEMENTADO: `SettingsLayout`/`SettingsGroup`/`SettingsLink` reescritos sobre `src/ui` (mesma API → todas as subtelas de ajustes, legal,
