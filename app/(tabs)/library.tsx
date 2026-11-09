@@ -145,8 +145,12 @@ function LibraryContent() {
     });
   }, [books, filter, query, sort, organization, collection, format]);
 
-  const continueBook = useMemo(() => books.filter(book => Number.isFinite(book.lastOpenedDate) && (book.lastOpenedDate ?? 0) > 0 && inferredReadingStatus(book, organization[book.id]) !== 'completed')
-    .reduce<LibraryBook | null>((latest, book) => !latest || book.lastOpenedDate! > latest.lastOpenedDate! ? book : latest, null), [books, organization]);
+  // Última leitura real: data de abertura, se existir, ou da última gravação de progresso (BUGS_ATUAIS 09/11).
+  const continueBook = useMemo(() => {
+    const lastActivity = (book: LibraryBook) => Math.max(book.lastOpenedDate ?? 0, book.lastReadAt ?? 0);
+    return books.filter(book => lastActivity(book) > 0 && inferredReadingStatus(book, organization[book.id]) !== 'completed')
+      .reduce<LibraryBook | null>((latest, book) => !latest || lastActivity(book) > lastActivity(latest) ? book : latest, null);
+  }, [books, organization]);
 
   const selectedSort =
     sorts.find((item) => item.value === sort)?.label ??

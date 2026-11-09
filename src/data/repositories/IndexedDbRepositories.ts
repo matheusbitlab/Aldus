@@ -12,12 +12,17 @@ export class IndexedDbBookRepository implements BookRepository {
   async listAll(): Promise<LibraryBook[]> { return webGetAllPersistent<LibraryBook>("book_metadata"); }
   async listActive(): Promise<LibraryBook[]> {
     const [books, progress] = await Promise.all([webGetAllPersistent<LibraryBook>("book_metadata"), webGetAllPersistent<ReadingProgress>("reading_progress")]);
-    const progressByBook = new Map(progress.map((item) => [item.bookId, item.percentage]));
-    return books.filter((book) => !book.isDeleted).map((book) => ({ ...book, progress: progressByBook.get(book.id) ?? book.progress ?? 0 })).sort((first, second) => (second.lastOpenedDate ?? second.addedDate) - (first.lastOpenedDate ?? first.addedDate));
+    const progressByBook = new Map(progress.map((item) => [item.bookId, item]));
+    return books.filter((book) => !book.isDeleted).map((book) => {
+      const saved = progressByBook.get(book.id);
+      // `lastReadAt` vem do progresso persistido (última leitura real); não é gravado no livro.
+      return { ...book, progress: saved?.percentage ?? book.progress ?? 0, lastReadAt: saved && Number.isFinite(saved.updatedAt) && saved.updatedAt > 0 ? saved.updatedAt : null };
+    }).sort((first, second) => (second.lastOpenedDate ?? second.addedDate) - (first.lastOpenedDate ?? first.addedDate));
   }
   async findById(bookId: string): Promise<LibraryBook | null> { const book = await webGetPersistent<LibraryBook>("books", bookId); return book && !book.isDeleted ? book : null; }
   async save(book: LibraryBook): Promise<void> {
-    await webSaveBookPersistent(book);
+    const { lastReadAt: _derived, ...stored } = book;
+    await webSaveBookPersistent(stored);
   }
   async softDelete(bookId: string): Promise<void> {
     const book = await webGetPersistent<LibraryBook>("books", bookId);

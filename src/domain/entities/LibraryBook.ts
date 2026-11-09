@@ -21,6 +21,11 @@ export interface LibraryBook {
   totalWords: number;
   addedDate: number;
   lastOpenedDate: number | null;
+  /**
+   * Derivado na leitura: `updatedAt` do progresso de leitura já persistido (última leitura real).
+   * Nunca é gravado de volta nem sincronizado; ausente/null quando não há progresso salvo.
+   */
+  lastReadAt?: number | null;
   isDeleted: boolean;
   progress: number;
 }

@@ -1,13 +1,16 @@
 # Aldus Reader — Bugs Atuais
 
-## 09/11/2026 — "Continue lendo" nunca aparece na Biblioteca (ABERTO)
+## 09/11/2026 — "Continue lendo" nunca aparece na Biblioteca (CORRIGIDO NO CÓDIGO; Android pendente)
 
 - Reprodução: Redmi, APK `ae98991`, após ler "Amêndoas" e voltar à Biblioteca: o cartão "Continue lendo" não aparece.
 - Causa CONFIRMADA no código: `continueBook` (`app/(tabs)/library.tsx`) exige `LibraryBook.lastOpenedDate`, mas nenhum caminho grava esse campo ao
   abrir um livro (nasce `null` em importações/catálogo; `OpenBookUseCase`/`UpdateReadingProgressUseCase` não o atualizam; SQLite não o lê). Pré-existente
   ao redesign: o recurso nunca funcionou para usuários reais. Fixtures de teste preenchem o campo, por isso os testes passavam.
-- Correção proposta (não feita): usar a data real da última gravação de progresso (`reading_progress.updatedAt`) já persistida, sem novo campo
-  nem mudança de Sync; ou gravar `lastOpenedDate` pelo repositório existente. Exige testes SQLite/IndexedDB e conta A/B.
+- Correção (09/11): `LibraryBook.lastReadAt` é **derivado na leitura** do `updatedAt` do progresso já persistido (`SqliteBookRepository` via JOIN,
+  `IndexedDbBookRepository` via `reading_progress`); `null` sem progresso; removido antes de salvar (não vai a `account_json`/IndexedDB nem ao Sync,
+  cujo payload lista campos explícitos). `library.tsx` usa a maior entre `lastOpenedDate` e `lastReadAt`. Sem migration nem novo dado gravado.
+- VALIDADO: `scripts/test-library-last-read.cjs` (SQLite real + IndexedDB stub, conta A/B, não regravação) no `test:critical` 90/90; export;
+  `test:library:bulk:web` e `test:library:web`. NÃO TESTADO no Redmi (requer novo APK).
 
 ## 06/11/2026 — EPUB/Reflow: reset ao abrir controles e restauração de posição (registro retroativo)
 

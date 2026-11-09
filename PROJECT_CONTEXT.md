@@ -61,8 +61,10 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
   iguais; moldura nova OK; Biblioteca "40 livros", linhas lado a lado (sem empilhamento), menus "+" e "⋯" em folha; Descobrir com 3 fontes Drive
   e BibliON/MEC; Estudo e Conta OK; sem FATAL no logcat. Achados: rótulos da barra quebravam (corrigido depois do APK, em `library.tsx`), nome
   "Leitor"/inicial "A" sem `display_name` (corrigido: usa o username), **"Continue lendo" nunca aparece** (BUGS_ATUAIS.md; pré-existente).
-  Essas duas correções NÃO estão no APK instalado.
-- Validação local de 09/11 (Fase 5, sobre `bb9d5dd`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `bb9d5dd4597e`, dirty=true);
+  Essas correções — e a do "Continue lendo" (commit seguinte) — NÃO estão no APK instalado.
+- Validação local de 09/11 ("Continue lendo", sobre `cb45b71`): typecheck PASS; `test:critical` 90/90 (nova `library-last-read`); `export:web` PASS;
+  `test:library:bulk:web` e `test:library:web` PASS; diff-check PASS.
+- Validação anterior (Fase 5, sobre `bb9d5dd`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `bb9d5dd4597e`, dirty=true);
   Chromium PASS: `test:reader:{browser,epub:web,reflow:web,concentration:web,settings:web,markings:web,pdf:web}`; diff-check PASS.
 - Validação anterior (Fase 4, sobre `02bb6f4`): typecheck PASS; `test:critical` 89/89; `export:web` PASS (build `02bb6f4ecac8`, dirty=true);
   Chromium PASS: `test:source-library:browser` (Conta/Estudo/Descobrir 320–1440), `test:library:bulk:web`, `test:library:web`, `test:saas:web`,
@@ -176,7 +178,7 @@ Documentos soltos na raiz (`GOOGLE_AUTH_DRIVE_DEPLOYMENT.md`, `LANDING_PAGE_CONT
 
 ## 7. Validação (comandos reais de package.json)
 
-Gates: `npm run typecheck`; `npm run test:critical` (89 suítes `scripts/test-*.cjs`, sem Android/Supabase real); `npm run export:web`;
+Gates: `npm run typecheck`; `npm run test:critical` (90 suítes `scripts/test-*.cjs`, sem Android/Supabase real); `npm run export:web`;
 `git diff --check`. Ferramentas de teste isoladas em `.expo/` (`npm run setup:test-tools`). Tempo típico: typecheck e critical levam alguns
 minutos; rode em segundo plano. Por área:
 - Reader: `test:reader:{browser,epub:web,reflow:web,study:web,pdf:web,settings:web,concentration:web,markings:web}` (Chromium; fora do critical)
