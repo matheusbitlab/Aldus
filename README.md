@@ -68,6 +68,36 @@ EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_KEY. Somente chave anon/publisha
 Drive Web usa adicionalmente EXPO_PUBLIC_GOOGLE_DRIVE_WEB_CLIENT_ID; catálogos usam
 EXPO_PUBLIC_CATALOG_CONTACT. Nunca colocar secret/service_role no app.
 
+## Trocar de computador
+
+O Git (GitHub `origin`) leva o código, a documentação e o `android/app/debug.keystore` versionado
+(mesmo certificado de ensaio `fac61745…` do APK instalado no Redmi). Antes de sair do PC antigo:
+`git status`, `git log origin/main..main` e `git push` do que deve seguir (push só com decisão explícita).
+
+Não vai pelo Git; copie por meio privado (pendrive/nuvem pessoal), nunca em commit, chat ou issue:
+
+- `.env.local` (configuração pública do app; sem ele `export:web` e o APK não validam o ambiente).
+- Chaves do Beta privado (`ALDUS_SIGNING_*`), se usadas: keystore e senhas ficam fora do repositório.
+- Opcionais: `Livros/` (livros pessoais de teste), `artifacts/apk/` (APKs gerados), `DesignIdeas*` e
+  `aldus-context.zip` (referências). `.expo/`, `dist/` e `android/app/build/` se regeneram.
+
+No PC novo: Node.js 24, JDK 17, Android SDK (platform/build-tools 36 e NDK do Gradle), Git e Chrome/Edge
+(suítes Chromium). Depois:
+
+```powershell
+git clone https://github.com/matheusbitlab/Aldus.git KIndle
+cd KIndle
+npm ci
+npm run setup:test-tools
+node scripts/ai-project-preflight.cjs
+npm run typecheck
+npm run test:critical
+```
+
+APK de ensaio para o Redmi: `$env:ALDUS_ALLOW_DEVELOPMENT_SIGNING='device-rehearsal'; npm run build:apk:local`
+(~26 min). Autorize a depuração USB do novo PC no aparelho; antes de instalar, compare package, certificado e
+versionCode da instalação (skill `verify-android-apk-delivery`) e use só `adb -s SERIAL install -r`.
+
 ## Validar
 
 ```powershell

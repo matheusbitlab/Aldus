@@ -45,6 +45,10 @@ Persistência (legado mantido, não renomear `kindle-*`/`@kindle/*`): Native SQL
   `DesignIdeas/` e `DesignIdeas.zip` (referência visual) e `aldus-context.zip` (pacote de contexto externo; seu conteúdo útil — os
   dois handoffs do ChatGPT — foi copiado para `docs/context/referencias/`). Arquivos na raiz ignorados: `Livros/`, `debug-reflow-*`,
   `artifacts/`, `dist/`, `.expo/`.
+- **Troca de computador (09/11)**: `main` e o branch `claude/acervo-dominio-publico-ae9294` enviados ao `origin` por decisão do usuário (sem
+  force). Ficam fora do Git e devem ser levados por meio privado: `.env.local`, chaves `ALDUS_SIGNING_*` (se usadas) e, opcionalmente,
+  `Livros/`, `artifacts/apk/` (inclui `Aldus-ae98991-device-rehearsal.apk`), `DesignIdeas*`, `aldus-context.zip`. Passo a passo: README → "Trocar de computador".
+  No PC novo é preciso autorizar a depuração USB do Redmi de novo.
 - Redesign de UI em andamento (decisões e fases em `docs/context/design-system.md`): Fases 1 (fundação `src/ui`), 2 (abas Biblioteca ·
   Descobrir · Estudo · Conta; tela Descobrir com fontes) 3 (Biblioteca com "+"), 4 (Conta e Estudo) e 5 (moldura do Reader, só visual) concluídas.
   Acervo: etapa 1 pronta no commit local `11cf66c` do branch `claude/acervo-dominio-publico-ae9294` (worktree próprio), **não integrado à `main`**.
